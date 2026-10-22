@@ -15,7 +15,8 @@ $orig = "F:\dxvk_remix\Claude\EBAHD Old\rom_hacking\original_roms\" + @{
     OE1 = "Osu! Tatakae! Ouendan (Japan).sav"
     OE2 = "Moero! Nekketsu Rhythm Damashii - Osu! Tatakae! Ouendan 2 (Japan).sav"
 }[$Game]
-$dest = Join-Path $root $Dest
+$folder = $Dest                         # (PowerShell: $dest is the same variable)
+$dest = Join-Path $root $folder
 New-Item -ItemType Directory -Force $dest | Out-Null
 Copy-Item (Join-Path $root "$tree\b\ndsrun.exe") (Join-Path $dest "$Game.exe") -Force
 foreach ($dll in "SDL3.dll", "libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll", "libiconv-2.dll") {
@@ -50,5 +51,12 @@ cd /d "%~dp0"
 "@
 # cmd.exe wants CRLF line ends in a batch file
 [IO.File]::WriteAllText((Join-Path $dest "Play $Game.bat"), (($bat -replace "`r`n", "`n") -replace "`n", "`r`n") + "`r`n")
+# and one at the repository's top that calls it
+$top = @"
+@echo off
+rem $title, recompiled: plays from the $folder folder (tools\make_play_folder.ps1 makes it).
+call "%~dp0$folder\Play $Game.bat"
+"@
+[IO.File]::WriteAllText((Join-Path $root "Play $Game.bat"), (($top -replace "`r`n", "`n") -replace "`n", "`r`n") + "`r`n")
 "play folder ready: $dest"
 Get-ChildItem $dest | Select-Object Name, Length

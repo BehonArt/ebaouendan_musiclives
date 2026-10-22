@@ -1,7 +1,8 @@
-// EBA's own code in ndsrun: what its parts share (button mode, timing, the
-// options bar, the settings file).
+// The port's own code in ndsrun (EBA, Ouendan 2, Ouendan 1): what its parts
+// share (button mode, timing, the options bar, the settings file, Customs).
 #pragma once
 #include "nds.h"
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <map>
@@ -16,6 +17,37 @@ void init();
 inline uint32_t rd(uint32_t a) { uint32_t v; std::memcpy(&v, g_main + (a & 0x3FFFFFu), 4); return v; }
 inline int16_t rh(uint32_t a) { int16_t v; std::memcpy(&v, g_main + (a & 0x3FFFFFu), 2); return v; }
 inline bool in_main(uint32_t a) { return a >= 0x02000000u && a < 0x02400000u; }
+
+// ---- the game (games.cpp) ----------------------------------------------------------------
+// What the port reads and writes of one game; 0 where it is not known (that
+// part does nothing for the game).
+struct Scenes { uint32_t title, menu, difficulty, map, intro, song, ending, results, regroup; };
+struct RouteStep { uint64_t at; int x, y; uint32_t scene; };   // y 0: the difficulty's row
+struct Game {
+    const char* id = "";                // EBA, OE2, OE1: the settings' folder
+    const char* title = "";
+    std::string code;                   // the cartridge's game code
+    uint32_t clock = 0;                 // the song's clock, frames
+    uint32_t manager = 0, tap = 0, slider = 0, spinner = 0;   // the notes' manager's and notes' vtables
+    uint32_t heap = 0;                  // where to look for the manager from
+    uint32_t judge = 0;                 // the judge (recompiled with --hook)
+    uint32_t scene_root = 0;            // the scene's vtable, scene_depth reads from here
+    int scene_depth = 0;
+    Scenes scenes{};
+    uint32_t session = 0, score = 0;    // the session's pointer; its score's offset
+    uint32_t song_channels = 0;         // the song's stream (muted for HD audio)
+    int skip_x = 0, skip_y = 0;         // a comic's SKIP
+    std::vector<RouteStep> route;       // Customs' autopilot on the known save
+    int route_tap = 3;                  // the frames each of its taps holds
+    std::array<int, 4> difficulty_rows{};
+    uint64_t card_from = 0, card_to = 0, hand_over = 0;   // the stage and difficulty set; the player's
+    std::array<const char*, 4> difficulties{};            // e n h x
+    const char* customs_dir = "customs";
+    float menu_button_x = 0.5f;         // the CUSTOMS button across the main menu's lower screen (0 left .. 1 right)
+};
+const Game& game();
+const std::vector<uint32_t>& all_judges();          // every game's judge (hooks are set where emitted)
+int difficulty_index(char d);                       // e n h x: 0 .. 3, the session's
 
 // ---- button mode (eba_buttons.cpp) -------------------------------------------------------
 struct Buttons {

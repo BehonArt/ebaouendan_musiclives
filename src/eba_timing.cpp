@@ -1,7 +1,7 @@
-// EBA's timing offset and the record of each tap's timing (eba.h).
+// The timing offset and the record of each tap's timing (eba.h).
 //
-// The judge, 0x020681D8(note, now) (recompiled with a hook: cmake/eba.cmake's
-// emit asks for --hook 020681D8), judges the note the game is judging at the
+// The judge, judge(note, now) (EBA's 0x020681D8, Ouendan 2's 0x020BB2B4;
+// recompiled with a hook: the emit asks for --hook ADDR), judges the note the game is judging at the
 // song's frame `now`: a fresh touch on it within 8 frames of its time is a
 // 300, 100 or 50 (2, 5, 8 frames), one earlier a miss, none by 8 frames after
 // a late miss. Taps and slider heads come through it (method 10 of both
@@ -20,7 +20,6 @@
 namespace eba {
 namespace {
 
-constexpr uint32_t kJudge = 0x020681D8;
 constexpr size_t kKeep = 200;                       // the taps the readout is made of
 
 int g_offset;
@@ -50,10 +49,11 @@ void judge(ArmContext& c, ArmFunc original) {
                  now - g_offset - time, tapped ? "" : ", no tap");
 }
 
+bool g_hooked;
+
 struct Register {
-    Register() {
-        if (!arm_set_hook(9, kJudge, judge))
-            nds_note("eba timing: the judge has no hook (recompile with --hook 020681D8): no offset");
+    Register() {                                    // whichever game's judge this build hooks
+        for (uint32_t j : all_judges()) g_hooked |= arm_set_hook(9, j, judge);
     }
 } registered;
 
@@ -85,6 +85,8 @@ void timing_options() {
     const auto& o = g_cfg.port;
     if (o.count("offset")) set_offset(std::atoi(o.at("offset").c_str()));
     g_log = o.count("timing-log") > 0;
+    if (!g_hooked)
+        nds_note("eba timing: the judge has no hook (recompile with --hook %08X): no offset", game().judge);
 }
 
 }  // namespace eba

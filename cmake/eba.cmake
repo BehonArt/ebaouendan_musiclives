@@ -1,8 +1,11 @@
-# EBA's own code, linked into ndsrun (ndskit's -DNDSKIT_EXTRA): its static
+# The port's own code (EBA, Ouendan 2, Ouendan 1: src/games.cpp says which),
+# linked into each game's ndsrun (ndskit's -DNDSKIT_EXTRA): its static
 # initialisers register its hooks with the runtime. The timing offset needs
-# the judge recompiled with a hook: python -m ndskit.recomp ... --hook 020681D8.
+# the judge recompiled with a hook: python -m ndskit.recomp ... --hook 020681D8
+# (EBA) or --hook 020BB2B4 (Ouendan 2).
 set(EBA_IMGUI ${CMAKE_CURRENT_LIST_DIR}/../third_party/imgui)
 target_sources(ndsrun PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../src/games.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_buttons.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_timing.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_settings.cpp

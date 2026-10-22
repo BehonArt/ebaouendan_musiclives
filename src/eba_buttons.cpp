@@ -1,4 +1,4 @@
-// EBA's button mode: a gamepad's face buttons, or a key, in place of the
+// Button mode: a gamepad's face buttons, or a key, in place of the
 // stylus in a song. A press puts the stylus on the note the game is judging
 // now, for two frames, and the game judges that tap as its own: the same
 // windows, the same score. On a slider, held, the stylus follows its ball
@@ -8,7 +8,8 @@
 // presses its SKIP. Elsewhere the buttons are the DS's as before (south B,
 // east A, west Y, north X); in a song and a comic, the face buttons are hits only.
 //
-// What it reads of the game (the stock USA ARM9, found 2026-10-22):
+// What it reads of the game (EBA's addresses, the stock USA ARM9, found
+// 2026-10-22; Ouendan 2's are its own, the fields the same: games.cpp):
 //   0x020CD390        the song's clock, in frames (the judge's `now`)
 //   class 0x020B4110  the notes' manager, on the heap: +0x70 the array of
 //                     the song's notes, +0x74 their count
@@ -48,8 +49,6 @@ using eba::in_main;
 using eba::rd;
 using eba::rh;
 
-constexpr uint32_t kManager = 0x020B4110, kTap = 0x020B4648, kSlider = 0x020B478C, kSpinner = 0x020B48D4;
-constexpr uint32_t kClock = 0x020CD390;
 constexpr uint32_t kFaceKeys = 0xC03;               // DS A, B, X, Y
 constexpr uint32_t kFacePad = 0xF;                  // the gamepad's south, east, west, north
 constexpr int kTapFrames = 2;                       // a tap holds the stylus this long
@@ -102,11 +101,12 @@ struct Mode {
 } m;
 
 bool manager_ok(uint32_t a) {
-    if (!in_main(a) || rd(a) != kManager) return false;
+    const eba::Game& g = eba::game();
+    if (!in_main(a) || rd(a) != g.manager) return false;
     uint32_t arr = rd(a + 0x70), n = rd(a + 0x74);
     if (!in_main(arr) || n == 0 || n > 2048) return false;
     uint32_t first = rd(arr), vt = in_main(first) ? rd(first) : 0;
-    return vt == kTap || vt == kSlider || vt == kSpinner;
+    return vt == g.tap || vt == g.slider || vt == g.spinner;
 }
 
 uint32_t manager(uint64_t vbl) {
@@ -114,8 +114,10 @@ uint32_t manager(uint64_t vbl) {
     m.mgr = 0;
     if (vbl < m.next_scan) return 0;
     m.next_scan = vbl + 30;                         // not in a song: look again in half a second
-    for (uint32_t o = 0x0CD000; o < 0x400000; o += 4)
-        if (rd(0x02000000u + o) == kManager && manager_ok(0x02000000u + o)) return m.mgr = 0x02000000u + o;
+    const eba::Game& g = eba::game();
+    if (!g.manager) return 0;
+    for (uint32_t a = g.heap; a < 0x02400000u; a += 4)
+        if (rd(a) == g.manager && manager_ok(a)) return m.mgr = a;
     return 0;
 }
 
@@ -180,8 +182,8 @@ void skip_comic(NdsInput& in) {
     if (left > 0 && !in.pen) {
         --left;
         in.pen = true;
-        in.x = 238;
-        in.y = 183;
+        in.x = eba::game().skip_x;
+        in.y = eba::game().skip_y;
     }
 }
 
@@ -193,7 +195,7 @@ void hook(NdsInput& in, uint64_t vbl) {
     if (!eba::buttons().on) return;
     if (eba::scene_has_skip()) { skip_comic(in); return; }
     uint32_t mgr = manager(vbl);
-    uint32_t clock = mgr ? rd(kClock) : 0;
+    uint32_t clock = mgr ? rd(eba::game().clock) : 0;
     if (clock != m.clock) { m.clock = clock; m.clock_seen = vbl; }
     bool live = mgr && vbl - m.clock_seen < 30;     // a song running: its clock moved in the last half second
     if (!live) {
@@ -342,7 +344,7 @@ void debug_pokes(uint64_t vbl) {
                           c.repeat == 1 ? "L" : c.repeat == 2 ? "1" : "M", c.src, c.loop + c.len);
             s += t;
         }
-        nds_note("eba: channels at song frame %u:%s", rd(0x020CD390), s.c_str());
+        nds_note("eba: channels at song frame %u:%s", game().clock ? rd(game().clock) : 0, s.c_str());
     }
 }
 

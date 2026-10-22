@@ -1,4 +1,4 @@
-// EBA's options bar: a menu bar in the window (Dear ImGui) for the display,
+// The options bar: a menu bar in the window (Dear ImGui) for the display,
 // the input and the timing, with a window that calibrates the timing from
 // the taps the game judges. Each change is made at once and saved
 // (eba_settings.cpp). In a window the bar sits above the screens (the window
@@ -174,7 +174,7 @@ void help_windows() {
     }
     if (g_about) {
         if (ImGui::Begin("About", &g_about, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("Elite Beat Agents, recompiled to native code (eba-recomp)");
+            ImGui::Text("%s, recompiled to native code (eba-recomp)", game().title);
             ImGui::Text("on ndskit, a static recompiler and runtime for the Nintendo DS.");
             ImGui::TextDisabled("Dear ImGui %s", IMGUI_VERSION);
         }

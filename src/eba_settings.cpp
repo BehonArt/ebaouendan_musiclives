@@ -1,6 +1,7 @@
-// EBA's settings: the window's (display.h), the sound's latency, button mode's
+// The settings: the window's (display.h), the sound's latency, button mode's
 // and the timing offset, in a file of KEY=VALUE lines in SDL's folder for the
-// user's settings (on Windows %APPDATA%\eba-recomp\EBA\settings.ini). A window's
+// user's settings, one a game (on Windows %APPDATA%\eba-recomp\EBA\settings.ini,
+// ...\OE2\, ...\OE1\). A window's
 // run reads it at its first frame and the options bar writes it at each
 // change; what ndsrun's own options set (--scale 3, --port offset=2) wins over
 // it for that run. A headless run neither reads nor writes it: its results
@@ -18,7 +19,7 @@ namespace eba {
 namespace {
 
 std::string path() {
-    char* dir = SDL_GetPrefPath("eba-recomp", "EBA");
+    char* dir = SDL_GetPrefPath("eba-recomp", game().id);
     if (!dir) return "";
     std::string p = std::string(dir) + "settings.ini";
     SDL_free(dir);
@@ -66,7 +67,7 @@ void settings_save() {
     std::FILE* f = p.empty() ? nullptr : std::fopen(p.c_str(), "w");
     if (!f) { nds_note("eba: cannot write %s", p.c_str()); return; }
     const DisplaySettings& s = display_settings();
-    std::fprintf(f, "# EBA (eba-recomp): the options bar writes this file\n");
+    std::fprintf(f, "# %s (eba-recomp): the options bar writes this file\n", game().id);
     std::fprintf(f, "scale=%d\nlayout=%s\nfps=%d\nfullscreen=%d\nlow_latency=%d\naudio_latency=%g\n", s.scale,
                  kLayouts[(int)s.layout], s.fps, s.fullscreen ? 1 : 0, s.low_latency ? 1 : 0, audio_latency());
     const Buttons& b = buttons();

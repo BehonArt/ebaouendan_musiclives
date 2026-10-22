@@ -1,5 +1,6 @@
 """Customs' assets, for the Customs screen and the HD sound of Customs mode
-(src/eba_customs.cpp, src/eba_ui.cpp), into customs/<tag>/ and its custom.ini:
+(src/eba_customs.cpp, src/eba_customs_ui.cpp), into customs/<tag>/ (Ouendan 2:
+customs_oe2/<tag>/) and its custom.ini:
 
   stage_card.bmp       the replaced stage's card as the game shows it (its upper
                        screen: its art, title, song), from the stock cartridge
@@ -9,15 +10,19 @@
   hd.wav               the custom's song at its source's quality (ffmpeg), with
   hd_gain              the HD song's gain to sit in the game's mix as the game's own song does
   hd_offset            the HD time (s) of the start of the audio the custom was built from,
-  clock0, clock_rate   the song clock (0x020CD390) at that start, and its frames a second:
+  clock0, clock_rate   the song clock (games.cpp's) at that start, and its frames a second:
                        HD time = hd_offset + (clock - clock0) / clock_rate
 
-The measures run ndsrun headless (build/recomp): the menu route to The Anthem's
-card on the pristine save, the stage's index set as the card opens; and Customs
-mode's own route into the song, with its clock logged and its sound recorded.
+The measures run the game's ndsrun headless: the menu route to the first
+stage's card on the pristine save, the stage's index set as the card opens; and
+Customs mode's own route into the song, with its clock logged and its sound
+recorded. The HD source must be the very edit the custom was built from: it is
+checked across the whole song, and a custom whose source strays plays the
+game's own sound.
 
-    python tools/bake_customs.py TAG [TAG ...]
+    python tools/bake_customs.py [--game OE2] TAG [TAG ...]
 """
+import argparse
 import json
 import os
 import subprocess
@@ -28,24 +33,48 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXE = os.path.join(ROOT, "build", "recomp", "b", "ndsrun.exe")
-ROM = os.path.join(ROOT, "roms", "EBA.nds")
-CUSTOMS = os.path.join(ROOT, "customs")
 WORK = os.path.join(ROOT, "build", "bake")
-TESTRUN = r"F:\dxvk_remix\Claude\EBAHD Old\rom_hacking\testrun01"
-PATCHED = r"F:\dxvk_remix\Claude\EBAHD Old\rom_hacking\patched_roms\Elite Beat Agents (FG_%s).diffs.json"
+RH = r"F:\dxvk_remix\Claude\EBAHD Old\rom_hacking"
+TESTRUN = RH + r"\testrun01"
+TESTRUN2 = RH + r"\ouendan2\testrunouendan2"
+PATCHED = RH + r"\patched_roms\Elite Beat Agents (FG_%s).diffs.json"
 FPS = 59.8261                               # VBlanks a second
 RATE = 32728                                # ndsrun's WAV rate
-ROUTE = "950:tap:128:150,1300:tap:128:66,2450:tap:236:178,3650:tap:126:103"
 
-# each custom's source, the exact edit it was built from at its own quality
-HD_SOURCE = {
-    "SS02_Movies": "Alien Ant Farm Movies v2.mp3",
-    "SS05_AllStar": "SS05_AllStarFixedEnding.mp3",
-    "SS09_LifeIsAHighway": "SS09_LifeIsAHighway.mp3",
-    "SS10_ComeAndGet": "SS10_ComeAndGet.mp3",
-    "SS11_GirlsJustWanna": "Girls Just Want to Have Fun.mp3",
+GAMES = {
+    "EBA": dict(
+        exe=os.path.join(ROOT, "build", "recomp", "b", "ndsrun.exe"), rom=os.path.join(ROOT, "roms", "EBA.nds"),
+        customs=os.path.join(ROOT, "customs"),
+        # to The Anthem's card; the session's stage (*0x020CD248 + 8) set as it opens
+        route="950:tap:128:150,1300:tap:128:66,2450:tap:236:178,3650:tap:126:103", poke=(0x020DDCF0, 3662),
+        card_shot=4250, preview=(3700, 4900), skip=5000, song_until=9600,
+        # each custom's source, the exact edit it was built from at its own quality; and that edit at 15 kHz
+        hd={"SS02_Movies": "Alien Ant Farm Movies v2.mp3",
+            "SS05_AllStar": "SS05_AllStarFixedEnding.mp3",
+            "SS09_LifeIsAHighway": "SS09_LifeIsAHighway.mp3",
+            "SS10_ComeAndGet": "SS10_ComeAndGet.mp3",
+            "SS11_GirlsJustWanna": "Girls Just Want to Have Fun.mp3"},
+        built=lambda tag: os.path.join(TESTRUN, os.path.basename(json.load(open(PATCHED % tag))["wav"])),
+        hd_dir=TESTRUN),
+    "OE2": dict(
+        exe=os.path.join(ROOT, "build", "oe2", "recomp", "b", "ndsrun.exe"), rom=os.path.join(ROOT, "roms", "OE2.nds"),
+        customs=os.path.join(ROOT, "customs_oe2"),
+        # to Samurai Blue's card (the map's book); the session's stage (*0x020A7A88 + 8) set as it opens
+        route="1850:tap:128:150,2650:tap:65:55,3350:tap:238:183,4350:tap:238:178", poke=(0x020D7104, 4364),
+        card_shot=4740, preview=(4420, 5620), skip=5200, song_until=10400,
+        hd={"OS02_Hohoemi": "OSO2_Hohoemi.mp3",
+            "OS03_Madder": "madder.mp3",
+            "OS05_Takedown": r"C:\Users\behon\Downloads\Huntrix - Takedown (Lyrics)   K-Pop Demon Hunters.mp3",
+            "OSB02_IWantYou": "OMB02_IWantYou.mp3"},
+        built=lambda tag: os.path.join(TESTRUN2, {
+            "OS02_Hohoemi": "OSO2_Hohoemi_15401.wav",
+            "OS03_Madder": "madder_15401.wav",
+            "OS05_Takedown": "Huntrix - Takedown (Lyrics)   K-Pop Demon Hunters_15401.wav",
+            "OSB02_IWantYou": "OMB02_IWantYou_15401.wav"}[tag]),
+        hd_dir=TESTRUN2),
 }
+G = GAMES["EBA"]
+CUSTOMS = G["customs"]
 
 
 def env():
@@ -85,7 +114,7 @@ def run(out, args, vblanks):
     os.makedirs(out, exist_ok=True)
     with open(os.path.join(CUSTOMS, "pristine.sav"), "rb") as s, open(os.path.join(out, "s.sav"), "wb") as d:
         d.write(s.read())
-    cmd = [EXE, ROM, "--out", out, "--save", os.path.join(out, "s.sav"), "--vblanks", str(vblanks), "--no-dump"] + args
+    cmd = [G["exe"], G["rom"], "--out", out, "--save", os.path.join(out, "s.sav"), "--vblanks", str(vblanks), "--no-dump"] + args
     with open(os.path.join(out, "log.txt"), "w") as log:
         subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, env=env(), check=True)
     return open(os.path.join(out, "log.txt"), encoding="utf-8", errors="replace").read()
@@ -126,30 +155,53 @@ def lag(hay, needle, to=8000):
 def stage_card(tag, vals, files):
     """The replaced stage's card and preview from the stock cartridge, and the custom's preview."""
     idx = int(vals["stage_index"])
-    common = ["--input", ROUTE, "--port", "poke=%08X:%d@3662" % (0x020DDCF0, idx), "--port", "customs-dir=" + CUSTOMS]
+    addr, at = G["poke"]
+    p0, p1 = G["preview"]
+    common = ["--input", G["route"], "--port", "poke=%08X:%d@%d" % (addr, idx, at), "--port", "customs-dir=" + CUSTOMS]
     out = os.path.join(WORK, tag, "card_stock")
-    run(out, common + ["--shots", "4250", "--wav", os.path.join(out, "a.wav")], 4900)
-    img = Image.open(os.path.join(out, "v4250.png")).crop((0, 0, 256, 192))
+    shot = G["card_shot"]
+    run(out, common + ["--shots", str(shot), "--wav", os.path.join(out, "a.wav")], p1)
+    img = Image.open(os.path.join(out, "v%d.png" % shot)).crop((0, 0, 256, 192))
     img.save(os.path.join(CUSTOMS, tag, "stage_card.bmp"))
     a, rate = read_wav(os.path.join(out, "a.wav"))
-    write_wav(os.path.join(CUSTOMS, tag, "preview_original.wav"), a[int(3700 / FPS * rate):int(4900 / FPS * rate)], rate)
+    write_wav(os.path.join(CUSTOMS, tag, "preview_original.wav"), a[int(p0 / FPS * rate):int(p1 / FPS * rate)], rate)
     out = os.path.join(WORK, tag, "card_custom")
-    run(out, common + replace_args(tag, files) + ["--wav", os.path.join(out, "a.wav")], 4900)
+    run(out, common + replace_args(tag, files) + ["--wav", os.path.join(out, "a.wav")], p1)
     c, crate = read_wav(os.path.join(out, "a.wav"))
-    return c[int(3700 / FPS * crate):int(4900 / FPS * crate)], crate
+    return c[int(p0 / FPS * crate):int(p1 / FPS * crate)], crate
 
 
 def hd_audio(tag, vals, files, custom_preview):
-    src = os.path.join(TESTRUN, HD_SOURCE[tag])
+    src = os.path.join(G["hd_dir"], G["hd"][tag])
     hd = os.path.join(CUSTOMS, tag, "hd.wav")
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-ac", "2", "-sample_fmt", "s16", hd], check=True)
     h, hrate = read_wav(hd)
     hm = mono(h, hrate)
-    # the audio the custom was built from (its .diffs.json names it), found in the HD file
-    built_name = os.path.basename(json.load(open(PATCHED % tag))["wav"])
-    b, brate = read_wav(os.path.join(TESTRUN, built_name))
+    # the audio the custom was built from, found in the HD file
+    b, brate = read_wav(G["built"](tag))
     bm = mono(b, brate)
     hd_offset, q1 = lag(hm, bm[:8000 * 40])
+    # the same edit all along: every 20 s of the built audio where the offset puts it in the HD file
+    strays = []
+    for k in range(0, int(len(bm) / 8000) - 10, 20):
+        seg = bm[8000 * k:8000 * (k + 8)]
+        at = int((hd_offset + k) * 8000)
+        hs = hm[at:at + len(seg)]
+        n = min(len(seg), len(hs))
+        q = float(np.dot(seg[:n], hs[:n]) / (np.linalg.norm(seg[:n]) * np.linalg.norm(hs[:n]) + 1e-9)) if n else 0.0
+        if q < 0.6:
+            strays.append((k, round(q, 2)))
+    if q1 < 0.6 or strays:
+        print("  %s is not the edit the custom was built from (start match %.2f; strays at %s s): no HD audio"
+              % (os.path.basename(G["hd"][tag]), q1, strays))
+        os.remove(hd)
+        for key in ("hd", "hd_offset", "clock0", "clock_rate", "hd_gain"):
+            vals.pop(key, None)
+        p, prate = custom_preview
+        write_wav(os.path.join(CUSTOMS, tag, "preview_custom.wav"), p, prate)
+        vals.update(art="art.bmp", stage_card="stage_card.bmp", preview_original="preview_original.wav",
+                    preview_custom="preview_custom.wav")
+        return
     # the preview the custom's card plays (VBlank 3700 on), found in the HD file: the best of a few
     # windows (its first moments cross-fade from the map's music; later it loops)
     p, prate = custom_preview
@@ -168,10 +220,10 @@ def hd_audio(tag, vals, files, custom_preview):
     # Customs mode's route into the song: the clock against the sound it plays
     out = os.path.join(WORK, tag, "song")
     # (the button mode's test player keeps the song going to its end)
-    log = run(out, replace_args(tag, files) + ["--input", "5000:PAD_SOUTH:3", "--port", "customs-dir=" + CUSTOMS,
+    log = run(out, replace_args(tag, files) + ["--input", "%d:PAD_SOUTH:3" % G["skip"], "--port", "customs-dir=" + CUSTOMS,
                                                "--port", "custom=" + tag, "--port", "difficulty=n",
                                                "--port", "campaign-save=none", "--port", "clock-log",
-                                               "--port", "buttons-auto", "--wav", os.path.join(out, "a.wav")], 9600)
+                                               "--port", "buttons-auto", "--wav", os.path.join(out, "a.wav")], G["song_until"])
     clocks = np.array([[int(x) for x in l.split()[-2:]] for l in log.splitlines() if "eba clock" in l], dtype=float)
     g, grate = read_wav(os.path.join(out, "a.wav"))
     gm = mono(g, grate)
@@ -197,7 +249,7 @@ def hd_audio(tag, vals, files, custom_preview):
                 clock0="%.2f" % clock0, clock_rate="%.4f" % rate)
     print("  HD %s %d Hz: built audio at %.3f s of it (match %.2f); preview from %.2f s (%.2f); clock0 %.2f,"
           " %.4f frames/s over %d points (worst %.2f frames off); gain %s" % (
-              HD_SOURCE[tag], hrate, hd_offset, q1, pv_at, q2, clock0, rate, len(pts), resid, vals["hd_gain"]))
+              os.path.basename(G["hd"][tag]), hrate, hd_offset, q1, pv_at, q2, clock0, rate, len(pts), resid, vals["hd_gain"]))
 
 
 def art(tag, vals):
@@ -234,7 +286,14 @@ def art(tag, vals):
 
 
 def main():
-    for tag in sys.argv[1:]:
+    global G, CUSTOMS
+    ap = argparse.ArgumentParser()
+    ap.add_argument("tags", nargs="+")
+    ap.add_argument("--game", default="EBA", choices=sorted(GAMES))
+    a = ap.parse_args()
+    G = GAMES[a.game]
+    CUSTOMS = G["customs"]
+    for tag in a.tags:
         print(tag)
         vals, files = ini_read(tag)
         art(tag, vals)

@@ -100,11 +100,21 @@ bool preview_playing(const std::string& path) {
 // ---- the screen ----------------------------------------------------------------------------
 const char kDiffs[4] = {'e', 'n', 'h', 'x'};
 
+// a difficulty's name without its gloss ("Kakan (normal)": Kakan)
+std::string short_name(char d) {
+    std::string n = customs_difficulty_name(d);
+    size_t p = n.find(" (");
+    return p == std::string::npos ? n : n.substr(0, p);
+}
+
 void scores_line(const Custom& c) {
+    float col = 0;                                      // the scores line up after the longest name
+    for (char d : kDiffs) col = std::max(col, ImGui::CalcTextSize(short_name(d).c_str()).x);
+    col += ImGui::GetFontSize();
     for (char d : kDiffs) {
         CustomScore s = custom_best(c.tag, d);
-        ImGui::TextDisabled("%s", customs_difficulty_name(d));
-        ImGui::SameLine(ImGui::GetFontSize() * 5.5f);
+        ImGui::TextDisabled("%s", short_name(d).c_str());
+        ImGui::SameLine(col);
         if (!s.score) { ImGui::TextDisabled("-"); continue; }
         ImGui::Text("%u%s", s.score, s.cleared ? "  cleared" : "");
         if (ImGui::IsItemHovered())
@@ -210,18 +220,20 @@ void failed_screen() {
 void menu_button() {
     float x, y, w, h;
     if (!display_screen_rect(1, &x, &y, &w, &h)) display_screen_rect(0, &x, &y, &w, &h);
-    float k = h / 192.0f;                               // the lower screen's top strip, above "Select Mission Type"
-    ImGui::SetNextWindowPos(ImVec2(x + w * 0.5f, y), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    float k = h / 192.0f;                               // the lower screen's top strip (EBA: above "Select Mission Type")
+    float ax = game().menu_button_x;                    // its place across the strip (Ouendan 2: left of its banner)
+    ImGui::SetNextWindowPos(ImVec2(x + 4 * k + (w - 8 * k) * ax, y), ImGuiCond_Always, ImVec2(ax, 0.0f));
     ImGui::Begin("##customs_button", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
                                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
-    ImGui::SetWindowFontScale(std::max(0.8f, k * 0.7f));
+    ImGui::SetWindowFontScale(std::max(0.7f, k * 0.6f));
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.45f, 0.05f, 0.95f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.6f, 0.15f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 0.75f, 0.3f, 1.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5 * k);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 2 * k));
-    if (ImGui::Button("  CUSTOMS  ", ImVec2(0, 14 * k))) g_open = true;
-    ImGui::PopStyleVar(2);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4 * k, 0));
+    if (ImGui::Button("  CUSTOMS  ")) g_open = true;    // as tall as its text
+    ImGui::PopStyleVar(3);
     ImGui::PopStyleColor(3);
     ImGui::End();
 }

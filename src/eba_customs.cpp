@@ -1,4 +1,4 @@
-// EBA's Customs: songs charted over the story's stages, played as a mode of
+// Customs: songs charted over the story's stages, played as a mode of
 // their own. Each custom is a folder (tools/extract_customs.py): the files it
 // changes on the cartridge and custom.ini (its title, artist, the stage it
 // replaces and that stage's index). Customs mode is a run of its own, started
@@ -11,7 +11,8 @@
 // customs/scores.ini, a file of their own beside the campaign's save, which
 // Customs mode never opens.
 //
-// What it reads and writes of the game (the stock USA ARM9, 2026-10-22):
+// What it reads and writes of the game (EBA's, the stock USA ARM9, 2026-10-22;
+// Ouendan 2's in games.cpp):
 //   *(*(*0x020CD1FC))   the scene's vtable: title 020B3D78, main menu 020B7288,
 //                       difficulty 020B736C, map 020B7528, a stage's opening
 //                       comic 020B64F0, its song 020B65A0, then its ending's
@@ -23,7 +24,8 @@
 // Options (ndsrun --port): custom=TAG difficulty=e|n|h|x campaign-save=PATH
 // (Customs mode, set by the launch); hd=off (the game's own song, not the HD one);
 // customs-dir=PATH (where the customs are:
-// by default customs/ beside the cartridge, else in the working directory).
+// by default customs/ beside the cartridge, else the game's folder in the working
+// directory: customs/ for EBA, customs_oe2/ for Ouendan 2).
 #include "eba.h"
 #include "display.h"
 #include <SDL3/SDL.h>
@@ -41,10 +43,6 @@
 namespace eba {
 namespace {
 
-constexpr uint32_t kSceneRoot = 0x020CD1FC, kSession = 0x020CD248;
-constexpr uint32_t kSceneTitle = 0x020B3D78, kSceneMenu = 0x020B7288, kSceneDifficulty = 0x020B736C,
-                   kSceneMap = 0x020B7528, kSceneIntro = 0x020B64F0, kSceneSong = 0x020B65A0,
-                   kSceneEnding = 0x020B6448;
 
 std::vector<Custom> g_catalog;
 std::string g_dir;
@@ -52,14 +50,13 @@ const Custom* g_playing;
 char g_difficulty = 'h';
 std::map<std::string, CustomScore> g_scores;
 
-// the autopilot: the route through the menus on the known save
-struct Step { uint64_t at; int x, y; uint32_t scene; };
+// the autopilot: the route through the menus on the known save (Game::route)
 bool g_auto;
 bool g_failed;
 uint32_t g_scene_prev;
 bool g_show_after;
 
-uint32_t session() { uint32_t s = rd(kSession); return in_main(s) ? s : 0; }
+uint32_t session() { uint32_t s = game().session ? rd(game().session) : 0; return in_main(s) ? s : 0; }
 
 // The HD song of a custom (tools/bake_customs.py: hd.wav, hd_offset, clock0,
 // clock_rate, hd_gain) in place of the game's: during the song the stream's
@@ -103,7 +100,7 @@ void hd_start() {
     if (!g_hd.stream) { nds_note("eba customs: no stream for the HD audio: %s", SDL_GetError()); return; }
     SDL_SetAudioStreamGain(g_hd.stream, (float)g_hd.gain);
     SDL_ResumeAudioStreamDevice(g_hd.stream);
-    sound_set_muted(0xC0);
+    sound_set_muted(game().song_channels);
     g_hd.fed = -1;
 }
 
@@ -149,8 +146,8 @@ void load_catalog() {
     const auto& o = g_cfg.port;
     if (o.count("customs-dir")) g_dir = o.at("customs-dir");
     else {
-        fs::path beside = fs::path(g_cfg.rom).parent_path() / "customs";
-        g_dir = fs::exists(beside) ? beside.string() : (fs::current_path() / "customs").string();
+        fs::path beside = fs::path(g_cfg.rom).parent_path() / "customs";   // a play folder's
+        g_dir = fs::exists(beside) ? beside.string() : (fs::current_path() / game().customs_dir).string();
     }
     std::error_code ec;
     for (const auto& e : fs::directory_iterator(g_dir, ec)) {
@@ -199,8 +196,8 @@ void load_scores() {
 void save_scores() {
     std::FILE* f = std::fopen(scores_path().c_str(), "w");
     if (!f) { nds_note("eba customs: cannot write %s", scores_path().c_str()); return; }
-    std::fprintf(f, "# EBA Customs: the best score of each custom and difficulty (score 300 100 50 miss cleared).\n"
-                    "# Its own file: the campaign's save is never touched by Customs.\n");
+    std::fprintf(f, "# Customs (%s): the best score of each custom and difficulty (score 300 100 50 miss cleared).\n"
+                    "# Its own file: the campaign's save is never touched by Customs.\n", game().id);
     for (const auto& [k, s] : g_scores)
         std::fprintf(f, "%s=%u %d %d %d %d %d\n", k.c_str(), s.score, s.grades[0], s.grades[1], s.grades[2], s.grades[3],
                      s.cleared ? 1 : 0);
@@ -244,36 +241,8 @@ void relaunch(const std::vector<std::string>& args, const std::string& log) {
     SDL_PushEvent(&e);
 }
 
-// EBA's four difficulties and the chart each plays (SSxx_e/n/h/x.seq_)
-const char* difficulty_name(char d) {
-    switch (d) {
-    case 'e': return "Breezin'";
-    case 'n': return "Cruisin'";
-    case 'x': return "Hard Rock";
-    default: return "Sweatin'";
-    }
-}
-
-// the difficulty screen's rows (lower screen), top to bottom: Hard Rock, Sweatin', Cruisin', Breezin'
-int difficulty_row(char d) {
-    switch (d) {
-    case 'e': return 153;
-    case 'n': return 119;
-    case 'x': return 45;
-    default: return 78;
-    }
-}
-
-// the session's difficulty (its first word): 0 Breezin' .. 3 Hard Rock. The tap on Sweatin's row,
-// already the one chosen on the known save, moves it to Hard Rock: the autopilot sets it instead.
-uint32_t difficulty_value(char d) {
-    switch (d) {
-    case 'e': return 0;
-    case 'n': return 1;
-    case 'x': return 3;
-    default: return 2;
-    }
-}
+// the four difficulties, as the charts' letters (SSxx_e/n/h/x.seq_)
+const char* difficulty_name(char d) { return game().difficulties[difficulty_index(d)]; }
 
 }  // namespace
 
@@ -284,14 +253,22 @@ bool customs_autopilot() { return g_auto; }
 bool customs_autopilot_failed() { return g_failed; }
 const char* customs_difficulty_name(char d) { return difficulty_name(d); }
 uint32_t scene() {
-    uint32_t a = rd(kSceneRoot);
-    if (!in_main(a)) return 0;
-    uint32_t b = rd(a);
-    return in_main(b) ? rd(b) : 0;
+    const Game& g = game();
+    if (!g.scene_root) return 0;
+    uint32_t a = g.scene_root;
+    for (int i = 0; i < g.scene_depth; ++i) {
+        if (!in_main(a)) return 0;
+        a = rd(a);
+    }
+    return a;
 }
-bool scene_is_main_menu() { return scene() == kSceneMenu; }
-bool scene_is_song() { return scene() == kSceneSong; }
-bool scene_has_skip() { uint32_t s = scene(); return s == kSceneIntro || s == kSceneEnding; }
+bool scene_is_main_menu() { return game().scenes.menu && scene() == game().scenes.menu; }
+bool scene_is_song() { return game().scenes.song && scene() == game().scenes.song; }
+bool scene_has_skip() {
+    uint32_t s = scene();
+    const Scenes& k = game().scenes;
+    return s && (s == k.intro || s == k.ending);
+}
 bool customs_take_show_request() { bool r = g_show_after; g_show_after = false; return r; }
 
 CustomScore custom_best(const std::string& tag, char d) {
@@ -309,6 +286,10 @@ void customs_init() {
         if (!g_playing) nds_note("eba customs: no custom %s in %s", o.at("custom").c_str(), g_dir.c_str());
         if (o.count("difficulty") && !o.at("difficulty").empty()) g_difficulty = o.at("difficulty")[0];
     }
+    if (g_playing && game().route.empty()) {
+        nds_note("eba customs: no way to a stage known in %s", game().id);
+        g_playing = nullptr;
+    }
     if (g_playing) {
         if (!o.count("hd") || o.at("hd") != "off") hd_load(*g_playing);
         g_auto = true;
@@ -316,7 +297,7 @@ void customs_init() {
         nds_note("eba customs: %s (%s, over %s), %s", g_playing->title.c_str(), g_playing->artist.c_str(),
                  g_playing->stage.c_str(), difficulty_name(g_difficulty));
     }
-    nds_note("eba customs: %zu in %s", g_catalog.size(), g_dir.c_str());
+    nds_note("eba customs: %zu in %s (%s)", g_catalog.size(), g_dir.c_str(), game().id);
 }
 
 void customs_launch(const Custom& c, char d) {
@@ -360,54 +341,54 @@ void customs_back_to_campaign() {
 
 // Each frame, before the input reaches the game: true while the autopilot drives it.
 bool customs_frame(NdsInput& in, uint64_t vbl) {
+    const Game& g = game();
+    const Scenes& k = g.scenes;
     uint32_t sc = scene();
+    bool song = k.song && sc == k.song, was_song = k.song && g_scene_prev == k.song;
     // a song of Customs mode ending: its score to the scores file, the Customs screen after the results
     static bool pending;                                // a song over, its score kept until the next scene says how
     static CustomScore now;
-    if (g_playing && sc == kSceneSong && g_scene_prev != kSceneSong) { timing_reset(); hd_start(); }
-    if (g_playing && sc == kSceneSong) hd_frame(rd(0x020CD390));
-    if (g_playing && sc != kSceneSong && g_scene_prev == kSceneSong) hd_stop();
-    if (g_playing && g_scene_prev == kSceneSong && sc != kSceneSong) {
+    if (g_playing && song && !was_song) { timing_reset(); hd_start(); }
+    if (g_playing && song) hd_frame(rd(g.clock));
+    if (g_playing && !song && was_song) hd_stop();
+    if (g_playing && was_song && !song) {
         uint32_t s = session();
         now = CustomScore();
-        now.score = s ? rd(s + 0xF8) : 0;
+        now.score = s && g.score ? rd(s + g.score) : 0;
         TimingStats t = timing_stats();
         std::copy(t.grades, t.grades + 4, now.grades);
         pending = true;
     }
-    if (pending && sc && sc != kSceneSong) {            // the ending's comic after a clear; Regroup? after a fail
+    if (pending && sc && !song) {                       // the ending's comic after a clear; Regroup? after a fail
         pending = false;
-        now.cleared = sc == kSceneEnding;
+        now.cleared = k.ending ? sc == k.ending : sc != k.regroup;
         std::string key = g_playing->tag + "." + g_difficulty;
         CustomScore& best = g_scores[key];
         nds_note("eba customs: %s %s: score %u (300 x%d, 100 x%d, 50 x%d, miss x%d)%s", g_playing->title.c_str(),
                  difficulty_name(g_difficulty), now.score, now.grades[0], now.grades[1], now.grades[2], now.grades[3],
                  now.cleared ? ", cleared" : "");
-        if (now.score > best.score || (now.cleared && !best.cleared)) {
+        int notes = now.grades[0] + now.grades[1] + now.grades[2] + now.grades[3];
+        auto better = [&](const CustomScore& a, const CustomScore& b) {   // the score, else (none known) the grades
+            if (a.score != b.score) return a.score > b.score;
+            return a.grades[0] * 3 + a.grades[1] * 2 + a.grades[2] > b.grades[0] * 3 + b.grades[1] * 2 + b.grades[2];
+        };
+        if (notes && (better(now, best) || (now.cleared && !best.cleared))) {
             best = now;
             save_scores();
         }
     }
-    if (g_playing && g_scene_prev != kSceneMap && sc == kSceneMap && !g_auto) g_show_after = true;
-    if (g_cfg.port.count("clock-log") && sc == kSceneSong && vbl % 30 == 0)   // tools/bake_customs.py's measure
-        nds_note("eba clock %llu %u", (unsigned long long)vbl, rd(0x020CD390));
-    if (g_playing && sc != g_scene_prev && g_cfg.port.count("timing-log"))
+    if (g_playing && k.map && g_scene_prev != k.map && sc == k.map && !g_auto) g_show_after = true;
+    if (g_cfg.port.count("clock-log") && song && vbl % 30 == 0)   // tools/bake_customs.py's measure
+        nds_note("eba clock %llu %u", (unsigned long long)vbl, rd(g.clock));
+    if (sc != g_scene_prev && (g_cfg.port.count("scene-log") || (g_playing && g_cfg.port.count("timing-log"))))
         nds_note("eba customs: scene %08X at VBlank %llu", sc, (unsigned long long)vbl);
     g_scene_prev = sc;
     if (!g_auto) return false;
 
     // the autopilot: the route on the known save, each step checked against the scene it needs
-    const Step route[] = {
-        {950, 128, 150, kSceneTitle},
-        {1300, 128, 66, kSceneMenu},
-        {2400, 128, difficulty_row(g_difficulty), kSceneDifficulty},
-        {2450, 236, 178, kSceneDifficulty},
-        {3650, 126, 103, kSceneMap},
-        {4300, 236, 178, kSceneMap},
-    };
     in = NdsInput();
-    for (const Step& st : route) {
-        if (vbl < st.at || vbl >= st.at + 3) continue;
+    for (const RouteStep& st : g.route) {
+        if (vbl < st.at || vbl >= st.at + g.route_tap) continue;
         if (vbl == st.at && sc != st.scene) {
             nds_note("eba customs: the route found scene %08X at VBlank %llu, not %08X: autopilot stopped", sc,
                      (unsigned long long)vbl, st.scene);
@@ -418,18 +399,18 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
         }
         in.pen = true;
         in.x = st.x;
-        in.y = st.y;
+        in.y = st.y ? st.y : g.difficulty_rows[difficulty_index(g_difficulty)];
     }
-    if (vbl == 3662) {                                  // the card opening: the custom's stage instead
+    if (vbl >= g.card_from && vbl <= g.card_to) {       // the card open: the custom's stage instead, and its difficulty
         uint32_t s = session();
         if (s) {
+            uint32_t d = (uint32_t)difficulty_index(g_difficulty);
+            if (vbl == g.card_from && rd(s) != d) nds_note("eba customs: difficulty %u on the card, set to %u", rd(s), d);
             g_main[(s + 8) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
-            uint32_t d = difficulty_value(g_difficulty);
-            if (rd(s) != d) nds_note("eba customs: difficulty %u on the card, set to %u", rd(s), d);
             std::memcpy(g_main + (s & 0x3FFFFF), &d, 4);
         }
     }
-    if (vbl >= 4310) {
+    if (vbl >= g.hand_over) {
         g_auto = false;
         display_set_turbo(false);
         nds_note("eba customs: on its way into %s", g_playing->stage.c_str());
