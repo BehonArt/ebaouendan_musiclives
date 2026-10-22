@@ -1,0 +1,535 @@
+diff --git a/runtime/audio.cpp b/runtime/audio.cpp
+index 3b71b2b..341c87c 100644
+--- a/runtime/audio.cpp
++++ b/runtime/audio.cpp
+@@ -5,7 +5,8 @@
+ // them to the device's rate, and to the WAV file if one is asked for. The
+ // window keeps the DS's pace by the host's clock (display.cpp) while the
+ // device plays by its own: the stream's queue is held near three frames by
+-// nudging its playback ratio, by at most 0.5% (a twelfth of a semitone).
++// nudging its playback ratio, by at most 0.5% (a twelfth of a semitone),
++// around the game's speed (1, or 60 / 59.83 when the window runs it at 60).
+ // A queue run dry (the window fell behind) plays silence until the next
+ // frame; one grown past half a second is cut back.
+ #include "display.h"
+@@ -23,6 +24,7 @@ uint64_t wav_bytes;
+ double queued_avg;
+ uint64_t frames, dry, cuts;                         // what the window's run went through
+ double ratio_sum, ratio_lo = 2, ratio_hi;
++double speed = 1;                                   // the game's pace against the DS's
+ const int kRate = 32728;
+ const double kTarget = 3 * 548.0 * 4;               // three frames, in bytes of the stream's input
+ 
+@@ -86,7 +88,7 @@ void audio_frame() {
+         }
+         SDL_PutAudioStreamData(stream, s.data(), (int)(2 * s.size()));
+         queued_avg += (q - queued_avg) * 0.05;
+-        double r = 1 + std::clamp((queued_avg - kTarget) / kTarget * 0.01, -0.005, 0.005);
++        double r = speed * (1 + std::clamp((queued_avg - kTarget) / kTarget * 0.01, -0.005, 0.005));
+         SDL_SetAudioStreamFrequencyRatio(stream, (float)r);
+         ++frames;
+         ratio_sum += r;
+@@ -96,6 +98,8 @@ void audio_frame() {
+     s.clear();
+ }
+ 
++void audio_set_speed(double s) { speed = s; }
++
+ void audio_close() {
+     if (wav) { wav_header(); std::fclose(wav); wav = nullptr; }
+     if (stream) {
+diff --git a/runtime/display.cpp b/runtime/display.cpp
+index 7a02421..0328e22 100644
+--- a/runtime/display.cpp
++++ b/runtime/display.cpp
+@@ -5,18 +5,36 @@
+ // engine A's when POWCNT1 bit 15 says so), as large as it allows at the
+ // DS's shape. Each frame the 2D engines' words (nds.h) go up as a texture,
+ // the 3D picture is drawn at 256x192 times the scale (render_gl.cpp), and a
+-// shader composes them per pixel of the window: the 2D layers at the DS's
+-// resolution, the 3D at its own. Headless pictures do the same at the DS's
+-// size, composed on the CPU (gpu2d_compose) from the 3D read back.
++// shader composes them per pixel: the 2D layers at the DS's resolution, the
++// 3D at its own. Without --scale it composes straight into the window, the
++// 3D at the scale nearest the window's. With it, into a picture of 256x384
++// times the scale, which a second shader brings to the window: sharp
++// bilinear where the window is the larger (whole texels, blended only across
++// their edges), the mean of the texels each window pixel covers where it is
++// the smaller. Headless pictures do the same at the DS's size, composed on
++// the CPU (gpu2d_compose) from the 3D read back.
+ //
+ // Input: the keys as the oracle's melonDS has them (X A, Z B, S X, A Y, Q L,
+ // W R, Enter START, Backspace SELECT, the arrows), the left mouse button on
+-// the lower screen as the stylus; F12 a picture into the run's directory.
++// the lower screen as the stylus; F12 a picture into the run's directory;
++// F11 and Alt+Enter the whole display, or back. A run with an input script
++// ignores the keyboard and the mouse.
+ //
+-// The pace: the DS's 59.83 frames a second by the host's clock, each frame
+-// presented with the vertical sync (again at each refresh until the next is
+-// due: twice on a display at 120 Hz). A run with an input script ignores the
+-// keyboard and the mouse.
++// The pace (--fps). The game runs a frame at a time; its picture is presented
++// after it, and again until the next frame is due (nothing the DS shows moves
++// between two frames).
++//   ds           the DS's 59.83 frames a second by the host's clock, presented
++//                with the vertical sync at each refresh until the next frame
++//                is due (on a display at 60 Hz a frame shows twice every 5.8 s)
++//   60 120 240   the game at 60 frames a second, 0.29% faster than the DS (the
++//                sound with it, audio.cpp), each frame presented 1, 2 or 4
++//                times. On a display refreshing at that rate the vertical sync
++//                is the clock: every frame the same number of refreshes. On
++//                another, the host's clock, with the sync if the display is
++//                the faster (no tearing), without it if not (no cap).
++//   uncapped     the DS's pace by the host's clock, pictures as fast as the
++//                host draws them, without the sync.
++// The window's title shows the frames and pictures of the last second.
+ #include "display.h"
+ #include "gl.h"
+ #include "render3d.h"
+@@ -42,10 +60,22 @@ bool visible;
+ GlTarget t_win, t_one;                                  // the 3D at the window's scale, and at 1
+ GLuint comp_prog, words_tex, empty_vao;
+ GLint loc_atop, loc_view;
++GLuint out_prog, pic_fbo, pic_tex;                      // --scale: the screens composed at the scale
++GLint loc_out_view, loc_out_size;
+ bool vsync;
+-double refresh_ns;
++int locked;                                             // refreshes a frame lasts, the sync the clock (0: the host's)
++double locked_avg_ns;                                   // ... the frames' mean length: far short, the sync is not holding them
++uint64_t locked_last_ns;
++double refresh_ns, frame_ns, picture_ns;                // a refresh, a frame at the pace asked for, a picture
+ uint64_t next_ns;
++uint64_t run_ns, run_frames, run_pictures;              // the window's run, for display_close (its clock
++uint64_t steady_pictures;                               // restarted after 60 frames: the start's own costs)
++uint64_t left_ns;                                       // when display_frame last returned: the game's frame runs after
++uint64_t late_frames, late_worst_ns, run_worst_ns;      // frames 1.5 times their length apart; the longest; the longest
++                                                        // the game took to run one (all after the first 60)
++uint64_t title_ns, title_frames, title_pictures;        // the last second's, for the title
+ std::string capture;                                    // a picture of the window, taken at the next present
++std::string capture_pic;                                // ... and of the scaled picture
+ const double kFrameNs = 1e9 * 263 * 355 * 6 / 33513982.0;   // 16.7154 ms
+ uint64_t shots_taken;
+ std::vector<uint32_t> words(256 * 384 * 2);
+@@ -123,6 +153,39 @@ void main() {
+ }
+ )";
+ 
++// --scale: the composed picture to the window
++const char* kOutFS = R"(#version 450
++layout(binding = 0) uniform sampler2D u_pic;      // the screens at the scale, rows bottom first, linear
++uniform vec4 u_view;                              // the screens' rectangle in the window: x, y (top), w, h
++uniform vec4 u_size;                              // the picture's size in texels (x, y)
++layout(location = 0) out vec4 o_col;
++
++void main() {
++    vec2 win = vec2(gl_FragCoord.x - u_view.x, u_view.w - (gl_FragCoord.y - u_view.y));
++    if (win.x < 0.0 || win.y < 0.0 || win.x >= u_view.z || win.y >= u_view.w) { o_col = vec4(0.0, 0.0, 0.0, 1.0); return; }
++    vec2 size = u_size.xy;
++    vec2 k = u_view.zw / size;                    // window pixels a texel
++    vec2 t = vec2(win.x, u_view.w - win.y) / k;   // the pixel's centre in texels
++    if (k.x >= 1.0) {
++        // sharp bilinear: each texel whole over the integer part of the ratio, blended across its edges
++        vec2 p = max(floor(k), vec2(1.0));
++        vec2 c = fract(t) - 0.5;
++        vec2 r = 0.5 - 0.5 / p;
++        vec2 f = (c - clamp(c, -r, r)) * p + 0.5;
++        o_col = vec4(texture(u_pic, (floor(t) + f) / size).rgb, 1.0);
++    } else {
++        // the mean over the pixel's footprint: n x n bilinear samples spread across it
++        int n = min(int(ceil(1.0 / k.x)), 8);
++        vec2 step = 1.0 / k / float(n);
++        vec2 t0 = t - 0.5 / k + 0.5 * step;
++        vec3 sum = vec3(0.0);
++        for (int j = 0; j < n; ++j)
++            for (int i = 0; i < n; ++i) sum += texture(u_pic, (t0 + vec2(i, j) * step) / size).rgb;
++        o_col = vec4(sum / float(n * n), 1.0);
++    }
++}
++)";
++
+ bool gl_load() {
+     bool ok = true;
+ #define NDSKIT_GL_LOAD(T, n)                                                   \
+@@ -159,6 +222,7 @@ void read_input() {
+     uint32_t keys = 0;
+     for (auto& m : map)
+         if (k[m.sc]) keys |= m.bit;
++    if (SDL_GetModState() & SDL_KMOD_ALT) keys &= ~(1u << 3);     // Alt+Enter is the whole display, not START
+     float mx, my;
+     SDL_MouseButtonFlags mb = SDL_GetMouseState(&mx, &my);
+     int ww, wh;
+@@ -176,6 +240,82 @@ void read_input() {
+     spi_set_pen(pen, pen ? dx : 0, pen ? dy : 0);
+ }
+ 
++// --scale: the picture the screens are composed into (the scale is the run's)
++void pic_target(int s) {
++    if (pic_fbo) return;
++    glCreateTextures(GL_TEXTURE_2D, 1, &pic_tex);
++    glTextureStorage2D(pic_tex, 1, GL_RGBA8, 256 * s, 384 * s);
++    glTextureParameteri(pic_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
++    glTextureParameteri(pic_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
++    glTextureParameteri(pic_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
++    glTextureParameteri(pic_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
++    glCreateFramebuffers(1, &pic_fbo);
++    glNamedFramebufferTexture(pic_fbo, GL_COLOR_ATTACHMENT0, pic_tex, 0);
++}
++
++// The window at the scale's size, inside the display's usable area at the DS's shape.
++void size_window(int s) {
++    float d = SDL_GetWindowPixelDensity(win);           // pixels a unit of the window's size
++    if (d <= 0) d = 1;
++    SDL_Rect u{0, 0, 1280, 720};
++    SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(win), &u);
++    double w = 256.0 * s / d, h = 384.0 * s / d;
++    double fit = std::min({1.0, u.w * 0.95 / w, u.h * 0.92 / h});
++    SDL_SetWindowSize(win, (int)(w * fit), (int)(h * fit));
++    SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
++    nds_note("display: the screens at %dx (%dx%d), the window %dx%d%s", s, 256 * s, 384 * s,
++             (int)(w * fit * d), (int)(h * fit * d), fit < 1.0 ? " (fitted to the display)" : "");
++}
++
++// The pace asked for (--fps) on a display refreshing at hz.
++void set_pace(float hz) {
++    refresh_ns = hz > 0 ? 1e9 / hz : kFrameNs;
++    frame_ns = kFrameNs;
++    picture_ns = 0;
++    locked = 0;
++    bool sync = false;
++    int fps = g_cfg.fps;
++    if (fps == 0) {
++        sync = hz >= 50.0f;
++    } else if (fps > 0) {
++        frame_ns = 1e9 / 60;
++        picture_ns = 1e9 / fps;
++        if (hz > 0 && std::fabs(hz - fps) < fps * 0.01f) {
++            sync = true;
++            locked = fps / 60;
++            frame_ns = 1e9 * locked / hz;
++        } else {
++            sync = hz > fps;
++        }
++    }
++    vsync = sync && SDL_GL_SetSwapInterval(1);
++    if (!vsync) {
++        SDL_GL_SetSwapInterval(0);
++        locked = 0;
++        int got = 0;
++        if (SDL_GL_GetSwapInterval(&got) && got != 0)   // the driver's own settings can keep it on
++            nds_note("display: the driver keeps the vertical sync on (its settings, not ndskit's): "
++                     "at most %.0f pictures a second", hz);
++    }
++    audio_set_speed(kFrameNs / frame_ns);
++    char how[160];
++    if (fps == 0)
++        std::snprintf(how, sizeof how, "the DS's pace, %s", vsync ? "with the vertical sync" : "by the clock");
++    else if (fps < 0)
++        std::snprintf(how, sizeof how, "the DS's pace by the clock, pictures uncapped");
++    else if (locked)
++        std::snprintf(how, sizeof how, "the game at %.2f frames a second, %d refresh%s each, the vertical sync the clock",
++                      1e9 / frame_ns, locked, locked > 1 ? "es" : "");
++    else
++        std::snprintf(how, sizeof how, "the game at 60 frames a second, %d pictures a second by the clock, %s", fps,
++                      vsync ? "with the vertical sync" : "without the vertical sync");
++    nds_note("display: %s, %.2f Hz, %s", (const char*)glGetString(GL_RENDERER), hz, how);
++}
++
++void toggle_fullscreen() {
++    SDL_SetWindowFullscreen(win, !(SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN));
++}
++
+ }  // namespace
+ 
+ GLuint gl_program(const char* vs, const char* fs) {
+@@ -234,24 +374,42 @@ bool display_open(bool vis) {
+     if (!comp_prog) return false;
+     loc_view = glGetUniformLocation(comp_prog, "u_view");
+     loc_atop = glGetUniformLocation(comp_prog, "u_atop");
++    out_prog = gl_program(kCompVS, kOutFS);
++    if (!out_prog) return false;
++    loc_out_view = glGetUniformLocation(out_prog, "u_view");
++    loc_out_size = glGetUniformLocation(out_prog, "u_size");
+     glCreateTextures(GL_TEXTURE_2D, 1, &words_tex);
+     glTextureStorage2D(words_tex, 1, GL_RG32UI, 256, 384);
+     glCreateVertexArrays(1, &empty_vao);
+     render_target(t_one, 1);
+     if (vis) {
++        if (g_cfg.scale > 0) {
++            pic_target(g_cfg.scale);
++            size_window(g_cfg.scale);
++        }
++        if (g_cfg.fullscreen) toggle_fullscreen();
+         float hz = 0;
+         if (const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(win))) hz = dm->refresh_rate;
+-        vsync = hz >= 50.0f && SDL_GL_SetSwapInterval(1);
+-        if (!vsync) SDL_GL_SetSwapInterval(0);
+-        refresh_ns = hz > 0 ? 1e9 / hz : kFrameNs;
+-        nds_note("display: %s, %.2f Hz, %s", (const char*)glGetString(GL_RENDERER), hz,
+-                 vsync ? "with the vertical sync" : "paced by the clock");
+-        next_ns = SDL_GetTicksNS();
++        set_pace(hz);
++        next_ns = run_ns = title_ns = locked_last_ns = SDL_GetTicksNS();
++        locked_avg_ns = frame_ns;
+     }
+     return true;
+ }
+ 
++void display_close() {
++    if (!visible || run_frames <= 60) return;
++    double s = (SDL_GetTicksNS() - run_ns) / 1e9;
++    uint64_t f = run_frames - 60, p = run_pictures - steady_pictures;
++    nds_note("display: %llu frames and %llu pictures in %.1f s after the first 60 frames: %.2f frames and %.1f pictures a second",
++             (unsigned long long)f, (unsigned long long)p, s, f / s, p / s);
++    nds_note("display: %llu frames late (1.5 frames or more after the one before; the longest %.1f ms); "
++             "the game's longest frame %.1f ms", (unsigned long long)late_frames, late_worst_ns / 1e6, run_worst_ns / 1e6);
++}
++
+ bool display_frame() {
++    uint64_t entered = SDL_GetTicksNS();
++    if (run_frames > 60 && entered - left_ns > run_worst_ns) run_worst_ns = entered - left_ns;
+     SDL_Event ev;
+     bool shot = false;
+     while (SDL_PollEvent(&ev)) {
+@@ -259,6 +417,9 @@ bool display_frame() {
+         if (ev.type == SDL_EVENT_KEY_DOWN && !ev.key.repeat) {
+             if (ev.key.scancode == SDL_SCANCODE_ESCAPE) return false;
+             if (ev.key.scancode == SDL_SCANCODE_F12) shot = true;
++            if (ev.key.scancode == SDL_SCANCODE_F11 ||
++                (ev.key.scancode == SDL_SCANCODE_RETURN && (ev.key.mod & SDL_KMOD_ALT)))
++                toggle_fullscreen();
+         }
+     }
+     if (g_cfg.input.empty()) read_input();     // a script drives the input instead
+@@ -273,17 +434,44 @@ bool display_frame() {
+     GLuint pic = render_draw(gx_job(), t_win);
+     gather_words();
+     glTextureSubImage2D(words_tex, 0, 0, 0, 256, 384, GL_RG_INTEGER, GL_UNSIGNED_INT, words.data());
+-    auto present = [&]() {
+-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+-        glViewport(0, 0, ww, wh);
++    auto compose = [&](float x, float y, float w, float h) {
+         glUseProgram(comp_prog);
+-        glProgramUniform4f(comp_prog, loc_view, r[0], r[1], r[2], r[3]);
++        glProgramUniform4f(comp_prog, loc_view, x, y, w, h);
+         glProgramUniform1i(comp_prog, loc_atop, gpu2d_top_is_a() ? 1 : 0);
+         glBindTextureUnit(0, words_tex);
+         glBindTextureUnit(1, pic);
+         glBindVertexArray(empty_vao);
+         glDrawArrays(GL_TRIANGLES, 0, 3);
+         glBindVertexArray(0);
++    };
++    if (g_cfg.scale > 0) {                      // the frame composed once at the scale; each present brings it over
++        int pw = 256 * scale, ph = 384 * scale;
++        glBindFramebuffer(GL_FRAMEBUFFER, pic_fbo);
++        glViewport(0, 0, pw, ph);
++        compose(0, 0, (float)pw, (float)ph);
++        if (!capture_pic.empty()) {
++            std::vector<uint8_t> rgb((size_t)pw * ph * 3), flip(rgb.size());
++            glPixelStorei(GL_PACK_ALIGNMENT, 1);
++            glGetTextureImage(pic_tex, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLsizei)rgb.size(), rgb.data());
++            for (int y = 0; y < ph; ++y) std::memcpy(&flip[(size_t)y * pw * 3], &rgb[(size_t)(ph - 1 - y) * pw * 3], (size_t)pw * 3);
++            write_png(capture_pic, pw, ph, flip.data());
++            capture_pic.clear();
++        }
++    }
++    auto present = [&]() {
++        glBindFramebuffer(GL_FRAMEBUFFER, 0);
++        glViewport(0, 0, ww, wh);
++        if (g_cfg.scale > 0) {
++            glUseProgram(out_prog);
++            glProgramUniform4f(out_prog, loc_out_view, r[0], r[1], r[2], r[3]);
++            glProgramUniform4f(out_prog, loc_out_size, 256.0f * scale, 384.0f * scale, 0, 0);
++            glBindTextureUnit(0, pic_tex);
++            glBindVertexArray(empty_vao);
++            glDrawArrays(GL_TRIANGLES, 0, 3);
++            glBindVertexArray(0);
++        } else {
++            compose(r[0], r[1], r[2], r[3]);
++        }
+         if (!capture.empty()) {
+             std::vector<uint8_t> rgb((size_t)ww * wh * 3), flip(rgb.size());
+             glPixelStorei(GL_PACK_ALIGNMENT, 1);
+@@ -293,18 +481,70 @@ bool display_frame() {
+             capture.clear();
+         }
+         SDL_GL_SwapWindow(win);
++        ++run_pictures;
++        ++title_pictures;
+     };
+     present();
+-    // the next DS frame is due at next_ns: with the vertical sync, the same
+-    // picture again at each of the display's refreshes until then (a display
+-    // at 120 Hz shows each frame twice); without it, a wait
+-    next_ns += (uint64_t)kFrameNs;
+-    for (;;) {
++    if (++run_frames == 60) { run_ns = SDL_GetTicksNS(); steady_pictures = run_pictures; }
++    ++title_frames;
++    if (locked) {
++        // the vertical sync is the clock: the frame for its refreshes, then the next
++        for (int i = 1; i < locked; ++i) present();
+         uint64_t now = SDL_GetTicksNS();
+-        if (now > next_ns + 100000000ull) { next_ns = now; break; }   // far behind: do not run to catch up
+-        if (!vsync) { if (next_ns > now) SDL_DelayPrecise(next_ns - now); break; }
+-        if (now + (uint64_t)(refresh_ns / 2) >= next_ns) break;
+-        present();
++        locked_avg_ns += ((double)(now - locked_last_ns) - locked_avg_ns) * 0.05;
++        locked_last_ns = now;
++        if (run_frames > 120 && locked_avg_ns < frame_ns * 0.8) {
++            nds_note("display: the vertical sync does not hold the frames (%.2f ms each): the clock keeps the pace",
++                     locked_avg_ns / 1e6);
++            locked = 0;
++            next_ns = now;
++        }
++    } else {
++        // the next frame is due at next_ns; until then the same picture again:
++        // ds, at each refresh (with the sync) or a wait (without); 60/120/240,
++        // a picture each 1/fps by the clock; uncapped, as fast as they draw
++        next_ns += (uint64_t)frame_ns;
++        uint64_t shown = SDL_GetTicksNS();
++        for (;;) {
++            uint64_t now = SDL_GetTicksNS();
++            if (now > next_ns + 100000000ull) { next_ns = now; break; }   // far behind: do not run to catch up
++            if (g_cfg.fps < 0) {
++                if (now >= next_ns) break;
++                present();
++            } else if (g_cfg.fps > 0) {
++                uint64_t at = shown + (uint64_t)picture_ns;
++                if (at + (uint64_t)(picture_ns / 2) > next_ns) {
++                    if (next_ns > now) SDL_DelayPrecise(next_ns - now);
++                    break;
++                }
++                if (at > now) SDL_DelayPrecise(at - now);
++                present();
++                shown = at;
++            } else {
++                if (!vsync) { if (next_ns > now) SDL_DelayPrecise(next_ns - now); break; }
++                if (now + (uint64_t)(refresh_ns / 2) >= next_ns) break;
++                present();
++            }
++        }
++    }
++    uint64_t now = SDL_GetTicksNS();
++    if (run_frames > 61 && now - left_ns > frame_ns * 1.5) {
++        ++late_frames;
++        late_worst_ns = std::max(late_worst_ns, now - left_ns);
++        if (now - left_ns > 50000000ull)
++            nds_note("display: a frame %.1f ms after the one before (the game's run of it %.1f ms, the picture's %.1f ms)",
++                     (now - left_ns) / 1e6, (entered - left_ns) / 1e6, (now - entered) / 1e6);
++    }
++    left_ns = now;
++    if (now - title_ns >= 1000000000ull) {
++        double s = (now - title_ns) / 1e9;
++        std::string rom = g_cfg.rom.substr(g_cfg.rom.find_last_of("/\\") + 1);
++        char t[256];
++        std::snprintf(t, sizeof t, "ndskit - %s  |  %dx  |  %.1f frames/s, %.0f pictures/s", rom.c_str(), scale,
++                      title_frames / s, title_pictures / s);
++        SDL_SetWindowTitle(win, t);
++        title_ns = now;
++        title_frames = title_pictures = 0;
+     }
+     return true;
+ }
+@@ -325,6 +565,7 @@ bool display_read3d(uint32_t* out) {
+ 
+ void display_shot(const std::string& path) {
+     if (visible) capture = path.substr(0, path.size() - 4) + "-window.png";
++    if (visible && g_cfg.scale > 0) capture_pic = path.substr(0, path.size() - 4) + "-" + std::to_string(g_cfg.scale) + "x.png";
+     GLuint pic = render_draw(gx_job(), t_one);
+     std::vector<uint8_t> px3d(256 * 192 * 4);
+     glGetTextureImage(pic, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLsizei)px3d.size(), px3d.data());
+diff --git a/runtime/display.h b/runtime/display.h
+index 3d500bf..2b92abc 100644
+--- a/runtime/display.h
++++ b/runtime/display.h
+@@ -10,6 +10,7 @@ bool display_open(bool visible);
+ // picture under them) and presented, the host's input read, the pace kept.
+ // False once the window is closed.
+ bool display_frame();
++void display_close();                   // the window's run: its frames and pictures, at what pace
+ // Both screens of the frame just finished, upper above lower, as a PNG at the DS's size.
+ void display_shot(const std::string& path);
+ void write_png(const std::string& path, int w, int h, const uint8_t* rgb);   // RGB8, top row first
+@@ -17,4 +18,5 @@ void write_png(const std::string& path, int w, int h, const uint8_t* rgb);   //
+ // The sound to the host (audio.cpp): the audio device (a window's run) and a WAV file.
+ bool audio_open(bool device, const std::string& wav);
+ void audio_frame();                     // after a VBlank: the frame's samples out
++void audio_set_speed(double speed);     // the game's pace against the DS's (1: 59.83 frames a second)
+ void audio_close();
+diff --git a/runtime/main.cpp b/runtime/main.cpp
+index 318112b..27c547f 100644
+--- a/runtime/main.cpp
++++ b/runtime/main.cpp
+@@ -1,13 +1,16 @@
+ // ndskit runtime — ndsrun: a cartridge's recompiled programs on the runtime.
+ //
+-//     ndsrun GAME.nds [--window] [--scale N] [--mute] [--wav FILE] [--out DIR] [--vblanks N]
++//     ndsrun GAME.nds [--window] [--scale N] [--fullscreen] [--fps ds|60|120|240|uncapped]
++//                     [--mute] [--wav FILE] [--out DIR] [--vblanks N]
+ //                     [--save FILE] [--save-size BYTES] [--shots V,V,...] [--shot-every N] [--input SCRIPT] [--trace]
+ //                     [--ticks9 N] [--ticks7 N] [--no-dump] [--calls N]
+ //                     [--break ADDR | --break7 ADDR] [--watch ADDR[:LEN]]
+ //
+ // With --window, the game in a window, in real time, played with the
+ // keyboard and the mouse, heard on the host's audio device (unless
+-// --mute). Otherwise headless: it runs until N VBlanks have passed (or a
++// --mute): --scale N composes the screens at N times the DS's resolution
++// (1 to 6; the window's own without it), --fps sets the pictures' pace
++// (display.cpp). Otherwise headless: it runs until N VBlanks have passed (or a
+ // fatal error), writes both screens as PNGs at the VBlanks asked for
+ // (DIR/v<N>.png), then writes the memories to DIR (main.bin, itcm.bin,
+ // dtcm.bin, wram7.bin, swram.bin, vram.bin: the banks A-I in order) and the CPUs' registers (cpus.txt), for
+@@ -42,7 +45,21 @@ int main(int argc, char** argv) {
+         else if (a == "--calls") cfg.calls = std::atoi(next().c_str());
+         else if (a == "--input") cfg.input = next();
+         else if (a == "--window") cfg.window = true;
+-        else if (a == "--scale") cfg.scale = std::atoi(next().c_str());
++        else if (a == "--scale") {
++            cfg.scale = std::atoi(next().c_str());
++            if (cfg.scale < 1 || cfg.scale > kMaxScale) {
++                std::fprintf(stderr, "--scale is 1 to %d (%d: %dx%d)\n", kMaxScale, kMaxScale, 256 * kMaxScale, 384 * kMaxScale);
++                return 2;
++            }
++        }
++        else if (a == "--fullscreen") cfg.fullscreen = true;
++        else if (a == "--fps") {
++            std::string v = next();
++            if (v == "ds") cfg.fps = 0;
++            else if (v == "uncapped") cfg.fps = -1;
++            else if (v == "60" || v == "120" || v == "240") cfg.fps = std::atoi(v.c_str());
++            else { std::fprintf(stderr, "--fps is ds, 60, 120, 240 or uncapped\n"); return 2; }
++        }
+         else if (a == "--mute") mute = true;
+         else if (a == "--wav") wav = next();
+         else if (a == "--shot-every") cfg.shot_every = std::strtoull(next().c_str(), nullptr, 0);
+@@ -88,6 +105,7 @@ int main(int argc, char** argv) {
+             display_shot(cfg.out + "/v" + std::to_string(vbl) + ".png");
+         if (cfg.window && !display_frame()) break;
+     }
++    if (cfg.window) display_close();
+     audio_close();
+     nds_finish();
+ }
+diff --git a/runtime/nds.h b/runtime/nds.h
+index d84332a..c1e1e17 100644
+--- a/runtime/nds.h
++++ b/runtime/nds.h
+@@ -26,11 +26,17 @@ struct NdsConfig {
+     int ticks9 = 16;                    // ticks a safe point stands for on the ARM9
+     int ticks7 = 24;                    // ... and on the ARM7
+     bool window = false;                // a window, in real time, the keyboard and mouse as input
+-    int scale = 0;                      // the 3D's resolution: 256x192 times this (0: from the window)
++    int scale = 0;                      // the picture's resolution: both screens at 256x384 times this, the 3D
++                                        // with them (0: the window's own); kMaxScale at most
++    bool fullscreen = false;            // the window over the whole display (F11 and Alt+Enter toggle it)
++    int fps = 0;                        // the pictures' pace: 0 the DS's (59.83 a second); 60, 120 or 240
++                                        // with the game at 60; -1 as fast as the host draws
+     std::vector<uint64_t> shots;        // headless: both screens as PNGs at these VBlanks
+     uint64_t shot_every = 0;            // ... and every N VBlanks
+ };
+ extern NdsConfig g_cfg;
++// 6: 1536x2304, the first multiple whose picture covers a 4K display's height
++static const int kMaxScale = 6;
+ 
+ static const uint64_t kLineTicks = 355 * 6 * 2;
+ static const uint64_t kFrameTicks = 263 * kLineTicks;

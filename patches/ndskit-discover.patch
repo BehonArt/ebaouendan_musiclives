@@ -1,0 +1,63 @@
+diff --git a/recomp/discover.py b/recomp/discover.py
+index 118e116..778eacf 100644
+--- a/recomp/discover.py
++++ b/recomp/discover.py
+@@ -42,7 +42,8 @@ output (the compiler of NitroSDK games) and the SDK's hand-written parts:
+    dispatch loop's head), makes it a call: execution resumes at lr's
+    value; a conditional one too (`movne lr, pc; bxne r12`, a hook called
+    when it is set). Two conditional transfers in a row with opposite conditions on
+-   the same flags (`bxpl r12` then `popmi {..., pc}`) end the block:
++   the same flags, no call between them (`bxpl r12` then `popmi {..., pc}`;
++   a call may return in the flags, `bl _dcmpeq; beq`), end the block:
+    nothing runs after them. That holds on a straight line only: when the
+    walk applied it across an address that something also jumps to (a
+    join, reached with other flags), the function is walked again without
+@@ -443,7 +444,9 @@ class Program:
+                 go_on = cond != 14 and not (ended is not None and cond == ended ^ 1)
+                 if cond != 14 and not go_on:
+                     ruled.append(list(since))
+-                if ins.s or op in arm.COMPARES:
++                if ins.s or op in arm.COMPARES or op in ("bl", "blx"):
++                    # a call's flags are not the ones before it: CodeWarrior's
++                    # soft-float compares return their result in them (`bl _dcmpeq; beq`)
+                     ended, since = None, []
+                 if after_bl is not None and not (op == "mov" and ins.rd == 8 and ins.rm == 8 and pc == after_bl + 4):
+                     after_bl = None
+@@ -542,6 +545,8 @@ class Program:
+                         if not go_on:
+                             break
+                         ended, since = cond, []
++                    else:
++                        ended, since = None, []     # returns here, with the callee's flags
+                     pc = nxt
+                     continue
+                 if go_on:
+@@ -824,12 +829,17 @@ class Program:
+         them, reached through a pointer or a call meant for it. It is refused and
+         the discovery done again without it."""
+         self.refused = set()
+-        for _ in range(4):
++        self.refuse_passes = 0
++        passes = 40
++        for i in range(passes):
+             self.guessed = set()
+             self._rounds(max_rounds)
+             bad = {a for a in self.guessed if a in self.funcs and self.funcs[a].conflicts}
+-            if not bad:
++            # never wipe after the last pass: a game needing more passes than
++            # the cap keeps what it found (with its conflicts) instead of nothing
++            if not bad or i == passes - 1:
+                 break
++            self.refuse_passes += 1
+             self.refused |= bad
+             self.entries, self.crossing, self.switches = {}, set(), {}
+             self.literal_loaded, self.funcs, self.code, self.data = set(), {}, {}, set()
+@@ -1273,6 +1283,8 @@ def main(argv=None):
+         prog = prog.run()
+         text, conf, unres = prog.summary()
+         print(text)
++        if prog.refuse_passes:
++            print("refused %d guessed entries over %d passes" % (len(prog.refused), prog.refuse_passes))
+         if oid is not None:
+             ov = [e for e in prog.funcs if mem.seg(e).overlay == oid]
+             print("overlay %d: %d functions (%d Thumb), %d reached from outside it" % (

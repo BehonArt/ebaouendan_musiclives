@@ -27,10 +27,53 @@ change hands as the game goes (6 then 1 at boot, 0 for the stage, 5 for
 gameplay, 6 again at the fail screen), each found by the runtime. Known
 runtime gap seen: 3D edge marking is not drawn (the EBA and OE2 stage maps).
 
-## Local ndskit patch
+## Display options (EBA's window; any ndskit game)
 
-`ndskit-discover-refuse-passes.patch` holds two fixes to `recomp/discover.py`,
-both to report upstream:
+    build/recomp/b/ndsrun roms/EBA.nds --save build/play/EBA.sav --window --scale 3 --fps 60
+
+| option | what it does |
+|---|---|
+| `--scale N` | composes both screens at N times the DS's resolution (1-6): 1x 256x384, 2x 512x768, 3x 768x1152, 4x 1024x1536, 5x 1280x1920, 6x 1536x2304 (the first to cover a 4K display's height). The 3D draws at that resolution; the 2D layers stay the DS's pixels, sharp. The window opens at that size, fitted to the display; a larger window gets a sharp-bilinear upscale, a smaller one the mean of the pixels it covers (supersampling). Without `--scale` the picture follows the window's size, as before. |
+| `--fullscreen` | the whole display, letterboxed at the DS's shape. F11 or Alt+Enter toggles it. |
+| `--fps ds` | the default: the DS's 59.83 frames a second, presented with the vertical sync (on a 60 Hz display one frame shows twice every 5.8 s). |
+| `--fps 60` / `120` / `240` | the game at exactly 60 frames a second (0.29% faster than the DS, the sound resampled with it: about 5 cents, inaudible), each frame shown 1, 2 or 4 times. On a display at that refresh rate the vertical sync is the clock, so every frame lasts the same: no judder. On another display, paced by the clock. |
+| `--fps uncapped` | the DS's pace, pictures as fast as the GPU draws them, without the vertical sync. |
+
+The title bar shows the last second's frames and pictures. The log ends with
+the run's averages (after its first 60 frames), how many frames came late,
+the longest, and the longest the game itself took to run one; any stall
+over 50 ms is noted as it happens. F12 also saves the composed picture at
+full scale (`shotN-3x.png`).
+
+Measured on this PC (RTX 4060, display 2715x1527 at 60.000 Hz, NVIDIA's
+"Vertical sync" left to the application), 20 s from the boot each:
+
+| `--fps` | game frames a second | pictures a second |
+|---|---|---|
+| `ds` | 59.80 to 59.83 | 60, with the sync |
+| `60` | 60.00, no frame late | 60.0, the sync the clock |
+| `120` | 59.95 | 120.0 |
+| `240` | 59.95 | 235.8 |
+| `uncapped` (fullscreen, 4x) | 59.73 | 2,166 |
+
+The game itself never took more than 6 ms for a frame. On this 60 Hz display,
+120 and 240 run without the sync, so they can tear; on a display at 120 or
+240 Hz they lock to it the way 60 does here. Above 60, each extra picture
+repeats the game's last frame: the DS draws nothing between frames. The
+planned HD note layer will draw the hit circles, approach circles, slider
+balls and spinners between frames, which is what makes 120/240/uncapped
+smoother. If a driver keeps the vertical sync on against the runtime's
+request (NVIDIA Control Panel's "Vertical sync: On" did), the log says so.
+
+## Local ndskit patches
+
+In `patches/`, each applying cleanly to upstream ndskit (5ee24af):
+
+- `ndskit-display-options.patch`: the display options above (runtime
+  `display.cpp`, `audio.cpp`, `main.cpp`, `nds.h`, `display.h`). Headless
+  runs are byte-identical with and without it.
+- `ndskit-discover.patch`: two fixes to `recomp/discover.py`, both to report
+  upstream (drafts in `upstream/`):
 
 1. `Program.run()` gave up after 4 refuse passes and wiped everything, so
    EBA's ARM9 discovered 0 functions. It now allows 40 passes and never wipes
@@ -47,7 +90,7 @@ both to report upstream:
 
 Re-apply after updating the submodule:
 
-    git -C ndskit apply ../ndskit-discover-refuse-passes.patch
+    git -C ndskit apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch
 
 ## Toolchain
 
@@ -91,6 +134,13 @@ In a window (put `C:\msys64\ucrt64\bin` on PATH; mouse = stylus, Esc quits):
 
 ## Next
 
-1. melonDS oracle: savestate at the same VBlank, `python -m ndskit.melonds STATE.ml1 --compare build/run`.
-2. File both discover.py bugs upstream.
-3. 3D edge marking (ndskit runtime), seen on the EBA and OE2 stage maps.
+EBA only for now:
+
+1. Button mode: a controller's face buttons or a key in place of the
+   stylus, reading the live notes from RAM (the judge at 0x020681D8 runs
+   every frame; note objects, vtable 0x020B4648, hold x and y): tap on time
+   for a hit circle, hold for a slider, mash for a spinner.
+2. HD note layer: the notes drawn natively between frames, for 120/240.
+3. melonDS oracle: savestate at the same VBlank, `python -m ndskit.melonds STATE.ml1 --compare build/run`.
+4. Post the discover.py bug reports (drafts in `upstream/`).
+5. 3D edge marking (ndskit runtime), seen on the EBA and OE2 stage maps.
