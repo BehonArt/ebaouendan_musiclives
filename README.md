@@ -20,7 +20,7 @@ with the real saves loaded and the music in the WAV.
 | failures | 0 | 0 | 0 |
 | save | 256 KiB flash | 8 KiB EEPROM | 256 KiB flash |
 | stage played | "The Anthem" | "ループ&ループ" | "サムライブルー" |
-| windowed play | timing and audio right (user) | timing and audio right (user) | not yet |
+| windowed play | timing and audio right (user) | timing and audio right (user) | works great (user), through the overlay swaps into a song |
 
 Plus ndskit's instruction test: 57,781 vectors, 0 failures. OE2's overlays
 change hands as the game goes (6 then 1 at boot, 0 for the stage, 5 for
@@ -91,6 +91,6 @@ In a window (put `C:\msys64\ucrt64\bin` on PATH; mouse = stylus, Esc quits):
 
 ## Next
 
-1. Play OE2 in the window.
-2. melonDS oracle: savestate at the same VBlank, `python -m ndskit.melonds STATE.ml1 --compare build/run`.
-3. File both discover.py bugs upstream.
+1. melonDS oracle: savestate at the same VBlank, `python -m ndskit.melonds STATE.ml1 --compare build/run`.
+2. File both discover.py bugs upstream.
+3. 3D edge marking (ndskit runtime), seen on the EBA and OE2 stage maps.
