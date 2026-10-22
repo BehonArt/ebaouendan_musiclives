@@ -2,3 +2,8 @@ roms/
 build/
 *.sav
 
+play/
+customs/
+play_*/
+customs_*/
+__pycache__/

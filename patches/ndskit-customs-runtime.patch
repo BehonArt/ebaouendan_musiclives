@@ -1,0 +1,316 @@
+diff --git a/runtime/audio.cpp b/runtime/audio.cpp
+index ae35960..a4b15c8 100644
+--- a/runtime/audio.cpp
++++ b/runtime/audio.cpp
+@@ -26,6 +26,7 @@ double queued_avg;
+ uint64_t frames, dry, cuts;                         // what the window's run went through
+ double ratio_sum, ratio_lo = 2, ratio_hi;
+ double speed = 1;                                   // the game's pace against the DS's
++double last_ratio = 1;                              // the playback ratio set last (audio_ratio)
+ const int kRate = 32728;
+ const double kFrameBytes = 548.0 * 4;               // a frame of the stream's input
+ double target = 3 * kFrameBytes;                   // the queue held near three frames (audio_set_latency)
+@@ -79,6 +80,10 @@ void audio_frame() {
+         wav_bytes += 2 * s.size();
+         wav_header();
+     }
++    if (stream && display_turbo()) {                // turbo: no sound
++        s.clear();
++        return;
++    }
+     if (stream) {
+         int q = SDL_GetAudioStreamQueued(stream);
+         if (q > kRate * 2) {                        // half a second
+@@ -92,6 +97,7 @@ void audio_frame() {
+         queued_avg += (q - queued_avg) * 0.05;
+         double r = speed * (1 + std::clamp((queued_avg - target) / target * 0.01, -0.005, 0.005));
+         SDL_SetAudioStreamFrequencyRatio(stream, (float)r);
++        last_ratio = r;
+         ++frames;
+         ratio_sum += r;
+         ratio_lo = std::min(ratio_lo, r);
+@@ -104,6 +110,8 @@ void audio_set_speed(double s) { speed = s; }
+ 
+ void audio_set_latency(double f) { target = std::clamp(f, 0.5, 12.0) * kFrameBytes; }
+ double audio_latency() { return target / kFrameBytes; }
++double audio_ratio() { return last_ratio; }
++double audio_queued_seconds() { return stream ? SDL_GetAudioStreamQueued(stream) / (4.0 * kRate) : 0; }
+ 
+ void audio_close() {
+     if (wav) { wav_header(); std::fclose(wav); wav = nullptr; }
+diff --git a/runtime/cart.cpp b/runtime/cart.cpp
+index edf227a..18484cc 100644
+--- a/runtime/cart.cpp
++++ b/runtime/cart.cpp
+@@ -11,6 +11,12 @@
+ // The backup memory is an EEPROM (64 Kbit and up: commands with a 2-byte
+ // address) or a flash chip (3-byte addresses), its type taken from the
+ // save file's size, or --save-size when there is no file yet (8 KiB by default).
++//
++// --replace-file NAME=PATH puts another file in place of one of the
++// cartridge's, by its name in the file system (data/seq/SS05_n.seq_): its
++// bytes go after the cartridge's end, the image grows to the next power of
++// two, and its entry in the FAT, which the game reads from the cartridge,
++// points there. The chip ID stays the cartridge's own.
+ #include "nds.h"
+ #include <cstdio>
+ #include <cstring>
+@@ -32,6 +38,67 @@ static std::vector<uint8_t> g_save;
+ static std::string g_save_path;
+ static bool g_save_dirty;
+ 
++static uint32_t rom32(size_t a) { uint32_t v = 0; if (a + 4 <= g_rom.size()) std::memcpy(&v, &g_rom[a], 4); return v; }
++static uint16_t rom16(size_t a) { uint16_t v = 0; if (a + 2 <= g_rom.size()) std::memcpy(&v, &g_rom[a], 2); return v; }
++
++// A file's id by its path in the cartridge's file system (FNT), or -1.
++static int find_file(const std::string& path) {
++    uint32_t fnt = rom32(0x40);
++    uint16_t dir = 0xF000;                          // the root
++    size_t at = 0;
++    while (at <= path.size()) {
++        size_t slash = path.find('/', at);
++        std::string part = path.substr(at, slash == std::string::npos ? std::string::npos : slash - at);
++        bool last = slash == std::string::npos;
++        size_t e = fnt + rom32(fnt + 8 * (dir & 0xFFF));
++        uint16_t id = rom16(fnt + 8 * (dir & 0xFFF) + 4);
++        bool found = false;
++        for (;;) {
++            uint8_t len = g_rom.size() > e ? g_rom[e] : 0;
++            if (!len) break;
++            bool is_dir = len & 0x80;
++            std::string name((const char*)&g_rom[e + 1], len & 0x7F);
++            e += 1 + (len & 0x7F);
++            if (is_dir) {
++                uint16_t sub = rom16(e);
++                e += 2;
++                if (!last && name == part) { dir = sub; found = true; break; }
++            } else {
++                if (last && name == part) return id;
++                ++id;
++            }
++        }
++        if (!found) return -1;
++        at = slash + 1;
++    }
++    return -1;
++}
++
++static void replace_files() {
++    if (g_cfg.replace_files.empty()) return;
++    size_t original = g_rom.size();
++    uint32_t fat = rom32(0x48), nfat = rom32(0x4C) / 8;
++    for (const auto& [name, path] : g_cfg.replace_files) {
++        int id = find_file(name);
++        if (id < 0 || (uint32_t)id >= nfat) nds_fatal("--replace-file: no %s on the cartridge", name.c_str());
++        FILE* f = std::fopen(path.c_str(), "rb");
++        if (!f) nds_fatal("--replace-file: cannot read %s", path.c_str());
++        std::fseek(f, 0, SEEK_END);
++        long n = std::ftell(f);
++        std::fseek(f, 0, SEEK_SET);
++        size_t at = (g_rom.size() + 0x1FF) & ~(size_t)0x1FF;
++        g_rom.resize(at + (size_t)n, 0xFF);
++        if (std::fread(&g_rom[at], 1, (size_t)n, f) != (size_t)n) nds_fatal("--replace-file: cannot read %s", path.c_str());
++        std::fclose(f);
++        uint32_t ends[2] = {(uint32_t)at, (uint32_t)(at + n)};
++        std::memcpy(&g_rom[fat + 8 * id], ends, 8);
++        nds_note("cartridge: file %d %s from %s (%ld bytes)", id, name.c_str(), path.c_str(), n);
++    }
++    size_t size = original;
++    while (size < g_rom.size()) size *= 2;
++    g_rom.resize(size, 0xFF);
++}
++
+ bool cart_open(const std::string& path) {
+     FILE* f = std::fopen(path.c_str(), "rb");
+     if (!f) return false;
+@@ -44,6 +111,7 @@ bool cart_open(const std::string& path) {
+     if (got != (size_t)n || n < 0x200) return false;
+     uint32_t mb = (uint32_t)((g_rom.size() + 0xFFFFF) >> 20);
+     g_chip_id = 0xC2u | ((mb ? mb - 1 : 0) & 0xFF) << 8;   // as melonDS makes it
++    replace_files();
+     // the save
+     g_save_path = g_cfg.save;
+     if (g_save_path.empty()) {
+diff --git a/runtime/display.cpp b/runtime/display.cpp
+index fb4afcc..4b94165 100644
+--- a/runtime/display.cpp
++++ b/runtime/display.cpp
+@@ -72,6 +72,7 @@ DisplaySettings cur, want;                              // the settings in force
+ bool changed;
+ DisplayHooks hooks;
+ int top_margin;
++bool turbo;                                             // display_set_turbo
+ float refresh_hz;
+ GlTarget t_win, t_one;                                  // the 3D at the picture's scale, and at 1
+ GLuint comp_prog, words_tex, empty_vao;
+@@ -425,6 +426,33 @@ const char* display_layout_name(NdsLayout l) {
+ }
+ 
+ void display_set_hooks(const DisplayHooks& h) { hooks = h; }
++
++void display_set_turbo(bool on) {
++    if (on == turbo) return;
++    turbo = on;
++    if (!on && visible) {               // the pace, and the run's measures, start again from now
++        next_ns = locked_last_ns = left_ns = SDL_GetTicksNS();
++        run_frames = run_pictures = steady_pictures = late_frames = late_worst_ns = run_worst_ns = 0;
++    }
++}
++bool display_turbo() { return turbo; }
++
++bool display_screen_rect(int screen, float* x, float* y, float* w, float* h) {
++    if (!visible) return false;
++    int ww, wh;
++    SDL_GetWindowSizeInPixels(win, &ww, &wh);
++    float r[4];
++    view_rect(ww, wh, r);
++    Geometry g = geometry(cur.layout);
++    int s = screen & 1;
++    if (!g.show[s]) return false;
++    float k = r[2] / g.w;
++    *x = r[0] + g.x[s] * k;
++    *y = r[1] + g.y[s] * k;
++    *w = 256 * k;
++    *h = 192 * k;
++    return true;
++}
+ void display_set_top_margin(int pixels) {
+     pixels = std::max(0, pixels);
+     if (pixels == top_margin) return;
+@@ -564,6 +592,8 @@ bool display_frame() {
+     cur.fullscreen = SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN;
+     if (g_cfg.input.empty()) read_input();     // a script drives the input instead
+     if (shot) display_shot(g_cfg.out + "/shot" + std::to_string(++shots_taken) + ".png");
++    static uint64_t turbo_frames;
++    if (turbo && ++turbo_frames % 20) return true;   // turbo: no picture, no pace
+ 
+     int ww, wh;
+     SDL_GetWindowSizeInPixels(win, &ww, &wh);
+@@ -628,6 +658,7 @@ bool display_frame() {
+     present();
+     if (++run_frames == 60) { run_ns = SDL_GetTicksNS(); steady_pictures = run_pictures; }
+     ++title_frames;
++    if (turbo) return true;
+     if (locked) {
+         // the vertical sync is the clock: the frame for its refreshes, then the next
+         for (int i = 1; i < locked; ++i) present();
+diff --git a/runtime/display.h b/runtime/display.h
+index df3503a..94f2b76 100644
+--- a/runtime/display.h
++++ b/runtime/display.h
+@@ -39,6 +39,12 @@ void display_set_hooks(const DisplayHooks& h);
+ void display_set_top_margin(int pixels);
+ struct SDL_Window;
+ SDL_Window* display_window();           // the window, for a port's UI (nullptr headless)
++// Turbo: the game as fast as it runs, a picture every 20 frames, no sound (a
++// port's own way through menus, behind its loading screen).
++void display_set_turbo(bool on);
++bool display_turbo();
++// Where a screen (0 upper, 1 lower) is in the window now, in pixels; false if the layout hides it.
++bool display_screen_rect(int screen, float* x, float* y, float* w, float* h);
+ void write_png(const std::string& path, int w, int h, const uint8_t* rgb);   // RGB8, top row first
+ 
+ // The sound to the host (audio.cpp): the audio device (a window's run) and a WAV file.
+@@ -47,4 +53,6 @@ void audio_frame();                     // after a VBlank: the frame's samples o
+ void audio_set_speed(double speed);     // the game's pace against the DS's (1: 59.83 frames a second)
+ void audio_set_latency(double frames);  // the sound queued ahead of the device, in frames (3 by default)
+ double audio_latency();
++double audio_ratio();                   // the playback ratio set last (the game's pace and the queue's nudge)
++double audio_queued_seconds();          // the sound waiting in the device's stream
+ void audio_close();
+diff --git a/runtime/input.cpp b/runtime/input.cpp
+index 940a0a7..f013660 100644
+--- a/runtime/input.cpp
++++ b/runtime/input.cpp
+@@ -85,9 +85,10 @@ void input_parse(const std::string& s) {
+     }
+ }
+ 
+-// At each VBlank: what is held now.
++// At each VBlank: what is held now. A headless run with no script still
++// passes through a port's hook (its own code may drive the input).
+ void input_vblank(uint64_t vbl) {
+-    if (g_script.empty()) return;
++    if (g_script.empty() && (g_cfg.window || !g_hook)) return;
+     NdsInput in;
+     for (const Press& p : g_script) {
+         if (vbl < p.from || vbl >= p.to) continue;
+diff --git a/runtime/main.cpp b/runtime/main.cpp
+index 8a129b7..58226d6 100644
+--- a/runtime/main.cpp
++++ b/runtime/main.cpp
+@@ -3,6 +3,7 @@
+ //     ndsrun GAME.nds [--window] [--scale N] [--fullscreen] [--fps ds|60|120|240|uncapped]
+ //                     [--layout stacked|side|top|bottom] [--low-latency] [--audio-latency FRAMES]
+ //                     [--mute] [--wav FILE] [--out DIR] [--vblanks N] [--port KEY[=VALUE] ...]
++//                     [--replace-file NAME=PATH ...]
+ //                     [--save FILE] [--save-size BYTES] [--shots V,V,...] [--shot-every N] [--input SCRIPT] [--trace]
+ //                     [--ticks9 N] [--ticks7 N] [--no-dump] [--calls N]
+ //                     [--break ADDR | --break7 ADDR] [--watch ADDR[:LEN]]
+@@ -70,6 +71,12 @@ int main(int argc, char** argv) {
+             else if (v == "60" || v == "120" || v == "240") cfg.fps = std::atoi(v.c_str());
+             else { std::fprintf(stderr, "--fps is ds, 60, 120, 240 or uncapped\n"); return 2; }
+         }
++        else if (a == "--replace-file") {           // NAME=PATH: a file of the cartridge's replaced (cart.cpp)
++            std::string v = next();
++            size_t e = v.find('=');
++            if (e == std::string::npos) { std::fprintf(stderr, "--replace-file is NAME=PATH\n"); return 2; }
++            cfg.replace_files.emplace_back(v.substr(0, e), v.substr(e + 1));
++        }
+         else if (a == "--port") {                   // KEY[=VALUE]: an option for the port's own code
+             std::string v = next();
+             size_t e = v.find('=');
+diff --git a/runtime/nds.h b/runtime/nds.h
+index 6064d16..d1bae55 100644
+--- a/runtime/nds.h
++++ b/runtime/nds.h
+@@ -39,6 +39,7 @@ struct NdsConfig {
+     std::vector<uint64_t> shots;        // headless: both screens as PNGs at these VBlanks
+     uint64_t shot_every = 0;            // ... and every N VBlanks
+     std::map<std::string, std::string> port;   // --port KEY[=VALUE]: options for a port's own code
++    std::vector<std::pair<std::string, std::string>> replace_files;   // --replace-file NAME=PATH (cart.cpp)
+ };
+ extern NdsConfig g_cfg;
+ // 6: 1536x2304, the first multiple whose picture covers a 4K display's height
+@@ -237,5 +238,10 @@ void sound_write(uint32_t addr, uint32_t v, int size);
+ uint32_t sound_read(uint32_t addr, int size);
+ void sound_sync(uint64_t t);
+ extern bool g_sound_keep;               // keep the output (someone listens): stereo, interleaved
++// A port's hand in the mix: the channels in the mask are not heard (they run on,
++// so a stream and the timing a game takes from it go on); each channel's state.
++void sound_set_muted(uint32_t mask);
++struct SoundChannel { bool on; int format, repeat; uint32_t src, loop, len; };   // format 0-3: PCM8 PCM16 ADPCM PSG
++SoundChannel sound_channel(int n);
+ std::vector<int16_t>& sound_samples();  // ... mixed since the listener last cleared it
+ void sound_dump(const std::string& path);   // the channels' places (a run's end)
+diff --git a/runtime/sound.cpp b/runtime/sound.cpp
+index 36f0b88..9113c45 100644
+--- a/runtime/sound.cpp
++++ b/runtime/sound.cpp
+@@ -70,6 +70,7 @@ struct Capture {
+ 
+ Channel ch[16];
+ Capture cap[2];
++uint32_t g_muted;                                   // sound_set_muted: channels run on, unheard
+ uint64_t g_next;                                    // the time of the next output sample
+ std::vector<int16_t> g_out;
+ 
+@@ -239,6 +240,7 @@ void mix_one() {
+         int32_t v[16];
+         for (int n = 0; n < 16; ++n) {
+             v[n] = run(ch[n], n);
++            if (g_muted >> n & 1) v[n] = 0;
+             if (!v[n]) continue;
+             if ((n == 1 && (sc & 0x1000)) || (n == 3 && (sc & 0x2000))) continue;
+             int p = pan(ch[n]);
+@@ -370,3 +372,10 @@ void sound_reset() {
+     g_next = 0;
+     g_out.clear();
+ }
++
++void sound_set_muted(uint32_t mask) { g_muted = mask & 0xFFFF; }
++
++SoundChannel sound_channel(int n) {
++    const Channel& c = ch[n & 15];
++    return {(c.cnt & 0x80000000u) != 0, (int)(c.cnt >> 29 & 3), (int)(c.cnt >> 27 & 3), c.src, c.loop, c.len};
++}

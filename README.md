@@ -27,12 +27,56 @@ change hands as the game goes (6 then 1 at boot, 0 for the stage, 5 for
 gameplay, 6 again at the fail screen), each found by the runtime. Known
 runtime gap seen: 3D edge marking is not drawn (the EBA and OE2 stage maps).
 
+## The options bar (EBA)
+
+EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
+`third_party/imgui`, v1.92.9b):
+
+- **Game:** screenshot (F12), quit (Esc).
+- **Display:** resolution (Auto, or 1x to 6x), layout (vertical, side by
+  side, top screen only, bottom screen only; F9 cycles), frame rate (DS,
+  60, 120, 240, uncapped), fullscreen (F11, Alt+Enter), low latency.
+- **Input:** button mode on or off, up to four hit keys (click one, then
+  press a key; right-click clears), the connected gamepads, the key map.
+- **Timing:** the offset (-8 to +8 frames), the sound's latency (1 to 6
+  frames), and **Calibrate...**, a window that counts every tap the game
+  judges by how many frames after its note it came (before the offset):
+  a histogram, the average and spread, the grades, and **Apply** to set the
+  offset to the average (from 20 taps).
+
+Every change is made at once and saved in `%APPDATA%\eba-recomp\EBA\settings.ini`
+(SDL's folder for the user's settings); ndsrun's own options win for a run
+that gives them, and headless runs ignore the file. In a window the bar sits
+above the screens and the window makes room for it; in fullscreen it shows
+while the mouse is near the top; F1 hides or shows it. While the mouse is on
+the bar or a menu, it is not the stylus, and Esc closes the menu, not the
+game.
+
+## Timing offset (EBA)
+
+The judge (`0x020681D8`, every tap and slider head; spinners are not timed)
+is recompiled with a hook (`--hook 020681D8`); `src/eba_timing.cpp` gives it
+the song's clock minus the offset, so a tap made N frames late is judged as
+on time. The picture and the music are untouched, so it suits a player who
+follows the sound or the picture alike. Checked headless with the button
+mode's test player pressing every note 4 frames late: offset 0, every note
+a 100 and the stage failed; offset 4, rank S, 258 of 258 at 300. Options:
+`--port offset=N`, `--port timing-log` (every judged tap). The playtest that
+asked for it: 241 presses averaged 1.8 frames late (about 30 ms), 99 of them
+100s.
+
 ## Display options (EBA's window; any ndskit game)
 
-    build/recomp/b/ndsrun roms/EBA.nds --save build/play/EBA.sav --window --scale 3 --fps 60
+    build/recomp/b/ndsrun roms/EBA.nds --save build/play/EBA.sav --window --scale 3 --fps 60 --layout side
+
+All of these also change while the window runs (the options bar, or F9 and
+F11).
 
 | option | what it does |
 |---|---|
+| `--layout stacked\|side\|top\|bottom` | the screens one above the other (default), side by side (for wide displays), or one alone. The stylus follows the lower screen wherever the layout puts it (none with the upper alone). |
+| `--low-latency` | waits for each picture to be drawn before the next (glFinish), so the driver queues none ahead of the display. |
+| `--audio-latency F` | the sound queued ahead of the device, in frames (3 by default; 1.5 held without a dropout at 60). |
 | `--scale N` | composes both screens at N times the DS's resolution (1-6): 1x 256x384, 2x 512x768, 3x 768x1152, 4x 1024x1536, 5x 1280x1920, 6x 1536x2304 (the first to cover a 4K display's height). The 3D draws at that resolution; the 2D layers stay the DS's pixels, sharp. The window opens at that size, fitted to the display; a larger window gets a sharp-bilinear upscale, a smaller one the mean of the pixels it covers (supersampling). Without `--scale` the picture follows the window's size, as before. |
 | `--fullscreen` | the whole display, letterboxed at the DS's shape. F11 or Alt+Enter toggles it. |
 | `--fps ds` | the default: the DS's 59.83 frames a second, presented with the vertical sync (on a 60 Hz display one frame shows twice every 5.8 s). |
@@ -65,16 +109,110 @@ balls and spinners between frames, which is what makes 120/240/uncapped
 smoother. If a driver keeps the vertical sync on against the runtime's
 request (NVIDIA Control Panel's "Vertical sync: On" did), the log says so.
 
+## Button mode (EBA)
+
+For players without a touchscreen: any face button of an Xbox, PlayStation
+or Switch controller, or Space on the keyboard, in place of the stylus during
+a song. It is on in EBA's build (`src/eba_buttons.cpp`, linked into `ndsrun`
+by `cmake/eba.cmake`).
+
+- **Hit circle:** press on the beat. The stylus touches the note the game is
+  judging, for two frames; the game judges it as its own tap, with its own
+  windows (300 at +-2 frames, 100 at +-5, 50 at +-8, and a press more than 8
+  frames early is a miss, as with a stylus).
+- **Slider:** press on its head and hold; the stylus follows the ball, a path
+  point a frame, through every pass and the tail.
+- **Spinner:** mash. Each press spins the stylus faster around the spinner
+  (2 turns a second per press, halving in 0.4 s without presses, at most 10
+  a second); about 6 presses a second keeps up with the hardest spinners.
+- The mouse still works and wins while it is down. Outside a song the face
+  buttons are the DS's (south B, east A, west Y, north X), for the menus.
+
+Options, each as `--port ...`: `buttons=off`; `button-keys=Space,F,J` (SDL
+key names); `buttons-log` (every press, the note it hit and how many frames
+off); `buttons-auto` (a test player: presses on every note's frame, holds
+the sliders, mashes the spinners).
+
+    build/recomp/b/ndsrun roms/EBA.nds --save build/play/EBA.sav --window --scale 3 --fps 60 --port buttons-log
+
+Checked headless: `buttons-auto` from the boot through The Anthem on Hard
+Rock, everything through button mode: rank S, 258 of 258 at 300, max combo
+408, the stage cleared. With no button pressed, runs are byte-identical to
+before. What it reads of the game (the song clock, the notes' manager and
+each note's fields) is at the top of `src/eba_buttons.cpp`;
+`tools/eba_notes.py` inspects a RAM dump.
+
+In the stage's opening and ending comics, a face button (or a hit key) also
+taps SKIP at the lower right.
+
+## Customs (EBA)
+
+A mode of its own, apart from the campaign: songs charted over story stages,
+each with its own scores and HD audio. An orange **CUSTOMS** button sits at
+the top of the main menu's lower screen (also Game > Customs...). The screen
+lists each custom: its art and an HD preview, its best score per difficulty,
+**Play**, and the stage it replaces (that stage's card and its own preview).
+
+- **Play** starts a new run of ndsrun (the same window settings, fullscreen
+  too) on the stock ROM with the custom's files in place (`--replace-file
+  NAME=PATH`: the files are appended to the image and the FAT points at
+  them) and a save copied from `customs/pristine.sav`. An autopilot (turbo,
+  behind a loading screen) takes the menus to the card of the stage, sets
+  the session's stage (`*0x020CD248 + 8`) and difficulty (`+0`: 0 Breezin'
+  .. 3 Hard Rock), and hands over at the stage's comic. Each step checks the
+  scene it expects (the scene's vtable); a wrong one stops it and says so.
+- **HD audio:** the song's original recording (44.1 or 48 kHz) plays in
+  place of the DS's 15 kHz stream (channels 6 and 7 muted), kept on the
+  game's song clock: `tools/bake_customs.py` measures the stream's offset
+  and the clock's rate per custom. `--port hd=off` plays the DS stream.
+- **Scores** go to `customs/scores.ini`, never the campaign's save: the best
+  per custom and difficulty, with the grades and whether it was cleared
+  (the ending comic follows a clear, Regroup a fail).
+- **Back to campaign** (on the Customs screen and in the Game menu) starts a
+  run on the campaign's save again.
+
+The five: All Star (over Rock This Town, SS05), Movies (Makes No Difference,
+SS02), Life Is a Highway (Highway Star, SS09), Come and Get Your Love (YMCA,
+SS10), Girls Just Want to Have Fun (SS11). `tools/extract_customs.py` takes
+each custom's files from its built ROM; `tools/bake_customs.py` makes the
+placeholder art, the stage cards and both previews, and the HD timing.
+`customs/` is not committed (the songs' audio).
+
 ## Local ndskit patches
 
-In `patches/`, each applying cleanly to upstream ndskit (5ee24af):
+In `patches/`, applied in this order to upstream ndskit (5ee24af); together
+they reproduce the submodule's working tree exactly:
 
+- `ndskit-discover.patch`: two discovery fixes (below).
 - `ndskit-display-options.patch`: the display options above (runtime
   `display.cpp`, `audio.cpp`, `main.cpp`, `nds.h`, `display.h`). Headless
   runs are byte-identical with and without it.
-- `ndskit-discover.patch`: two fixes to `recomp/discover.py`, both to report
-  upstream (drafts in `upstream/`):
+- `ndskit-input-hook.patch`: one input path for the window and scripts
+  (`nds_apply_input`) with a hook for a port's own code; SDL3 gamepads by
+  the place of each button (south B, east A, west Y, north X, the d-pad,
+  Start, Back, shoulders); `PAD_*` names in input scripts; `--port
+  KEY[=VALUE]` options for the port.
+- `ndskit-display-live.patch`: screen layouts (`--layout`, F9); every
+  display setting changeable while the window runs (`display_change`);
+  hooks for a port's UI (its first look at each event, drawing over the
+  picture, a margin kept above the screens); `--low-latency` and
+  `--audio-latency`. The screens are now always composed into a picture
+  at the scale and laid out from it.
+- `ndskit-function-hooks.patch`: `python -m ndskit.recomp --hook ADDR`
+  recompiles a function as `f_ADDR_orig` with `f_ADDR` in its place,
+  calling the hook a port sets with `arm_set_hook` (ArmModule::hooks). One
+  of ndskit's own known gaps ("no hooks yet").
+- `ndskit-customs-runtime.patch`: what Customs needs of the runtime:
+  `--replace-file NAME=PATH`, muting sound channels (`sound_set_muted`) and
+  reading one (`sound_channel`), turbo (`display_set_turbo`: frames neither
+  drawn nor paced, the sound dropped), where a screen is in the window
+  (`display_screen_rect`), the sound's playback ratio and queue
+  (`audio_ratio`, `audio_queued_seconds`), and a port's input hook running
+  headless without a script. Headless runs are byte-identical before and
+  after it (EBA, 3,000 VBlanks through the menus: RAM, VRAM, save and
+  screenshots).
 
+The discovery fixes, both to report upstream (drafts in `upstream/`):
 1. `Program.run()` gave up after 4 refuse passes and wiped everything, so
    EBA's ARM9 discovered 0 functions. It now allows 40 passes and never wipes
    after the last one.
@@ -90,7 +228,8 @@ In `patches/`, each applying cleanly to upstream ndskit (5ee24af):
 
 Re-apply after updating the submodule:
 
-    git -C ndskit apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch
+    cd ndskit
+    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch
 
 ## Toolchain
 
@@ -102,7 +241,7 @@ OE2.nds; not committed). Each game gets its own tree: EBA in
 ## Commands
 
     python tools/phase0_check.py roms/EBA.nds --game eba        # discovery + hand-found addresses
-    python -m ndskit.recomp roms/EBA.nds --out build/recomp --optest
+    python -m ndskit.recomp roms/EBA.nds --out build/recomp --optest --hook 020681D8
     python -m ndskit.recomp.selftest roms/EBA.nds --cpu 9 --auto --out build/recomp/selftest_eba9.txt
     C:\msys64\usr\bin\bash.exe -lc "/f/dxvk_remix/Claude/eba-recomp/tools/build.sh"
     build/recomp/b/selftest build/recomp/selftest/*.txt build/recomp/selftest_eba9.txt
@@ -113,8 +252,8 @@ OE1 and OE2 are the same with their ROM, `--out build/oe1/recomp` or
 `--cpu 9 --overlay N --auto` for N in 0-6.
 
 `tools/run_headless.ps1` runs a build headless from a fresh copy of the real
-save. These scripts go from boot into a stage on the middle difficulty (taps
-are lower-screen coordinates):
+save. These scripts go from boot into a stage on the difficulty each save
+starts on (EBA's: Hard Rock); taps are lower-screen coordinates:
 
     tools\run_headless.ps1 -Game EBA -VBlanks 9000 -Wav -Shots 5600,7500 `
       -Script "950:tap:128:150,1300:tap:128:66,2450:tap:236:178,3650:tap:126:103,4300:tap:236:178,5000:tap:238:183"
@@ -136,11 +275,11 @@ In a window (put `C:\msys64\ucrt64\bin` on PATH; mouse = stylus, Esc quits):
 
 EBA only for now:
 
-1. Button mode: a controller's face buttons or a key in place of the
-   stylus, reading the live notes from RAM (the judge at 0x020681D8 runs
-   every frame; note objects, vtable 0x020B4648, hold x and y): tap on time
-   for a hit circle, hold for a slider, mash for a spinner.
-2. HD note layer: the notes drawn natively between frames, for 120/240.
-3. melonDS oracle: savestate at the same VBlank, `python -m ndskit.melonds STATE.ml1 --compare build/run`.
-4. Post the discover.py bug reports (drafts in `upstream/`).
-5. 3D edge marking (ndskit runtime), seen on the EBA and OE2 stage maps.
+1. Playtest the options bar and calibrate the offset (Timing > Calibrate).
+2. HD note layer: the notes drawn natively between frames, for 120/240
+   (the same note reading as button mode).
+3. OE1 and OE2: re-emit and rebuild on the current ndskit (their trees
+   predate the input, display and hook changes).
+4. melonDS oracle: savestate at the same VBlank, `python -m ndskit.melonds STATE.ml1 --compare build/run`.
+5. Post the discover.py bug reports (drafts in `upstream/`).
+6. 3D edge marking (ndskit runtime), seen on the EBA and OE2 stage maps.

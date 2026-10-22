@@ -1,0 +1,687 @@
+diff --git a/runtime/audio.cpp b/runtime/audio.cpp
+index 341c87c..ae35960 100644
+--- a/runtime/audio.cpp
++++ b/runtime/audio.cpp
+@@ -4,7 +4,8 @@
+ // as 32 728 in a WAV's header) go to an SDL3 audio stream, which resamples
+ // them to the device's rate, and to the WAV file if one is asked for. The
+ // window keeps the DS's pace by the host's clock (display.cpp) while the
+-// device plays by its own: the stream's queue is held near three frames by
++// device plays by its own: the stream's queue is held near three frames
++// (audio_set_latency: fewer, the sound sooner after its frame, more, safer) by
+ // nudging its playback ratio, by at most 0.5% (a twelfth of a semitone),
+ // around the game's speed (1, or 60 / 59.83 when the window runs it at 60).
+ // A queue run dry (the window fell behind) plays silence until the next
+@@ -26,7 +27,8 @@ uint64_t frames, dry, cuts;                         // what the window's run wen
+ double ratio_sum, ratio_lo = 2, ratio_hi;
+ double speed = 1;                                   // the game's pace against the DS's
+ const int kRate = 32728;
+-const double kTarget = 3 * 548.0 * 4;               // three frames, in bytes of the stream's input
++const double kFrameBytes = 548.0 * 4;               // a frame of the stream's input
++double target = 3 * kFrameBytes;                   // the queue held near three frames (audio_set_latency)
+ 
+ void put16(uint8_t* p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
+ void put32(uint8_t* p, uint32_t v) { put16(p, v); put16(p + 2, v >> 16); }
+@@ -58,9 +60,9 @@ bool audio_open(bool device, const std::string& wav_path) {
+         SDL_AudioSpec spec{SDL_AUDIO_S16, 2, kRate};
+         stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
+         if (!stream) { nds_note("audio: no device: %s", SDL_GetError()); return false; }
+-        std::vector<int16_t> silence((size_t)kTarget / 2);
+-        SDL_PutAudioStreamData(stream, silence.data(), (int)kTarget);
+-        queued_avg = kTarget;
++        std::vector<int16_t> silence((size_t)target / 2);
++        SDL_PutAudioStreamData(stream, silence.data(), (int)target);
++        queued_avg = target;
+         SDL_ResumeAudioStreamDevice(stream);
+         SDL_AudioSpec dev;
+         if (SDL_GetAudioDeviceFormat(SDL_GetAudioStreamDevice(stream), &dev, nullptr))
+@@ -88,7 +90,7 @@ void audio_frame() {
+         }
+         SDL_PutAudioStreamData(stream, s.data(), (int)(2 * s.size()));
+         queued_avg += (q - queued_avg) * 0.05;
+-        double r = speed * (1 + std::clamp((queued_avg - kTarget) / kTarget * 0.01, -0.005, 0.005));
++        double r = speed * (1 + std::clamp((queued_avg - target) / target * 0.01, -0.005, 0.005));
+         SDL_SetAudioStreamFrequencyRatio(stream, (float)r);
+         ++frames;
+         ratio_sum += r;
+@@ -100,6 +102,9 @@ void audio_frame() {
+ 
+ void audio_set_speed(double s) { speed = s; }
+ 
++void audio_set_latency(double f) { target = std::clamp(f, 0.5, 12.0) * kFrameBytes; }
++double audio_latency() { return target / kFrameBytes; }
++
+ void audio_close() {
+     if (wav) { wav_header(); std::fclose(wav); wav = nullptr; }
+     if (stream) {
+diff --git a/runtime/display.cpp b/runtime/display.cpp
+index de6f82c..fb4afcc 100644
+--- a/runtime/display.cpp
++++ b/runtime/display.cpp
+@@ -1,27 +1,31 @@
+ // ndskit runtime — the screens: the window, the compositor, the host's
+ // input, pictures.
+ //
+-// The window shows the two screens one above the other (the upper one is
+-// engine A's when POWCNT1 bit 15 says so), as large as it allows at the
+-// DS's shape. Each frame the 2D engines' words (nds.h) go up as a texture,
+-// the 3D picture is drawn at 256x192 times the scale (render_gl.cpp), and a
+-// shader composes them per pixel: the 2D layers at the DS's resolution, the
+-// 3D at its own. Without --scale it composes straight into the window, the
+-// 3D at the scale nearest the window's. With it, into a picture of 256x384
+-// times the scale, which a second shader brings to the window: sharp
+-// bilinear where the window is the larger (whole texels, blended only across
+-// their edges), the mean of the texels each window pixel covers where it is
+-// the smaller. Headless pictures do the same at the DS's size, composed on
+-// the CPU (gpu2d_compose) from the 3D read back.
++// The window shows the two screens in a layout: one above the other (the
++// upper one is engine A's when POWCNT1 bit 15 says so), side by side, or one
++// alone, as large as the window allows at their shape, below the space a
++// port keeps for itself (a menu bar). Each frame the 2D engines' words
++// (nds.h) go up as a texture, the 3D picture is drawn at 256x192 times the
++// scale (render_gl.cpp), and a shader composes them per pixel into a picture
++// of both screens, upper above lower, 256x384 times the scale: the 2D layers
++// at the DS's resolution, the 3D at its own. The scale is --scale's, or
++// without it the one nearest the window's. A second shader brings that
++// picture to the window in the layout: sharp bilinear where the window is
++// the larger (whole texels, blended only across their edges), the mean of the
++// texels each window pixel covers where it is the smaller, each screen
++// sampled within itself. Headless pictures are composed on the CPU
++// (gpu2d_compose) at the DS's size, from the 3D read back.
+ //
+ // Input: the keys as the oracle's melonDS has them (X A, Z B, S X, A Y, Q L,
+ // W R, Enter START, Backspace SELECT, the arrows), the left mouse button on
+-// the lower screen as the stylus; F12 a picture into the run's directory;
+-// F11 and Alt+Enter the whole display, or back. Gamepads (SDL3's: Xbox,
+-// PlayStation, Switch...) by the place of each button: south B, east A,
+-// west Y, north X, the d-pad, Start, Back (SELECT), the shoulders L and R.
+-// It all goes through nds_apply_input (input.cpp), a port's hook with it. A
+-// run with an input script ignores the keyboard, the mouse and the gamepads.
++// the lower screen, wherever the layout puts it, as the stylus; F12 a
++// picture into the run's directory; F11 and Alt+Enter the whole display, or
++// back; F9 the next layout. Gamepads (SDL3's: Xbox, PlayStation, Switch...)
++// by the place of each button: south B, east A, west Y, north X, the d-pad,
++// Start, Back (SELECT), the shoulders L and R. It all goes through
++// nds_apply_input (input.cpp), a port's hook with it. A run with an input
++// script ignores the keyboard, the mouse and the gamepads. A port's code sees
++// each event first and draws over the picture (display_set_hooks).
+ //
+ // The pace (--fps). The game runs a frame at a time; its picture is presented
+ // after it, and again until the next frame is due (nothing the DS shows moves
+@@ -37,7 +41,11 @@
+ //                the faster (no tearing), without it if not (no cap).
+ //   uncapped     the DS's pace by the host's clock, pictures as fast as the
+ //                host draws them, without the sync.
+-// The window's title shows the frames and pictures of the last second.
++// Low latency waits for each picture to be drawn (glFinish) after it is
++// presented, so the driver queues none ahead of the display. The window's
++// title shows the frames and pictures of the last second. The settings change
++// while the window runs (display_change); each change is made at the start
++// of the next frame.
+ #include "display.h"
+ #include "gl.h"
+ #include "render3d.h"
+@@ -60,11 +68,17 @@ namespace {
+ SDL_Window* win;
+ SDL_GLContext ctx;
+ bool visible;
+-GlTarget t_win, t_one;                                  // the 3D at the window's scale, and at 1
++DisplaySettings cur, want;                              // the settings in force, and those asked for next
++bool changed;
++DisplayHooks hooks;
++int top_margin;
++float refresh_hz;
++GlTarget t_win, t_one;                                  // the 3D at the picture's scale, and at 1
+ GLuint comp_prog, words_tex, empty_vao;
+ GLint loc_atop, loc_view;
+-GLuint out_prog, pic_fbo, pic_tex;                      // --scale: the screens composed at the scale
+-GLint loc_out_view, loc_out_size;
++GLuint out_prog, pic_fbo, pic_tex;                      // the screens composed at the scale
++int pic_scale;
++GLint loc_out_view, loc_out_size, loc_out_canvas, loc_out_top, loc_out_bottom;
+ bool vsync;
+ int locked;                                             // refreshes a frame lasts, the sync the clock (0: the host's)
+ double locked_avg_ns;                                   // ... the frames' mean length: far short, the sync is not holding them
+@@ -79,7 +93,7 @@ uint64_t late_frames, late_worst_ns, run_worst_ns;      // frames 1.5 times thei
+ uint64_t title_ns, title_frames, title_pictures;        // the last second's, for the title
+ std::vector<SDL_Gamepad*> gamepads;                     // every one connected; their buttons pressed together
+ std::string capture;                                    // a picture of the window, taken at the next present
+-std::string capture_pic;                                // ... and of the scaled picture
++std::string capture_pic;                                // ... and of the composed picture
+ const double kFrameNs = 1e9 * 263 * 355 * 6 / 33513982.0;   // 16.7154 ms
+ uint64_t shots_taken;
+ std::vector<uint32_t> words(256 * 384 * 2);
+@@ -91,11 +105,11 @@ void main() {
+ }
+ )";
+ 
+-// gpu2d_compose, per pixel of the window
++// gpu2d_compose, per pixel of the picture
+ const char* kCompFS = R"(#version 450
+ layout(binding = 0) uniform usampler2D u_words;   // 256x384: the upper screen's words, then the lower's
+ layout(binding = 1) uniform sampler2D u_3d;       // engine A's 3D, rows bottom first
+-uniform vec4 u_view;                              // the screens' rectangle in the window: x, y (top), w, h
++uniform vec4 u_view;                              // the screens' rectangle in the target: x, y (top), w, h
+ uniform int u_atop;                               // engine A on the upper screen
+ layout(location = 0) out vec4 o_col;
+ 
+@@ -157,26 +171,38 @@ void main() {
+ }
+ )";
+ 
+-// --scale: the composed picture to the window
++// the composed picture to the window, in the layout
+ const char* kOutFS = R"(#version 450
+-layout(binding = 0) uniform sampler2D u_pic;      // the screens at the scale, rows bottom first, linear
+-uniform vec4 u_view;                              // the screens' rectangle in the window: x, y (top), w, h
+-uniform vec4 u_size;                              // the picture's size in texels (x, y)
++layout(binding = 0) uniform sampler2D u_pic;      // both screens at the scale, upper above lower, rows bottom first
++uniform vec4 u_view;                              // the layout's rectangle in the window: x, y (bottom), w, h
++uniform vec4 u_size;                              // the picture's size in texels, the scale (texels a DS pixel)
++uniform vec4 u_canvas;                            // the layout's size in DS pixels
++uniform vec4 u_top, u_bottom;                     // each screen's place in it (x, y), shown (z)
+ layout(location = 0) out vec4 o_col;
+ 
+ void main() {
+     vec2 win = vec2(gl_FragCoord.x - u_view.x, u_view.w - (gl_FragCoord.y - u_view.y));
+-    if (win.x < 0.0 || win.y < 0.0 || win.x >= u_view.z || win.y >= u_view.w) { o_col = vec4(0.0, 0.0, 0.0, 1.0); return; }
++    o_col = vec4(0.0, 0.0, 0.0, 1.0);
++    if (win.x < 0.0 || win.y < 0.0 || win.x >= u_view.z || win.y >= u_view.w) return;
++    vec2 c = win / u_view.zw * u_canvas.xy;       // in the layout, DS pixels, y down
++    int i = -1;
++    if (u_top.z > 0.5 && all(greaterThanEqual(c, u_top.xy)) && all(lessThan(c, u_top.xy + vec2(256.0, 192.0)))) i = 0;
++    else if (u_bottom.z > 0.5 && all(greaterThanEqual(c, u_bottom.xy)) && all(lessThan(c, u_bottom.xy + vec2(256.0, 192.0)))) i = 1;
++    if (i < 0) return;
++    vec2 local = c - (i == 0 ? u_top.xy : u_bottom.xy);
++    float sc = u_size.z;
+     vec2 size = u_size.xy;
+-    vec2 k = u_view.zw / size;                    // window pixels a texel
+-    vec2 t = vec2(win.x, u_view.w - win.y) / k;   // the pixel's centre in texels
++    float base = i == 0 ? 192.0 * sc : 0.0;       // the screen's first row in the picture
++    vec2 lo = vec2(0.5, base + 0.5), hi = vec2(256.0 * sc - 0.5, base + 192.0 * sc - 0.5);
++    vec2 k = u_view.zw / u_canvas.xy / sc;        // window pixels a texel
++    vec2 t = vec2(local.x * sc, base + (192.0 - local.y) * sc);   // the pixel's centre in texels
+     if (k.x >= 1.0) {
+         // sharp bilinear: each texel whole over the integer part of the ratio, blended across its edges
+         vec2 p = max(floor(k), vec2(1.0));
+-        vec2 c = fract(t) - 0.5;
++        vec2 f = fract(t) - 0.5;
+         vec2 r = 0.5 - 0.5 / p;
+-        vec2 f = (c - clamp(c, -r, r)) * p + 0.5;
+-        o_col = vec4(texture(u_pic, (floor(t) + f) / size).rgb, 1.0);
++        vec2 g = (f - clamp(f, -r, r)) * p + 0.5;
++        o_col = vec4(texture(u_pic, clamp(floor(t) + g, lo, hi) / size).rgb, 1.0);
+     } else {
+         // the mean over the pixel's footprint: n x n bilinear samples spread across it
+         int n = min(int(ceil(1.0 / k.x)), 8);
+@@ -184,12 +210,24 @@ void main() {
+         vec2 t0 = t - 0.5 / k + 0.5 * step;
+         vec3 sum = vec3(0.0);
+         for (int j = 0; j < n; ++j)
+-            for (int i = 0; i < n; ++i) sum += texture(u_pic, (t0 + vec2(i, j) * step) / size).rgb;
++            for (int m = 0; m < n; ++m) sum += texture(u_pic, clamp(t0 + vec2(m, j) * step, lo, hi) / size).rgb;
+         o_col = vec4(sum / float(n * n), 1.0);
+     }
+ }
+ )";
+ 
++// A layout: its size in DS pixels, each screen's place in it, whether it shows.
++struct Geometry { float w, h; float x[2], y[2]; bool show[2]; };
++
++Geometry geometry(NdsLayout l) {
++    switch (l) {
++    case NdsLayout::SideBySide: return {512, 192, {0, 256}, {0, 0}, {true, true}};
++    case NdsLayout::Top: return {256, 192, {0, 0}, {0, 0}, {true, false}};
++    case NdsLayout::Bottom: return {256, 192, {0, 0}, {0, 0}, {false, true}};
++    default: return {256, 384, {0, 0}, {0, 192}, {true, true}};
++    }
++}
++
+ bool gl_load() {
+     bool ok = true;
+ #define NDSKIT_GL_LOAD(T, n)                                                   \
+@@ -209,11 +247,13 @@ void gather_words() {
+     }
+ }
+ 
+-// The rectangle of the window the screens fill.
++// The rectangle of the window the layout fills, below the port's margin.
+ void view_rect(int ww, int wh, float* r) {
+-    float s = std::min(ww / 256.0f, wh / 384.0f);
+-    r[2] = 256 * s; r[3] = 384 * s;
+-    r[0] = (ww - r[2]) / 2; r[1] = (wh - r[3]) / 2;
++    Geometry g = geometry(cur.layout);
++    float avail = (float)std::max(1, wh - top_margin);
++    float s = std::min(ww / g.w, avail / g.h);
++    r[2] = g.w * s; r[3] = g.h * s;
++    r[0] = (ww - r[2]) / 2; r[1] = top_margin + (avail - r[3]) / 2;
+ }
+ 
+ void read_input() {
+@@ -240,8 +280,10 @@ void read_input() {
+     float px = mx * ww / std::max(lw, 1), py = my * wh / std::max(lh, 1);
+     float r[4];
+     view_rect(ww, wh, r);
+-    int dx = (int)((px - r[0]) / r[2] * 256), dy = (int)((py - r[1]) / r[3] * 384) - 192;
+-    in.pen = (mb & SDL_BUTTON_LMASK) && dx >= 0 && dx < 256 && dy >= 0 && dy < 192;
++    Geometry g = geometry(cur.layout);
++    float cx = (px - r[0]) / r[2] * g.w, cy = (py - r[1]) / r[3] * g.h;   // in the layout, DS pixels
++    int dx = (int)std::floor(cx - g.x[1]), dy = (int)std::floor(cy - g.y[1]);
++    in.pen = g.show[1] && (mb & SDL_BUTTON_LMASK) && dx >= 0 && dx < 256 && dy >= 0 && dy < 192;
+     in.x = dx;
+     in.y = dy;
+     nds_apply_input(in, nds_vblanks());
+@@ -260,9 +302,14 @@ void gamepad_event(const SDL_Event& ev) {
+     }
+ }
+ 
+-// --scale: the picture the screens are composed into (the scale is the run's)
++// The picture the screens are composed into, at a scale.
+ void pic_target(int s) {
+-    if (pic_fbo) return;
++    if (pic_fbo && pic_scale == s) return;
++    if (pic_fbo) {
++        glDeleteFramebuffers(1, &pic_fbo);
++        glDeleteTextures(1, &pic_tex);
++    }
++    pic_scale = s;
+     glCreateTextures(GL_TEXTURE_2D, 1, &pic_tex);
+     glTextureStorage2D(pic_tex, 1, GL_RGBA8, 256 * s, 384 * s);
+     glTextureParameteri(pic_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+@@ -273,18 +320,21 @@ void pic_target(int s) {
+     glNamedFramebufferTexture(pic_fbo, GL_COLOR_ATTACHMENT0, pic_tex, 0);
+ }
+ 
+-// The window at the scale's size, inside the display's usable area at the DS's shape.
++// The window at the layout's size times the scale (and the port's margin),
++// inside the display's usable area at its shape.
+ void size_window(int s) {
++    if (SDL_GetWindowFlags(win) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED)) return;
++    Geometry g = geometry(cur.layout);
+     float d = SDL_GetWindowPixelDensity(win);           // pixels a unit of the window's size
+     if (d <= 0) d = 1;
+     SDL_Rect u{0, 0, 1280, 720};
+     SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(win), &u);
+-    double w = 256.0 * s / d, h = 384.0 * s / d;
++    double w = g.w * s / d, h = (g.h * s + top_margin) / d;
+     double fit = std::min({1.0, u.w * 0.95 / w, u.h * 0.92 / h});
+     SDL_SetWindowSize(win, (int)(w * fit), (int)(h * fit));
+     SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+-    nds_note("display: the screens at %dx (%dx%d), the window %dx%d%s", s, 256 * s, 384 * s,
+-             (int)(w * fit * d), (int)(h * fit * d), fit < 1.0 ? " (fitted to the display)" : "");
++    nds_note("display: %s, the screens at %dx (%dx%d), the window %dx%d%s", display_layout_name(cur.layout), s,
++             (int)g.w * s, (int)g.h * s, (int)(w * fit * d), (int)(h * fit * d), fit < 1.0 ? " (fitted to the display)" : "");
+ }
+ 
+ // The pace asked for (--fps) on a display refreshing at hz.
+@@ -294,7 +344,7 @@ void set_pace(float hz) {
+     picture_ns = 0;
+     locked = 0;
+     bool sync = false;
+-    int fps = g_cfg.fps;
++    int fps = cur.fps;
+     if (fps == 0) {
+         sync = hz >= 50.0f;
+     } else if (fps > 0) {
+@@ -329,15 +379,60 @@ void set_pace(float hz) {
+     else
+         std::snprintf(how, sizeof how, "the game at 60 frames a second, %d pictures a second by the clock, %s", fps,
+                       vsync ? "with the vertical sync" : "without the vertical sync");
+-    nds_note("display: %s, %.2f Hz, %s", (const char*)glGetString(GL_RENDERER), hz, how);
++    nds_note("display: %s, %.2f Hz, %s%s", (const char*)glGetString(GL_RENDERER), hz, how,
++             cur.low_latency ? ", low latency" : "");
++    next_ns = locked_last_ns = SDL_GetTicksNS();
++    locked_avg_ns = frame_ns;
+ }
+ 
+-void toggle_fullscreen() {
+-    SDL_SetWindowFullscreen(win, !(SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN));
++// The settings asked for since the last frame, made.
++void apply_changes() {
++    if (!changed) return;
++    changed = false;
++    DisplaySettings old = cur;
++    cur = want;
++    cur.scale = std::clamp(cur.scale, 0, kMaxScale);
++    if (cur.fullscreen != old.fullscreen) SDL_SetWindowFullscreen(win, cur.fullscreen);
++    if (cur.layout != old.layout || (cur.scale != old.scale && cur.scale > 0)) {
++        int s = cur.scale > 0 ? cur.scale : std::max(1, pic_scale);
++        size_window(s);
++        if (cur.layout != old.layout) nds_note("display: %s", display_layout_name(cur.layout));
++    }
++    if (cur.fps != old.fps || cur.low_latency != old.low_latency) {
++        float hz = 0;
++        if (const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(win))) hz = dm->refresh_rate;
++        refresh_hz = hz;
++        set_pace(hz);
++    }
+ }
+ 
+ }  // namespace
+ 
++const DisplaySettings& display_settings() { return cur; }
++
++void display_change(const DisplaySettings& s) {
++    want = s;
++    changed = true;
++}
++
++const char* display_layout_name(NdsLayout l) {
++    switch (l) {
++    case NdsLayout::SideBySide: return "side by side";
++    case NdsLayout::Top: return "the upper screen alone";
++    case NdsLayout::Bottom: return "the lower screen alone";
++    default: return "one above the other";
++    }
++}
++
++void display_set_hooks(const DisplayHooks& h) { hooks = h; }
++void display_set_top_margin(int pixels) {
++    pixels = std::max(0, pixels);
++    if (pixels == top_margin) return;
++    top_margin = pixels;
++    if (visible && cur.scale > 0) size_window(cur.scale);   // room for it, the screens at their scale
++}
++SDL_Window* display_window() { return visible ? win : nullptr; }
++
+ GLuint gl_program(const char* vs, const char* fs) {
+     auto compile = [](GLenum type, const char* src) -> GLuint {
+         GLuint sh = glCreateShader(type);
+@@ -399,21 +494,33 @@ bool display_open(bool vis) {
+     if (!out_prog) return false;
+     loc_out_view = glGetUniformLocation(out_prog, "u_view");
+     loc_out_size = glGetUniformLocation(out_prog, "u_size");
++    loc_out_canvas = glGetUniformLocation(out_prog, "u_canvas");
++    loc_out_top = glGetUniformLocation(out_prog, "u_top");
++    loc_out_bottom = glGetUniformLocation(out_prog, "u_bottom");
+     glCreateTextures(GL_TEXTURE_2D, 1, &words_tex);
+     glTextureStorage2D(words_tex, 1, GL_RG32UI, 256, 384);
+     glCreateVertexArrays(1, &empty_vao);
+     render_target(t_one, 1);
+     if (vis) {
+-        if (g_cfg.scale > 0) {
+-            pic_target(g_cfg.scale);
+-            size_window(g_cfg.scale);
++        // the settings the run was started with, and those a port asked for before the window opened
++        DisplaySettings start = changed ? want : DisplaySettings();
++        if (!changed) {
++            start.scale = g_cfg.scale;
++            start.fps = g_cfg.fps;
++            start.fullscreen = g_cfg.fullscreen;
++            start.layout = (NdsLayout)std::clamp(g_cfg.layout, 0, 3);
++            start.low_latency = g_cfg.low_latency;
+         }
+-        if (g_cfg.fullscreen) toggle_fullscreen();
+-        float hz = 0;
+-        if (const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(win))) hz = dm->refresh_rate;
+-        set_pace(hz);
+-        next_ns = run_ns = title_ns = locked_last_ns = SDL_GetTicksNS();
+-        locked_avg_ns = frame_ns;
++        changed = false;
++        cur = want = start;
++        if (cur.scale > 0) {
++            pic_target(cur.scale);
++            size_window(cur.scale);
++        }
++        if (cur.fullscreen) SDL_SetWindowFullscreen(win, true);
++        if (const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(win))) refresh_hz = dm->refresh_rate;
++        set_pace(refresh_hz);
++        run_ns = title_ns = SDL_GetTicksNS();
+     }
+     return true;
+ }
+@@ -436,14 +543,25 @@ bool display_frame() {
+     while (SDL_PollEvent(&ev)) {
+         if (ev.type == SDL_EVENT_QUIT) return false;
+         gamepad_event(ev);
++        if (hooks.event && hooks.event(&ev)) continue;  // the port's
+         if (ev.type == SDL_EVENT_KEY_DOWN && !ev.key.repeat) {
+             if (ev.key.scancode == SDL_SCANCODE_ESCAPE) return false;
+             if (ev.key.scancode == SDL_SCANCODE_F12) shot = true;
+             if (ev.key.scancode == SDL_SCANCODE_F11 ||
+-                (ev.key.scancode == SDL_SCANCODE_RETURN && (ev.key.mod & SDL_KMOD_ALT)))
+-                toggle_fullscreen();
++                (ev.key.scancode == SDL_SCANCODE_RETURN && (ev.key.mod & SDL_KMOD_ALT))) {
++                DisplaySettings s = changed ? want : cur;
++                s.fullscreen = !(SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN);
++                display_change(s);
++            }
++            if (ev.key.scancode == SDL_SCANCODE_F9) {
++                DisplaySettings s = changed ? want : cur;
++                s.layout = (NdsLayout)(((int)s.layout + 1) % 4);
++                display_change(s);
++            }
+         }
+     }
++    apply_changes();
++    cur.fullscreen = SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN;
+     if (g_cfg.input.empty()) read_input();     // a script drives the input instead
+     if (shot) display_shot(g_cfg.out + "/shot" + std::to_string(++shots_taken) + ".png");
+ 
+@@ -451,49 +569,49 @@ bool display_frame() {
+     SDL_GetWindowSizeInPixels(win, &ww, &wh);
+     float r[4];
+     view_rect(ww, wh, r);
+-    int scale = g_cfg.scale > 0 ? g_cfg.scale : std::max(1, (int)std::lround(r[3] / 384.0f));
++    Geometry g = geometry(cur.layout);
++    int scale = cur.scale > 0 ? cur.scale : std::clamp((int)std::lround(r[3] / g.h), 1, kMaxScale);
+     render_target(t_win, scale);
++    pic_target(scale);
+     GLuint pic = render_draw(gx_job(), t_win);
+     gather_words();
+     glTextureSubImage2D(words_tex, 0, 0, 0, 256, 384, GL_RG_INTEGER, GL_UNSIGNED_INT, words.data());
+-    auto compose = [&](float x, float y, float w, float h) {
+-        glUseProgram(comp_prog);
+-        glProgramUniform4f(comp_prog, loc_view, x, y, w, h);
+-        glProgramUniform1i(comp_prog, loc_atop, gpu2d_top_is_a() ? 1 : 0);
+-        glBindTextureUnit(0, words_tex);
+-        glBindTextureUnit(1, pic);
+-        glBindVertexArray(empty_vao);
+-        glDrawArrays(GL_TRIANGLES, 0, 3);
+-        glBindVertexArray(0);
+-    };
+-    if (g_cfg.scale > 0) {                      // the frame composed once at the scale; each present brings it over
+-        int pw = 256 * scale, ph = 384 * scale;
+-        glBindFramebuffer(GL_FRAMEBUFFER, pic_fbo);
+-        glViewport(0, 0, pw, ph);
+-        compose(0, 0, (float)pw, (float)ph);
+-        if (!capture_pic.empty()) {
+-            std::vector<uint8_t> rgb((size_t)pw * ph * 3), flip(rgb.size());
+-            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+-            glGetTextureImage(pic_tex, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLsizei)rgb.size(), rgb.data());
+-            for (int y = 0; y < ph; ++y) std::memcpy(&flip[(size_t)y * pw * 3], &rgb[(size_t)(ph - 1 - y) * pw * 3], (size_t)pw * 3);
+-            write_png(capture_pic, pw, ph, flip.data());
+-            capture_pic.clear();
+-        }
++    // the frame composed once at the scale; each present brings it over in the layout
++    int pw = 256 * scale, ph = 384 * scale;
++    glBindFramebuffer(GL_FRAMEBUFFER, pic_fbo);
++    glViewport(0, 0, pw, ph);
++    glUseProgram(comp_prog);
++    glProgramUniform4f(comp_prog, loc_view, 0, 0, (float)pw, (float)ph);
++    glProgramUniform1i(comp_prog, loc_atop, gpu2d_top_is_a() ? 1 : 0);
++    glBindTextureUnit(0, words_tex);
++    glBindTextureUnit(1, pic);
++    glBindVertexArray(empty_vao);
++    glDrawArrays(GL_TRIANGLES, 0, 3);
++    glBindVertexArray(0);
++    if (!capture_pic.empty()) {
++        std::vector<uint8_t> rgb((size_t)pw * ph * 3), flip(rgb.size());
++        glPixelStorei(GL_PACK_ALIGNMENT, 1);
++        glGetTextureImage(pic_tex, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLsizei)rgb.size(), rgb.data());
++        for (int y = 0; y < ph; ++y) std::memcpy(&flip[(size_t)y * pw * 3], &rgb[(size_t)(ph - 1 - y) * pw * 3], (size_t)pw * 3);
++        write_png(capture_pic.substr(0, capture_pic.size() - 4) + "-" + std::to_string(scale) + "x.png", pw, ph, flip.data());
++        capture_pic.clear();
+     }
+     auto present = [&]() {
+         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+         glViewport(0, 0, ww, wh);
+-        if (g_cfg.scale > 0) {
+-            glUseProgram(out_prog);
+-            glProgramUniform4f(out_prog, loc_out_view, r[0], r[1], r[2], r[3]);
+-            glProgramUniform4f(out_prog, loc_out_size, 256.0f * scale, 384.0f * scale, 0, 0);
+-            glBindTextureUnit(0, pic_tex);
+-            glBindVertexArray(empty_vao);
+-            glDrawArrays(GL_TRIANGLES, 0, 3);
+-            glBindVertexArray(0);
+-        } else {
+-            compose(r[0], r[1], r[2], r[3]);
+-        }
++        glClearColor(0, 0, 0, 1);
++        glClear(GL_COLOR_BUFFER_BIT);
++        glUseProgram(out_prog);
++        glProgramUniform4f(out_prog, loc_out_view, r[0], wh - r[1] - r[3], r[2], r[3]);   // y from the bottom, as GL counts
++        glProgramUniform4f(out_prog, loc_out_size, (float)pw, (float)ph, (float)scale, 0);
++        glProgramUniform4f(out_prog, loc_out_canvas, g.w, g.h, 0, 0);
++        glProgramUniform4f(out_prog, loc_out_top, g.x[0], g.y[0], g.show[0] ? 1.0f : 0.0f, 0);
++        glProgramUniform4f(out_prog, loc_out_bottom, g.x[1], g.y[1], g.show[1] ? 1.0f : 0.0f, 0);
++        glBindTextureUnit(0, pic_tex);
++        glBindVertexArray(empty_vao);
++        glDrawArrays(GL_TRIANGLES, 0, 3);
++        glBindVertexArray(0);
++        if (hooks.draw) hooks.draw(ww, wh);
+         if (!capture.empty()) {
+             std::vector<uint8_t> rgb((size_t)ww * wh * 3), flip(rgb.size());
+             glPixelStorei(GL_PACK_ALIGNMENT, 1);
+@@ -503,6 +621,7 @@ bool display_frame() {
+             capture.clear();
+         }
+         SDL_GL_SwapWindow(win);
++        if (cur.low_latency) glFinish();
+         ++run_pictures;
+         ++title_pictures;
+     };
+@@ -530,10 +649,10 @@ bool display_frame() {
+         for (;;) {
+             uint64_t now = SDL_GetTicksNS();
+             if (now > next_ns + 100000000ull) { next_ns = now; break; }   // far behind: do not run to catch up
+-            if (g_cfg.fps < 0) {
++            if (cur.fps < 0) {
+                 if (now >= next_ns) break;
+                 present();
+-            } else if (g_cfg.fps > 0) {
++            } else if (cur.fps > 0) {
+                 uint64_t at = shown + (uint64_t)picture_ns;
+                 if (at + (uint64_t)(picture_ns / 2) > next_ns) {
+                     if (next_ns > now) SDL_DelayPrecise(next_ns - now);
+@@ -586,8 +705,10 @@ bool display_read3d(uint32_t* out) {
+ }
+ 
+ void display_shot(const std::string& path) {
+-    if (visible) capture = path.substr(0, path.size() - 4) + "-window.png";
+-    if (visible && g_cfg.scale > 0) capture_pic = path.substr(0, path.size() - 4) + "-" + std::to_string(g_cfg.scale) + "x.png";
++    if (visible) {
++        capture = path.substr(0, path.size() - 4) + "-window.png";
++        capture_pic = path;
++    }
+     GLuint pic = render_draw(gx_job(), t_one);
+     std::vector<uint8_t> px3d(256 * 192 * 4);
+     glGetTextureImage(pic, 0, GL_RGBA, GL_UNSIGNED_BYTE, (GLsizei)px3d.size(), px3d.data());
+diff --git a/runtime/display.h b/runtime/display.h
+index 2b92abc..df3503a 100644
+--- a/runtime/display.h
++++ b/runtime/display.h
+@@ -13,10 +13,38 @@ bool display_frame();
+ void display_close();                   // the window's run: its frames and pictures, at what pace
+ // Both screens of the frame just finished, upper above lower, as a PNG at the DS's size.
+ void display_shot(const std::string& path);
++
++// The window's settings, changed while it runs (a port's options UI; F9 cycles
++// the layout): each change is made at the start of the next frame.
++enum class NdsLayout { Stacked, SideBySide, Top, Bottom };
++struct DisplaySettings {
++    int scale = 0;                      // the picture: the screens at 256x192 times this (0: from the window)
++    NdsLayout layout = NdsLayout::Stacked;
++    int fps = 0;                        // as --fps: 0 the DS's pace, 60 120 240, -1 uncapped
++    bool fullscreen = false;
++    bool low_latency = false;           // wait for each picture to be drawn before the next (no frames queued)
++};
++const DisplaySettings& display_settings();
++void display_change(const DisplaySettings& s);
++const char* display_layout_name(NdsLayout l);
++
++// A port's own code in the window: the first look at each host event (SDL_Event;
++// true keeps it from the runtime), drawing over the picture before each present
++// (its UI), and space kept free above the screens (a menu bar), in pixels.
++struct DisplayHooks {
++    bool (*event)(const void* sdl_event) = nullptr;
++    void (*draw)(int w, int h) = nullptr;
++};
++void display_set_hooks(const DisplayHooks& h);
++void display_set_top_margin(int pixels);
++struct SDL_Window;
++SDL_Window* display_window();           // the window, for a port's UI (nullptr headless)
+ void write_png(const std::string& path, int w, int h, const uint8_t* rgb);   // RGB8, top row first
+ 
+ // The sound to the host (audio.cpp): the audio device (a window's run) and a WAV file.
+ bool audio_open(bool device, const std::string& wav);
+ void audio_frame();                     // after a VBlank: the frame's samples out
+ void audio_set_speed(double speed);     // the game's pace against the DS's (1: 59.83 frames a second)
++void audio_set_latency(double frames);  // the sound queued ahead of the device, in frames (3 by default)
++double audio_latency();
+ void audio_close();
+diff --git a/runtime/gl.h b/runtime/gl.h
+index 95fd6f5..0a42f63 100644
+--- a/runtime/gl.h
++++ b/runtime/gl.h
+@@ -71,7 +71,8 @@
+     X(PFNGLBINDFRAMEBUFFERPROC, glBindFramebuffer)                                                  \
+     X(PFNGLCHECKNAMEDFRAMEBUFFERSTATUSPROC, glCheckNamedFramebufferStatus)                          \
+     X(PFNGLREADPIXELSPROC, glReadPixels)                                                            \
+-    X(PFNGLGETTEXTUREIMAGEPROC, glGetTextureImage)
++    X(PFNGLGETTEXTUREIMAGEPROC, glGetTextureImage)                                                  \
++    X(PFNGLFINISHPROC, glFinish)
+ 
+ #define NDSKIT_GL_DECLARE(T, n) extern T n;
+ NDSKIT_GL_FUNCS(NDSKIT_GL_DECLARE)
+diff --git a/runtime/main.cpp b/runtime/main.cpp
+index fbec263..8a129b7 100644
+--- a/runtime/main.cpp
++++ b/runtime/main.cpp
+@@ -1,6 +1,7 @@
+ // ndskit runtime — ndsrun: a cartridge's recompiled programs on the runtime.
+ //
+ //     ndsrun GAME.nds [--window] [--scale N] [--fullscreen] [--fps ds|60|120|240|uncapped]
++//                     [--layout stacked|side|top|bottom] [--low-latency] [--audio-latency FRAMES]
+ //                     [--mute] [--wav FILE] [--out DIR] [--vblanks N] [--port KEY[=VALUE] ...]
+ //                     [--save FILE] [--save-size BYTES] [--shots V,V,...] [--shot-every N] [--input SCRIPT] [--trace]
+ //                     [--ticks9 N] [--ticks7 N] [--no-dump] [--calls N]
+@@ -53,6 +54,15 @@ int main(int argc, char** argv) {
+             }
+         }
+         else if (a == "--fullscreen") cfg.fullscreen = true;
++        else if (a == "--layout") {
++            std::string v = next();
++            const char* names[] = {"stacked", "side", "top", "bottom"};
++            cfg.layout = -1;
++            for (int l = 0; l < 4; ++l) if (v == names[l]) cfg.layout = l;
++            if (cfg.layout < 0) { std::fprintf(stderr, "--layout is stacked, side, top or bottom\n"); return 2; }
++        }
++        else if (a == "--low-latency") cfg.low_latency = true;
++        else if (a == "--audio-latency") cfg.audio_latency = std::atof(next().c_str());
+         else if (a == "--fps") {
+             std::string v = next();
+             if (v == "ds") cfg.fps = 0;
+@@ -96,6 +106,7 @@ int main(int argc, char** argv) {
+     if (!nds_boot(cfg)) return 2;
+     bool shots = !cfg.shots.empty() || cfg.shot_every;
+     if ((cfg.window || shots) && !display_open(cfg.window)) return 2;
++    audio_set_latency(cfg.audio_latency);
+     if (!audio_open(cfg.window && !mute, wav)) return 2;
+     auto shot_at = [&](uint64_t vbl) {
+         return shots && ((cfg.shot_every && vbl % cfg.shot_every == 0) ||
+diff --git a/runtime/nds.h b/runtime/nds.h
+index 6aee87c..6064d16 100644
+--- a/runtime/nds.h
++++ b/runtime/nds.h
+@@ -32,6 +32,10 @@ struct NdsConfig {
+     bool fullscreen = false;            // the window over the whole display (F11 and Alt+Enter toggle it)
+     int fps = 0;                        // the pictures' pace: 0 the DS's (59.83 a second); 60, 120 or 240
+                                         // with the game at 60; -1 as fast as the host draws
++    int layout = 0;                     // the screens: 0 one above the other, 1 side by side, 2 the upper alone,
++                                        // 3 the lower alone (display.h's NdsLayout)
++    bool low_latency = false;           // no picture queued ahead of the display (display.cpp)
++    double audio_latency = 3;           // the sound queued ahead of the device, in frames (audio.cpp)
+     std::vector<uint64_t> shots;        // headless: both screens as PNGs at these VBlanks
+     uint64_t shot_every = 0;            // ... and every N VBlanks
+     std::map<std::string, std::string> port;   // --port KEY[=VALUE]: options for a port's own code

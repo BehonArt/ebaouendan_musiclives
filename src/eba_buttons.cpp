@@ -1,0 +1,349 @@
+// EBA's button mode: a gamepad's face buttons, or a key, in place of the
+// stylus in a song. A press puts the stylus on the note the game is judging
+// now, for two frames, and the game judges that tap as its own: the same
+// windows, the same score. On a slider, held, the stylus follows its ball
+// along the path, a point a frame. On a spinner, each press spins the stylus
+// faster around its centre; it slows down when the presses stop. The mouse,
+// when it is down, wins. In a stage's opening or ending comic a hit button
+// presses its SKIP. Elsewhere the buttons are the DS's as before (south B,
+// east A, west Y, north X); in a song and a comic, the face buttons are hits only.
+//
+// What it reads of the game (the stock USA ARM9, found 2026-10-22):
+//   0x020CD390        the song's clock, in frames (the judge's `now`)
+//   class 0x020B4110  the notes' manager, on the heap: +0x70 the array of
+//                     the song's notes, +0x74 their count
+//   each note         vtable 0x020B4648 tap, 0x020B478C slider, 0x020B48D4
+//                     spinner; +4 byte 0 its kind (0 1 2), byte 1 its state
+//                     (4: the one being judged), byte 3 its number; +0x14
+//                     low half the frame it appears, high half its time (a
+//                     spinner's end); +0x18, +0x1C x, y on the lower screen
+//                     (a spinner's centre)
+//   a slider          +0x40 its path, a point a frame of one pass (int16
+//                     x * 16, y * 64 / 3), +0x44 the points, +0x4C the passes
+//                     (counted down while it plays: read at the press); its
+//                     tail is judged the frame after the last point
+//   a spinner         +0x40 the frames it spins (ending at its time), +0x44
+//                     the turns it asks for
+//
+// Options (the options bar, saved; or ndsrun --port): buttons=off;
+// button-keys=Space,... (SDL key names, up to 4; Space by default);
+// buttons-log (each press and what it hit; buttons-trace adds the note judged
+// every 15 frames); buttons-auto[=N] (a test: presses on every note's frame,
+// or N frames after it, holds the sliders, mashes the spinners at 7.5 a
+// second: The Anthem on Hard Rock, rank S, 258 of 258 at 300).
+#include "eba.h"
+#include <SDL3/SDL.h>
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <vector>
+
+namespace {
+
+using eba::in_main;
+using eba::rd;
+using eba::rh;
+
+constexpr uint32_t kManager = 0x020B4110, kTap = 0x020B4648, kSlider = 0x020B478C, kSpinner = 0x020B48D4;
+constexpr uint32_t kClock = 0x020CD390;
+constexpr uint32_t kFaceKeys = 0xC03;               // DS A, B, X, Y
+constexpr uint32_t kFacePad = 0xF;                  // the gamepad's south, east, west, north
+constexpr int kTapFrames = 2;                       // a tap holds the stylus this long
+constexpr double kSpinBoost = 2.0 / 60;             // a press adds 2 turns a second ...
+constexpr double kSpinDecay = 0.9715;               // ... which halve in 0.4 s without presses
+constexpr double kSpinMax = 10.0 / 60;              // at most 10 turns a second
+constexpr double kSpinRadius = 40;
+
+struct Note {
+    uint32_t at = 0;
+    int kind = 0, state = 0, number = 0, appear = 0, time = 0, x = 0, y = 0;
+};
+
+Note note_at(uint32_t a) {
+    Note n;
+    n.at = a;
+    uint32_t w4 = rd(a + 4), t = rd(a + 0x14);
+    n.kind = w4 & 0xFF;
+    n.state = (w4 >> 8) & 0xFF;
+    n.number = w4 >> 24;
+    n.appear = t & 0xFFFF;
+    n.time = t >> 16;
+    n.x = (int)rd(a + 0x18);
+    n.y = (int)rd(a + 0x1C);
+    return n;
+}
+
+// A slider as it was before it began: the game counts its passes down in
+// the object while it plays, so its shape is taken once, at the press.
+struct Slider {
+    uint32_t at = 0, path = 0;
+    int time = 0, n = 0, passes = 1;
+};
+
+struct Mode {
+    bool init = false, log = false, autoplay = false;
+    int auto_late = 0;                  // buttons-auto=N: each press N frames after its note (a late player)
+    uint32_t mgr = 0;
+    uint64_t next_scan = 0;
+    uint32_t clock = 0;
+    uint64_t clock_seen = 0;            // the VBlank the clock last moved
+    uint32_t held_prev = 0;             // the hit buttons held at the last call
+    int tap_left = 0, tap_x = 0, tap_y = 0;
+    int pending = 0;                    // a press that waits for the stylus to lift first
+    Slider slider;                      // the slider the held buttons follow
+    uint32_t spinner = 0;
+    double angle = 0, speed = 0;        // turns, turns a frame
+    uint32_t auto_last = 0;             // buttons-auto: the last note pressed
+    int auto_mash = 0;
+} m;
+
+bool manager_ok(uint32_t a) {
+    if (!in_main(a) || rd(a) != kManager) return false;
+    uint32_t arr = rd(a + 0x70), n = rd(a + 0x74);
+    if (!in_main(arr) || n == 0 || n > 2048) return false;
+    uint32_t first = rd(arr), vt = in_main(first) ? rd(first) : 0;
+    return vt == kTap || vt == kSlider || vt == kSpinner;
+}
+
+uint32_t manager(uint64_t vbl) {
+    if (manager_ok(m.mgr)) return m.mgr;
+    m.mgr = 0;
+    if (vbl < m.next_scan) return 0;
+    m.next_scan = vbl + 30;                         // not in a song: look again in half a second
+    for (uint32_t o = 0x0CD000; o < 0x400000; o += 4)
+        if (rd(0x02000000u + o) == kManager && manager_ok(0x02000000u + o)) return m.mgr = 0x02000000u + o;
+    return 0;
+}
+
+// The note the game judges now (state 4), else the next one to come.
+bool current(uint32_t mgr, Note& out) {
+    uint32_t arr = rd(mgr + 0x70), n = rd(mgr + 0x74);
+    bool upcoming = false;
+    for (uint32_t i = 0; i < n; ++i) {
+        uint32_t a = rd(arr + 4 * i);
+        if (!in_main(a)) return false;
+        Note t = note_at(a);
+        if (t.state == 4) { out = t; return true; }
+        if (!upcoming && t.state >= 1 && t.state <= 3) { out = t; upcoming = true; }
+    }
+    return upcoming;
+}
+
+Slider slider_at(uint32_t s) {
+    Slider r;
+    r.at = s;
+    r.time = (int)(rd(s + 0x14) >> 16);
+    r.path = rd(s + 0x40);
+    r.n = (int)rd(s + 0x44);
+    r.passes = std::max(1, (int)rd(s + 0x4C));
+    if (!in_main(r.path) || r.n <= 0 || r.n > 4096) r.at = 0;
+    return r;
+}
+
+// The ball at a frame of the song: a path point a frame, passes alternating.
+bool ball(const Slider& s, int now, int& x, int& y) {
+    if (!s.at) return false;
+    int k = now - s.time;
+    if (k > s.n * s.passes) return false;           // over (the frame after the last point still holds)
+    if (k < 0) k = 0;
+    if (k == s.n * s.passes) --k;
+    int pass = k / s.n, i = k - pass * s.n;
+    if (pass & 1) i = s.n - 1 - i;
+    x = rh(s.path + 4 * i) / 16;
+    y = rh(s.path + 4 * i + 2) * 3 / 64;
+    return true;
+}
+
+// The hit buttons held: the gamepad's face buttons and the keys, one bit each.
+uint32_t hit_buttons(const NdsInput& in) {
+    uint32_t held = in.pad & kFacePad;
+    if (in.keyboard)
+        for (int i = 0; i < 4; ++i) {
+            int sc = eba::buttons().keys[i];
+            if (sc > 0 && sc < SDL_SCANCODE_COUNT && in.keyboard[sc]) held |= 1u << (8 + i);
+        }
+    return held;
+}
+
+// A stage's opening or ending comic: a hit button presses its SKIP, at the lower right.
+void skip_comic(NdsInput& in) {
+    static uint32_t prev;
+    static int left;
+    uint32_t held = hit_buttons(in);
+    in.keys &= ~(in.pad_keys & kFaceKeys);
+    if (held & ~prev) left = kTapFrames;
+    prev = held;
+    if (left > 0 && !in.pen) {
+        --left;
+        in.pen = true;
+        in.x = 238;
+        in.y = 183;
+    }
+}
+
+void hook(NdsInput& in, uint64_t vbl) {
+    if (!m.init) { m.init = true; eba::init(); }
+    eba::debug_pokes(vbl);
+    if (eba::customs_frame(in, vbl)) return;        // Customs' autopilot drives the game to its stage
+    if (eba::ui_wants_mouse()) in.pen = false;      // the mouse is on the options bar
+    if (!eba::buttons().on) return;
+    if (eba::scene_has_skip()) { skip_comic(in); return; }
+    uint32_t mgr = manager(vbl);
+    uint32_t clock = mgr ? rd(kClock) : 0;
+    if (clock != m.clock) { m.clock = clock; m.clock_seen = vbl; }
+    bool live = mgr && vbl - m.clock_seen < 30;     // a song running: its clock moved in the last half second
+    if (!live) {
+        m.slider = Slider();
+        m.spinner = 0;
+        m.tap_left = m.pending = 0;
+        m.held_prev = 0;
+        return;
+    }
+    uint32_t held = hit_buttons(in);
+    Note cur;
+    bool have = current(mgr, cur);
+    int now = (int)clock + 1;                       // the frame this input is read in
+    if (m.autoplay) {                               // the test: a perfect player
+        held = 0;
+        if (have && cur.kind != 2 && cur.at != m.auto_last && now >= cur.time + m.auto_late) {
+            m.auto_last = cur.at;
+            held = 1;
+        }
+        if (m.slider.at) { int bx, by; if (ball(m.slider, now, bx, by)) held |= 1; }   // the same button, held on
+        if (have && cur.kind == 2 && now >= cur.time - (int)rd(cur.at + 0x40) && now <= cur.time)
+            held |= (++m.auto_mash % 8 < 4) ? 4 : 0;    // 4 frames down, 4 up: 7.5 presses a second
+    }
+    if (m.log && g_cfg.port.count("buttons-trace") && vbl % 15 == 0)
+        nds_note("eba buttons: song frame %d: current #%d kind %d state %d time %d at %08X; slider %08X held %X",
+                 now, have ? cur.number : -1, cur.kind, cur.state, cur.time, cur.at, m.slider.at, held);
+    in.keys &= ~(in.pad_keys & kFaceKeys);          // in a song the face buttons are hits, not the DS's
+    int presses = __builtin_popcount(held & ~m.held_prev);
+    m.held_prev = held;
+    bool mouse = in.pen;
+
+    // a press: a tap on the note being judged, the head of a slider, or a spinner's push
+    if (presses && have) {
+        if (cur.kind == 2) {
+            m.spinner = cur.at;
+            m.speed = std::min(kSpinMax, m.speed + kSpinBoost * presses);
+        } else if (m.tap_left > 0 || m.pending) {
+            m.tap_left = 0;                         // still down from the last: lift for a frame first
+            m.pending = 1;
+        } else {
+            m.tap_left = kTapFrames;
+            m.tap_x = cur.x;
+            m.tap_y = cur.y;
+            m.slider = cur.kind == 1 ? slider_at(cur.at) : Slider();
+        }
+        if (m.log)
+            nds_note("eba buttons: press at song frame %d: #%d %s, time %d (%+d), state %d", now, cur.number,
+                     cur.kind == 0 ? "tap" : cur.kind == 1 ? "slider" : "spinner", cur.time, now - cur.time, cur.state);
+    } else if (m.pending && m.tap_left == 0 && have && cur.kind != 2) {
+        m.pending = 0;                              // the lifted frame is past: the waiting press
+        m.tap_left = kTapFrames;
+        m.tap_x = cur.x;
+        m.tap_y = cur.y;
+        m.slider = cur.kind == 1 ? slider_at(cur.at) : Slider();
+    }
+    if (mouse) return;
+
+    // the stylus: a slider held, a tap's frames, a spinner turning
+    int bx, by;
+    if (m.slider.at && held && ball(m.slider, now, bx, by)) {
+        in.pen = true; in.x = bx; in.y = by;
+        m.tap_left = 0;
+        return;
+    }
+    if (m.slider.at && !(held && ball(m.slider, now, bx, by))) m.slider = Slider();
+    if (m.tap_left > 0) {
+        --m.tap_left;
+        in.pen = true; in.x = m.tap_x; in.y = m.tap_y;
+        return;
+    }
+    if (m.spinner) {
+        Note s = note_at(m.spinner);
+        if (now > s.time || s.kind != 2) { m.spinner = 0; m.speed = 0; return; }
+        m.angle += m.speed;
+        m.speed *= kSpinDecay;
+        if (m.speed < 0.2 / 60 && !held) return;    // stopped: the stylus up
+        double r = m.angle * 2 * M_PI;
+        in.pen = true;
+        in.x = std::clamp((int)std::lround(s.x + kSpinRadius * std::cos(r)), 0, 255);
+        in.y = std::clamp((int)std::lround(s.y + kSpinRadius * std::sin(r)), 0, 191);
+    }
+}
+
+struct Register {
+    Register() { nds_set_input_hook(hook); }
+} registered;
+
+}  // namespace
+
+namespace eba {
+
+Buttons& buttons() {
+    static Buttons b;
+    return b;
+}
+
+void buttons_options() {
+    const auto& o = g_cfg.port;
+    Buttons& b = buttons();
+    if (o.count("buttons")) b.on = o.at("buttons") != "off";
+    m.log = o.count("buttons-log") > 0;
+    m.autoplay = o.count("buttons-auto") > 0;
+    if (m.autoplay) m.auto_late = std::atoi(o.at("buttons-auto").c_str());
+    if (o.count("button-keys")) {
+        std::fill(b.keys, b.keys + 4, 0);
+        std::stringstream ss(o.at("button-keys"));
+        std::string k;
+        for (int i = 0; i < 4 && std::getline(ss, k, ',');) {
+            SDL_Scancode sc = SDL_GetScancodeFromName(k.c_str());
+            if (sc == SDL_SCANCODE_UNKNOWN) nds_note("eba buttons: no key %s", k.c_str());
+            else b.keys[i++] = sc;
+        }
+    }
+    if (b.on) nds_note("eba buttons: on%s", m.autoplay ? " (buttons-auto)" : "");
+}
+
+// --port poke=ADDR:VALUE@VBLANK,... (hex address, decimal byte): a test's writes to main RAM
+void debug_pokes(uint64_t vbl) {
+    static std::vector<std::tuple<uint32_t, uint8_t, uint64_t>> pokes;
+    static bool parsed;
+    if (!parsed) {
+        parsed = true;
+        if (g_cfg.port.count("poke")) {
+            std::stringstream ss(g_cfg.port.at("poke"));
+            std::string p;
+            while (std::getline(ss, p, ',')) {
+                unsigned a = 0, v = 0;
+                unsigned long long at = 0;
+                if (std::sscanf(p.c_str(), "%x:%u@%llu", &a, &v, &at) == 3) pokes.emplace_back(a, (uint8_t)v, at);
+            }
+        }
+    }
+    for (auto& [a, v, at] : pokes)
+        if (vbl == at && in_main(a)) {
+            g_main[a & 0x3FFFFF] = v;
+            nds_note("eba: poke %08X = %u", a, v);
+        }
+    if (g_cfg.port.count("channel-log") && vbl % 300 == 0) {   // the sound channels playing
+        std::string s;
+        for (int n = 0; n < 16; ++n) {
+            SoundChannel c = sound_channel(n);
+            if (!c.on) continue;
+            char t[96];
+            static const char* const kFmt[4] = {"pcm8", "pcm16", "adpcm", "psg"};
+            std::snprintf(t, sizeof t, " %d:%s,%s %08X+%X", n, kFmt[c.format & 3],
+                          c.repeat == 1 ? "L" : c.repeat == 2 ? "1" : "M", c.src, c.loop + c.len);
+            s += t;
+        }
+        nds_note("eba: channels at song frame %u:%s", rd(0x020CD390), s.c_str());
+    }
+}
+
+}  // namespace eba

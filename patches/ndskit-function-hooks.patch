@@ -1,0 +1,192 @@
+diff --git a/recomp/__main__.py b/recomp/__main__.py
+index da4554a..e3cae71 100644
+--- a/recomp/__main__.py
++++ b/recomp/__main__.py
+@@ -2,6 +2,7 @@
+ 
+     python -m ndskit.recomp GAME.nds --out build/recomp [--cpu 9,7] [--per-file 8000]
+                             [--no-comments] [--optest] [--copy CPU:DEST=SRC:LEN ...]
++                            [--hook ADDR,...]
+     python -m ndskit.recomp --image NAME=FILE@BASE:CPU[+SEED,...] ... --out DIR
+ 
+ Each program is discovered (recomp/discover.py) where it runs, in segments
+@@ -35,6 +36,11 @@ code no module holds are left to the runtime's interpreter. Writes, into --out:
+                             registers by how they were resolved, targets
+                             that are not entries
+ 
++--hook ADDR (hex; odd: Thumb) recompiles that function with a hook: its
++body as f_ADDR_orig and in its place f_ADDR, which calls the hook a port
++sets at run time (arm_set_hook) with the body to call, or the body alone
++while none is set. The module lists its hooks (ArmModule::hooks).
++
+ --optest adds ndskit's own instruction test (recomp/selftest.py): synthetic
+ programs with every instruction form, for each CPU, as modules OPTEST9 and
+ OPTEST7, and their vectors in --out/selftest/.
+@@ -134,6 +140,22 @@ def volatile_literals(prog):
+     return out
+ 
+ 
++def hooked(lines, key, hooks):
++    """A function recompiled with a hook (--hook): its body renamed f_X_orig, and
++    in its place f_X, calling the hook a port set with the body, or the body."""
++    if key not in hooks:
++        return lines
++    name = E.fname(key & ~1, key & 1)
++    out = list(lines)
++    i = out.index("void %s(ArmContext& c) {" % name)
++    out[i] = "void %s_orig(ArmContext& c) {" % name
++    return out + ["",
++                  "ArmHookFn %s_hook = nullptr;" % name,
++                  "void %s(ArmContext& c) {" % name,
++                  "    if (%s_hook) %s_hook(c, %s_orig); else %s_orig(c);" % (name, name, name, name),
++                  "}"]
++
++
+ class Module:
+     """A program's (or one overlay's) functions to C++.
+ 
+@@ -167,6 +189,7 @@ class Module:
+                     self.names[k] = "%s::%s" % (ens, E.fname(k & ~1, k & 1))
+         self.files, self.sites, self.unknown = [], {}, []
+         self.n_ins = 0
++        self.hooks = set()                   # keys recompiled with a hook (--hook)
+ 
+     def extent(self, f, volatile):
+         """The bytes a function of an overlay is built from: its first instruction
+@@ -206,14 +229,15 @@ class Module:
+         for e in sorted(self.own):
+             fn = self.own[e]
+             body = E.Body(prog, fn, self.entries, volatile, arch, comments, self.names)
++            key = e | int(fn.thumb)
+             try:
+                 lines = body.emit()
+             except E.Unsupported as why:     # bytes that are not code as they lie (encrypted, data)
+                 self.interpreted.append((e, str(why)))
+-                buf.append("\n".join(E.interpreted(fn.entry, fn.thumb, str(why))))
++                buf.append("\n".join(hooked(E.interpreted(fn.entry, fn.thumb, str(why)), key, self.hooks)))
+                 count += len(fn.code)
+                 continue
+-            buf.append("\n".join(lines))
++            buf.append("\n".join(hooked(lines, key, self.hooks)))
+             for k, v in body.sites.items():
+                 self.sites[k] = self.sites.get(k, 0) + v
+             self.unknown += [(t, e) for t in body.unknown]
+@@ -231,6 +255,9 @@ class Module:
+             f.write('\nnamespace %s {\n' % self.ns)
+             for k in keys:
+                 f.write("void %s(ArmContext& c);\n" % E.fname(k & ~1, k & 1))
++            for k in sorted(self.hooks):
++                f.write("void %s_orig(ArmContext& c);\nextern ArmHookFn %s_hook;\n"
++                        % (E.fname(k & ~1, k & 1), E.fname(k & ~1, k & 1)))
+             f.write("extern const ArmModule module;\n}  // namespace %s\n" % self.ns)
+         segs = [self.overlay[1]] if self.overlay is not None else self.segs
+         with Out(os.path.join(out, self.ns + "_table.cpp")) as f:
+@@ -261,9 +288,14 @@ class Module:
+                 f.write("static const uint32_t crcs[] = {\n%s};\n\n" % "".join(
+                     "    0x%08Xu,\n" % zlib.crc32(s.data[lo - s.base:hi - s.base]) for lo, hi in ext))
+                 tail = "%d, extents, crcs" % self.overlay[0]
+-            f.write('extern const ArmModule module = {"%s", %d, segs, %d, funcs, %d, %s, %d, %s};\n'
++            hooks = "nullptr, 0"
++            if self.hooks:
++                f.write("static const ArmHookSlot hooks[] = {\n%s};\n\n" % "".join(
++                    "    {0x%08Xu, &%s_hook},\n" % (k, E.fname(k & ~1, k & 1)) for k in sorted(self.hooks)))
++                hooks = "hooks, %d" % len(self.hooks)
++            f.write('extern const ArmModule module = {"%s", %d, segs, %d, funcs, %d, %s, %d, %s, %s};\n'
+                     % (self.name, self.cpu, len(segs) + (self.loaded is not None), len(keys), "landings" if land else "nullptr",
+-                       len(land), tail))
++                       len(land), tail, hooks))
+             f.write("\n}  // namespace %s\n" % self.ns)
+         self.files.append(self.ns + "_table.cpp")
+ 
+@@ -294,8 +326,9 @@ endif()
+ """
+ 
+ 
+-def generate(modules_spec, out, per_file=8000, comments=True, optest=False, log=print):
+-    """modules_spec: [(name, segments, cpu, seeds[, Module's keyword arguments])]."""
++def generate(modules_spec, out, per_file=8000, comments=True, optest=False, log=print, hooks=()):
++    """modules_spec: [(name, segments, cpu, seeds[, Module's keyword arguments])]; hooks: keys
++    (address, bit 0 for Thumb) recompiled with a hook, in whichever module holds them."""
+     t0 = time.time()
+     os.makedirs(out, exist_ok=True)
+     specs = list(modules_spec)
+@@ -309,6 +342,9 @@ def generate(modules_spec, out, per_file=8000, comments=True, optest=False, log=
+         name, segs, cpu, seeds = spec[:4]
+         t = time.time()
+         m = Module(name, segs, cpu, seeds, **(spec[4] if len(spec) > 4 else {}))
++        m.hooks = {k for k in hooks if k in m.entries and (k & ~1) in m.own}
++        for k in sorted(m.hooks):
++            log("%-9s %s recompiled with a hook" % (name, E.fname(k & ~1, k & 1)))
+         m.generate(out, per_file, comments)
+         modules.append(m)
+         log("%-9s %5d functions %8d instructions %3d files  %.1f s"
+@@ -436,6 +472,8 @@ def main(argv=None):
+     ap.add_argument("--no-comments", action="store_true")
+     ap.add_argument("--optest", action="store_true", help="add ndskit's instruction test modules")
+     ap.add_argument("--no-overlays", action="store_true", help="the programs alone, without their overlays")
++    ap.add_argument("--hook", action="append", default=[],
++                    help="ADDR,... (hex; odd: Thumb): functions recompiled with a hook a port sets (arm_set_hook)")
+     a = ap.parse_args(argv)
+     specs = []
+     if a.rom:
+@@ -458,7 +496,8 @@ def main(argv=None):
+         with open(path, "rb") as fh:
+             data = fh.read()
+         specs.append((name, [discover.Segment(base, data, "main")], cpu, [base] + seeds))
+-    generate(specs, a.out, a.per_file, not a.no_comments, a.optest)
++    hooks = {int(x, 16) for h in a.hook for x in h.split(",") if x}
++    generate(specs, a.out, a.per_file, not a.no_comments, a.optest, hooks=hooks)
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/runtime/arm.h b/runtime/arm.h
+index e3683e9..475d9b4 100644
+--- a/runtime/arm.h
++++ b/runtime/arm.h
+@@ -44,6 +44,11 @@ enum { ARM_SEG_PROGRAM = 0, ARM_SEG_COPIED = 1, ARM_SEG_OVERLAY = 2, ARM_SEG_LOA
+ // loads it, compressed, before its crt0 decompresses it in place (not code)
+ struct ArmSegment { uint32_t base, size, crc, kind; };
+ struct ArmRange { uint32_t base, size; };
++// A port's own code in place of one of the game's functions (python -m
++// ndskit.recomp --hook ADDR): it runs where the function would and calls the
++// function itself, `original`, before, after, or not at all.
++typedef void (*ArmHookFn)(ArmContext& c, ArmFunc original);
++struct ArmHookSlot { uint32_t key; ArmHookFn* hook; };
+ struct ArmModule {
+     const char* name;
+     int cpu;
+@@ -62,7 +67,12 @@ struct ArmModule {
+     int overlay;
+     const ArmRange* extents;
+     const uint32_t* crcs;
++    const ArmHookSlot* hooks;           // the functions recompiled with a hook (--hook), sorted by key
++    uint32_t nhooks;
+ };
++// Sets the hook of a function recompiled with one (nullptr: none); false if no
++// module of the CPU has a hook there.
++bool arm_set_hook(int cpu, uint32_t key, ArmHookFn hook);
+ 
+ // A return that went to a landing of the active module, not to the call's
+ // own address: a saved context was loaded. The runtime throws it; the
+diff --git a/runtime/core.cpp b/runtime/core.cpp
+index 5c7d8c7..714df92 100644
+--- a/runtime/core.cpp
++++ b/runtime/core.cpp
+@@ -142,6 +142,17 @@ static const ArmModule* g_active[2];             // [0] the ARM9's, [1] the ARM7
+ 
+ void arm_activate(const ArmModule* m) { g_active[m->cpu == 9 ? 0 : 1] = m; }
+ 
++bool arm_set_hook(int cpu, uint32_t key, ArmHookFn hook) {
++    bool found = false;
++    for (int i = 0; i < g_arm_nmodules; ++i) {
++        const ArmModule* m = g_arm_modules[i];
++        if (m->cpu != cpu) continue;
++        for (uint32_t h = 0; h < m->nhooks; ++h)
++            if (m->hooks[h].key == key) { *m->hooks[h].hook = hook; found = true; }
++    }
++    return found;
++}
++
+ static int find_func(const ArmModule* m, uint32_t key) {
+     uint32_t lo = 0, hi = m->nfuncs;
+     while (lo < hi) {
