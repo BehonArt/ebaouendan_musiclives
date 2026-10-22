@@ -20,7 +20,7 @@ the real saves loaded and the music in the WAV.
 | failures | 0 | 0 |
 | save | 256 KiB flash | 8 KiB EEPROM |
 | stage played | "The Anthem" | "ループ&ループ" |
-| windowed play | timing and audio right (user) | not yet |
+| windowed play | timing and audio right (user) | timing and audio right (user) |
 
 Plus ndskit's instruction test: 57,781 vectors, 0 failures. Known runtime gap
 seen: 3D edge marking is not drawn (EBA's stage map).
@@ -65,7 +65,6 @@ are lower-screen coordinates):
 
 ## Next
 
-1. Play OE1 in the window.
-2. OE2: 7 overlays (standard BLZ), run through the overlay dispatch.
-3. melonDS oracle: savestate at the same VBlank, `python -m ndskit.melonds STATE.ml1 --compare build/run`.
-4. File the discover.py bug upstream.
+1. OE2: 7 overlays (standard BLZ), run through the overlay dispatch.
+2. melonDS oracle: savestate at the same VBlank, `python -m ndskit.melonds STATE.ml1 --compare build/run`.
+3. File the discover.py bug upstream.
