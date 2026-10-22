@@ -1,0 +1,33 @@
+﻿diff --git a/recomp/discover.py b/recomp/discover.py
+index 118e116..c80bb3a 100644
+--- a/recomp/discover.py
++++ b/recomp/discover.py
+@@ -824,12 +824,17 @@ class Program:
+         them, reached through a pointer or a call meant for it. It is refused and
+         the discovery done again without it."""
+         self.refused = set()
+-        for _ in range(4):
++        self.refuse_passes = 0
++        passes = 40
++        for i in range(passes):
+             self.guessed = set()
+             self._rounds(max_rounds)
+             bad = {a for a in self.guessed if a in self.funcs and self.funcs[a].conflicts}
+-            if not bad:
++            # never wipe after the last pass: a game needing more passes than
++            # the cap keeps what it found (with its conflicts) instead of nothing
++            if not bad or i == passes - 1:
+                 break
++            self.refuse_passes += 1
+             self.refused |= bad
+             self.entries, self.crossing, self.switches = {}, set(), {}
+             self.literal_loaded, self.funcs, self.code, self.data = set(), {}, {}, set()
+@@ -1273,6 +1278,8 @@ def main(argv=None):
+         prog = prog.run()
+         text, conf, unres = prog.summary()
+         print(text)
++        if prog.refuse_passes:
++            print("refused %d guessed entries over %d passes" % (len(prog.refused), prog.refuse_passes))
+         if oid is not None:
+             ov = [e for e in prog.funcs if mem.seg(e).overlay == oid]
+             print("overlay %d: %d functions (%d Thumb), %d reached from outside it" % (

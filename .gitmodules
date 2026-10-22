@@ -1,0 +1,3 @@
+[submodule "ndskit"]
+	path = ndskit
+	url = https://github.com/vs-sr-dev/ndskit
