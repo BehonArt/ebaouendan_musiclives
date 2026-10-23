@@ -30,6 +30,7 @@
 #include "display.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -177,6 +178,135 @@ void load_catalog() {
     std::sort(g_catalog.begin(), g_catalog.end(), [](const Custom& a, const Custom& b) { return a.stage_index < b.stage_index; });
 }
 
+// ---- import: a custom ROM of this game, or a custom's folder ------------------------------
+// A cartridge's files by name (its FNT and FAT), for the files a custom ROM changes.
+struct RomFiles {
+    std::vector<uint8_t> data;
+    std::vector<std::string> names;                     // by file id ("" for the overlays' and others')
+    std::vector<std::pair<uint32_t, uint32_t>> fat;     // start, end
+    bool load(const std::string& path) {
+        std::ifstream f(path, std::ios::binary);
+        if (!f) return false;
+        data.assign(std::istreambuf_iterator<char>(f), {});
+        if (data.size() < 0x200) return false;
+        auto u32 = [&](size_t o) { uint32_t v = 0; if (o + 4 <= data.size()) std::memcpy(&v, &data[o], 4); return v; };
+        uint32_t fnt = u32(0x40), fat_off = u32(0x48), fat_size = u32(0x4C);
+        if (fat_off + fat_size > data.size() || fnt >= data.size()) return false;
+        for (uint32_t i = 0; i < fat_size / 8; ++i) fat.emplace_back(u32(fat_off + 8 * i), u32(fat_off + 8 * i + 4));
+        names.assign(fat.size(), "");
+        walk(fnt, 0xF000, "");
+        return true;
+    }
+    void walk(uint32_t fnt, uint16_t dir, const std::string& prefix) {
+        size_t e = fnt + (dir & 0xFFF) * 8;
+        if (e + 8 > data.size()) return;
+        uint32_t sub;
+        uint16_t id;
+        std::memcpy(&sub, &data[e], 4);
+        std::memcpy(&id, &data[e + 4], 2);
+        for (size_t p = fnt + sub; p < data.size() && data[p];) {
+            int len = data[p] & 0x7F;
+            bool is_dir = data[p] & 0x80;
+            std::string name(reinterpret_cast<const char*>(&data[p + 1]), len);
+            p += 1 + len;
+            if (is_dir) {
+                uint16_t d;
+                std::memcpy(&d, &data[p], 2);
+                p += 2;
+                walk(fnt, d, prefix + name + "/");
+            } else if (id < names.size()) {
+                names[id++] = prefix + name;
+            }
+        }
+    }
+    bool same(const RomFiles& o, size_t i) const {
+        auto [a, b] = fat[i];
+        auto [c, d] = o.fat[i];
+        return b - a == d - c && b <= data.size() && d <= o.data.size() && std::equal(&data[a], &data[a] + (b - a), &o.data[c]);
+    }
+};
+
+std::string sanitize(std::string s) {
+    for (char& ch : s)
+        if (!std::isalnum((unsigned char)ch) && ch != '-' && ch != '_') ch = '_';
+    return s.empty() ? std::string("custom") : s;
+}
+
+// The custom's files out of a custom ROM: each that differs from this cartridge's own;
+// its stage from the story charts it changes; its title from the file's name.
+std::string import_rom(const std::string& path) {
+    namespace fs = std::filesystem;
+    RomFiles stock, mine;
+    if (!stock.load(g_cfg.rom) || !mine.load(path)) return "Could not read " + base_name(path) + ".";
+    if (std::memcmp(&stock.data[0xC], &mine.data[0xC], 4) != 0)
+        return base_name(path) + " is not a custom of " + game().title + ".";
+    if (stock.fat.size() != mine.fat.size()) return base_name(path) + "'s file table is not this game's.";
+    std::vector<size_t> changed;
+    std::string stage;
+    for (size_t i = 0; i < stock.fat.size(); ++i) {
+        if (stock.names[i].empty() || stock.same(mine, i)) continue;
+        changed.push_back(i);
+        const std::string& n = stock.names[i];          // data/seq/SS05_n.seq_: the stem, if a story stage's
+        if (n.rfind("data/seq/", 0) == 0 && n.size() > 14 && n.compare(n.size() - 5, 5, ".seq_") == 0) {
+            std::string stem = n.substr(9, n.find('_', 9) - 9);
+            for (const char* st : game().stages)
+                if (stem == st) stage = stem;
+        }
+    }
+    if (changed.empty()) return base_name(path) + " changes nothing of this game's files.";
+    if (stage.empty()) return base_name(path) + " changes no story stage's chart (not a custom Customs can play).";
+    int index = 0;
+    for (size_t k = 0; k < game().stages.size(); ++k)
+        if (stage == game().stages[k]) index = (int)k;
+    std::string stem = fs::path(path).stem().string(), title = stem;   // "Elite Beat Agents (FG_SS05_AllStar)": FG_SS05_AllStar
+    size_t a = stem.rfind('('), b = stem.rfind(')');
+    if (a != std::string::npos && b != std::string::npos && b > a) title = stem.substr(a + 1, b - a - 1);
+    if (title.rfind("FG_", 0) == 0) title = title.substr(3);
+    if (title.size() > stage.size() + 1 && title.compare(0, stage.size() + 1, stage + "_") == 0) title = title.substr(stage.size() + 1);
+    std::string tag = stage + "_" + sanitize(title);
+    std::string words;                                  // AllStar_Final: All Star Final
+    for (size_t i = 0; i < title.size(); ++i) {
+        char ch = title[i] == '_' ? ' ' : title[i];
+        if (i && std::isupper((unsigned char)ch) && std::islower((unsigned char)title[i - 1])) words += ' ';
+        words += ch;
+    }
+    title = words;
+    fs::path dir = fs::path(g_dir) / tag;
+    for (int n = 2; fs::exists(dir); ++n) dir = fs::path(g_dir) / (tag + "_" + std::to_string(n));
+    std::error_code ec;
+    fs::create_directories(dir / "files", ec);
+    if (ec) return "Could not make " + dir.string() + ".";
+    std::ofstream ini(dir / "custom.ini", std::ios::binary);
+    ini << "title=" << title << "\nartist=\nstage=" << stage << "\nstage_index=" << index << "\nreplaces=" << stage
+        << "\nimported_from=" << path << "\n";
+    for (size_t i : changed) {
+        const std::string& file = stock.names[i];       // files/ holds each by its name, '/' as "__"
+        std::string out;
+        for (char ch : file) { if (ch == '/') out += "__"; else out += ch; }
+        std::ofstream f(dir / "files" / out, std::ios::binary);
+        auto [s0, s1] = mine.fat[i];
+        f.write(reinterpret_cast<const char*>(&mine.data[s0]), s1 - s0);
+        ini << "file=" << file << "\n";
+    }
+    nds_note("eba customs: imported %s: %zu files, over %s", path.c_str(), changed.size(), stage.c_str());
+    return "Imported \"" + title + "\" over " + stage + " (" + std::to_string(changed.size()) +
+           " files). Its title and artist are in " + (dir / "custom.ini").string() + ".";
+}
+
+// A custom's folder (a shared one: custom.ini and files/), copied in as it is.
+std::string import_folder(const std::string& path) {
+    namespace fs = std::filesystem;
+    fs::path src(path);
+    if (!fs::exists(src / "custom.ini")) return src.filename().string() + " has no custom.ini: not a custom's folder.";
+    fs::path dst = fs::path(g_dir) / src.filename();
+    if (fs::exists(dst)) return "A custom named " + src.filename().string() + " is already there.";
+    std::error_code ec;
+    fs::copy(src, dst, fs::copy_options::recursive, ec);
+    if (ec) return "Could not copy " + src.string() + ": " + ec.message();
+    nds_note("eba customs: imported the folder %s", path.c_str());
+    return "Imported the folder " + src.filename().string() + ".";
+}
+
 std::string scores_path() { return (std::filesystem::path(g_dir) / "scores.ini").string(); }
 
 void load_scores() {
@@ -249,6 +379,20 @@ const char* difficulty_name(char d) { return game().difficulties[difficulty_inde
 }  // namespace
 
 const std::vector<Custom>& customs() { return g_catalog; }
+
+std::string customs_import(const std::string& path) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::create_directories(g_dir, ec);
+    std::string msg = fs::is_directory(path) ? import_folder(path) : import_rom(path);
+    std::string playing = g_playing ? g_playing->tag : "";
+    g_catalog.clear();                                  // the list again, with the new one
+    load_catalog();
+    g_playing = nullptr;
+    for (const Custom& c : g_catalog)
+        if (c.tag == playing) g_playing = &c;
+    return msg;
+}
 const Custom* custom_playing() { return g_playing; }
 char custom_difficulty() { return g_difficulty; }
 bool customs_autopilot() { return g_auto || g_again_at || g_again_asked; }
@@ -280,6 +424,8 @@ CustomScore custom_best(const std::string& tag, char d) {
 
 void customs_init() {
     load_catalog();
+    if (g_cfg.port.count("customs-import"))           // a test's import, as the Customs screen's
+        nds_note("eba customs: %s", customs_import(g_cfg.port.at("customs-import")).c_str());
     load_scores();
     const auto& o = g_cfg.port;
     if (o.count("custom")) {

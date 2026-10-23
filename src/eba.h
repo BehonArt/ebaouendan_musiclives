@@ -56,6 +56,7 @@ struct Game {
     uint32_t replay = 0;                // the replay's Array {data, capacity, count}, +0xC its cursor
     uint32_t approach = 0, hit_radius = 0;   // .data the game sets per stage: frames a note shows; the hit test's extra px
     const char* customs_dir = "customs";
+    std::vector<const char*> stages;    // the story's stages by index (the charts' stems: SS05, OS03, s03)
     float menu_button_x = 0.5f;         // the CUSTOMS button across the main menu's lower screen (0 left .. 1 right)
 };
 const Game& game();
@@ -121,6 +122,7 @@ bool customs_autopilot_failed();
 CustomScore custom_best(const std::string& tag, char difficulty);
 void customs_launch(const Custom& c, char difficulty, bool autoplay);   // a Customs run (or the map again)
 void customs_back_to_campaign();
+std::string customs_import(const std::string& path);   // a custom ROM (.nds) or a custom's folder: what happened
 bool customs_frame(NdsInput& in, uint64_t vblank);       // true: the autopilot drives the input
 bool customs_take_show_request();       // a custom's song is over: the Customs screen, once
 uint32_t scene();                       // the scene's vtable (eba_customs.cpp's table)

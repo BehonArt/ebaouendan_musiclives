@@ -200,6 +200,15 @@ lists each custom: its art and an HD preview, its best score per difficulty,
   with autoplay, a replay or a wider hit circle.
 - **Autoplay** (a checkbox on the Customs screen): the game's own, to watch
   or hear a custom.
+- **Import** (two buttons on the Customs screen): a custom ROM of the game
+  (`.nds`): the files that differ from the stock cartridge's (its FNT and
+  FAT) go to `customs/<stage>_<title>/files/`, the stage from the story
+  charts it changes, the title from the file's name (`Elite Beat Agents
+  (FG_SS04_ReadyToGo).nds`: Ready To Go); or a custom's folder someone shared
+  (`custom.ini` and `files/`), copied in. An imported custom has no art,
+  previews or HD audio until `tools/bake_customs.py` makes them: its title
+  stands in. `--port customs-import=PATH` does the same headless. Checked:
+  Ready To Go imported from its ROM and played through to a clear.
 - **Again, without the reboot:** Play on the same custom from the map after
   its results (any difficulty, autoplay or not) skips the new run: the map
   is centred on the stage just played, so the autopilot taps it (EBA its

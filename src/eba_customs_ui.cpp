@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <map>
+#include <mutex>
 #include <string>
 
 namespace eba {
@@ -59,7 +60,20 @@ std::string asset(const Custom& c, const char* key) {
 void image(const Custom& c, const char* key, float w) {
     const Tex& t = texture(asset(c, key));
     if (t.id) ImGui::Image(ImTextureRef((ImTextureID)(intptr_t)t.id), ImVec2(w, w * t.h / std::max(t.w, 1)));
-    else ImGui::Dummy(ImVec2(w, w * 0.75f));
+    else {                                              // none baked (an imported custom): its title on a card
+        ImVec2 p = ImGui::GetCursorScreenPos(), q(p.x + w, p.y + w * 0.75f);
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        unsigned hue = 0;
+        for (char ch : c.tag) hue = hue * 31 + (unsigned char)ch;
+        float h = (hue % 360) / 360.0f, r, g, b;
+        ImGui::ColorConvertHSVtoRGB(h, 0.55f, 0.55f, r, g, b);
+        dl->AddRectFilled(p, q, ImGui::GetColorU32(ImVec4(r, g, b, 1)), 4);
+        std::string label = std::string(key) == "stage_card" ? "Stage " + c.stage : c.title;
+        ImVec2 ts = ImGui::CalcTextSize(label.c_str(), nullptr, false, w - 8);
+        dl->AddText(nullptr, 0, ImVec2(p.x + (w - ts.x) * 0.5f, p.y + (w * 0.75f - ts.y) * 0.5f), IM_COL32_WHITE,
+                    label.c_str(), nullptr, w - 8);
+        ImGui::Dummy(ImVec2(w, w * 0.75f));
+    }
 }
 
 // ---- previews ------------------------------------------------------------------------------
@@ -96,6 +110,39 @@ bool preview_playing(const std::string& path) {
     if (!g_preview || path != g_preview_path) return false;
     if (SDL_GetAudioStreamQueued(g_preview) == 0) { preview_stop(); return false; }
     return true;
+}
+
+// ---- import (the system's file and folder pickers answer on their own thread) -------------
+std::mutex g_pick_mu;
+std::string g_picked;                                   // a path picked, not yet imported
+std::string g_import_msg;
+
+void picked(void*, const char* const* list, int) {
+    if (!list || !list[0]) return;                      // cancelled, or an error
+    std::lock_guard<std::mutex> l(g_pick_mu);
+    g_picked = list[0];
+}
+
+void import_buttons() {
+    static const SDL_DialogFileFilter kRom[] = {{"Custom ROM", "nds"}};
+    if (ImGui::Button("Import custom ROM...")) SDL_ShowOpenFileDialog(picked, nullptr, display_window(), kRom, 1, nullptr, false);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("A custom ROM of this game (.nds): the files it changes are taken from it,\n"
+                          "its stage from the story charts it changes.");
+    ImGui::SameLine();
+    if (ImGui::Button("Import custom folder...")) SDL_ShowOpenFolderDialog(picked, nullptr, display_window(), nullptr, false);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("A custom's folder someone shared (custom.ini and files\\ in it).");
+    std::string path;
+    {
+        std::lock_guard<std::mutex> l(g_pick_mu);
+        path.swap(g_picked);
+    }
+    if (!path.empty()) g_import_msg = customs_import(path);
+    if (!g_import_msg.empty()) {
+        ImGui::PushTextWrapPos(0);
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", g_import_msg.c_str());
+        ImGui::PopTextWrapPos();
+    }
 }
 
 // ---- the screen ----------------------------------------------------------------------------
@@ -152,6 +199,7 @@ void customs_window() {
         ImGui::SameLine();
         if (ImGui::Button("Back to campaign")) { preview_stop(); customs_back_to_campaign(); }
     }
+    import_buttons();
     ImGui::Separator();
     float fs = ImGui::GetFontSize();
     float art_w = std::clamp(ImGui::GetContentRegionAvail().x * 0.3f, fs * 7, fs * 12);
@@ -166,7 +214,7 @@ void customs_window() {
             ImGui::TableNextColumn();                   // the custom: its art and HD preview
             image(c, "art", art_w);
             std::string pc = asset(c, "preview_custom");
-            if (ImGui::Button(preview_playing(pc) ? "Stop##c" : "Preview (HD)", ImVec2(art_w, 0))) preview_play(pc);
+            if (!pc.empty() && ImGui::Button(preview_playing(pc) ? "Stop##c" : "Preview (HD)", ImVec2(art_w, 0))) preview_play(pc);
             ImGui::TableNextColumn();                   // its title, scores, Play
             ImGui::PushTextWrapPos(0);
             ImGui::Text("%s", c.title.c_str());
@@ -182,11 +230,12 @@ void customs_window() {
             }
             ImGui::TableNextColumn();                   // the stage it replaces: its card and its own preview
             ImGui::PushTextWrapPos(0);
-            ImGui::TextDisabled("Replaces %s (%s)", c.replaces.c_str(), c.stage.c_str());
+            if (c.replaces == c.stage) ImGui::TextDisabled("Replaces %s", c.stage.c_str());
+            else ImGui::TextDisabled("Replaces %s (%s)", c.replaces.c_str(), c.stage.c_str());
             ImGui::PopTextWrapPos();
             image(c, "stage_card", art_w);
             std::string po = asset(c, "preview_original");
-            if (ImGui::Button(preview_playing(po) ? "Stop##o" : "Original preview", ImVec2(art_w, 0))) preview_play(po);
+            if (!po.empty() && ImGui::Button(preview_playing(po) ? "Stop##o" : "Original preview", ImVec2(art_w, 0))) preview_play(po);
             ImGui::PopID();
         }
         ImGui::EndTable();

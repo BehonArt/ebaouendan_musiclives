@@ -51,6 +51,8 @@ Game make_eba() {
     g.autoplay = 0x234; g.replaying = 0x138; g.replay = 0xA0;
     g.approach = 0x020B4704; g.hit_radius = 0x020B22E0;
     g.difficulties = {"Breezin'", "Cruisin'", "Sweatin'", "Hard Rock"};
+    g.stages = {"SS01", "SS02", "SS06", "SS04", "SS05", "SS09", "SS10", "SS03", "SS08", "SS11", "SS13", "SS12",
+                "SSB03", "SS07", "SS15A", "SS15B", "SSB02", "SSB01", "SS14"};   // the table at 0x020B3EE4
     g.customs_dir = "customs";
     return g;
 }
@@ -79,6 +81,8 @@ Game make_oe2() {
     g.again = {160, 88, 440, 450, 238, 183};    // the stage last played: its character, in the middle
     g.autoplay = 0x27C; g.replaying = 0x15C; g.replay = 0xA0;   // from its judge (EBA's +0x234, +0x138)
     g.difficulties = {"Kigaru (easy)", "Kakan (normal)", "Gekiretsu (hard)", "Karei (insane)"};
+    g.stages = {"OS01", "OS02", "OS04", "OS06", "OS08", "OS10", "OSB02", "OS11", "OS03", "OS07", "OS14", "OS12",
+                "OS13", "OS05", "OS15A", "OS15B", "OSB03", "OSB01", "OS09"};   // the table at 0x02092020
     g.customs_dir = "customs_oe2";
     g.menu_button_x = 0.0f;             // the strip's right holds 応援スタイルを選ぶべし
     return g;
@@ -109,6 +113,8 @@ Game make_oe1() {
     g.autoplay = 0x1F8;                 // (no replays in the first game)
     g.approach = 0x020891B0; g.hit_radius = 0x02086184;
     g.difficulties = {"Kigaru (easy)", "Kakan (normal)", "Gekiretsu (hard)", "Karei (insane)"};
+    g.stages = {"s01", "s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "s13",
+                "s14", "s15"};                // its name is "%c%02d" of the index + 1
     g.customs_dir = "customs_oe1";
     return g;
 }
