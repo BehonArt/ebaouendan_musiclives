@@ -7,3 +7,8 @@ customs/
 play_*/
 customs_*/
 __pycache__/
+studio/build/
+studio/dist/
+studio/studio.ini
+studio/toolkit_deps.py
+studio/*.log
