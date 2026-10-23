@@ -39,6 +39,25 @@ void change(const DisplaySettings& s) {
     settings_save();
 }
 
+// The skins (eba_skins.cpp): texture packs over the notes' pictures.
+void skin_menu() {
+    Skin& k = skin();
+    if (ImGui::BeginMenu("Skin")) {
+        auto names = skins_list();
+        if (ImGui::MenuItem("The game's own", nullptr, k.name.empty())) { k.name.clear(); skins_apply(); settings_save(); }
+        for (auto& n : names)
+            if (ImGui::MenuItem(n.c_str(), nullptr, k.name == n)) { k.name = n; skins_apply(); settings_save(); }
+        if (names.empty()) ImGui::TextDisabled("(no skins in the %s folder)", game().skins_dir);
+        ImGui::Separator();
+        ImGui::TextDisabled("Pictures only: the game's sounds stay.");
+        ImGui::EndMenu();
+    }
+    if (hd_rings_available()) {
+        if (ImGui::MenuItem("HD approach circles", nullptr, k.hd_rings)) { k.hd_rings = !k.hd_rings; skins_apply(); settings_save(); }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("The shrinking rings drawn smooth at any resolution (a skin's own come first).");
+    }
+}
+
 void display_menu() {
     DisplaySettings s = display_settings();
     if (ImGui::BeginMenu("Resolution")) {
@@ -80,6 +99,10 @@ void display_menu() {
         ImGui::TextDisabled("60/120/240 run the game at 60 (0.29%% fast),");
         ImGui::TextDisabled("smooth on a display at that rate.");
         ImGui::EndMenu();
+    }
+    if (*game().skins_dir) {
+        ImGui::Separator();
+        skin_menu();
     }
     ImGui::Separator();
     if (ImGui::MenuItem("Fullscreen", "F11 / Alt+Enter", s.fullscreen)) { s.fullscreen = !s.fullscreen; change(s); }
@@ -179,6 +202,15 @@ void assist_menu() {
     struct { const char* name; int px; } rad[] = {{"Normal", 0}, {"Generous  (+5 px)", 5}, {"Very generous  (+11 px)", 11}};
     for (auto& x : rad)
         if (ImGui::MenuItem(x.name, nullptr, a.hit_extra == x.px)) { a.hit_extra = x.px; settings_save(); }
+    if (!game().gauge_on) return;
+    ImGui::Separator();
+    if (ImGui::MenuItem("No-Fail", nullptr, a.no_fail)) { a.no_fail = !a.no_fail; settings_save(); }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("The life gauge stays where it starts: misses never end the song.\n"
+                          "Customs keep no score with it.");
+    ImGui::BeginDisabled(!a.no_fail);
+    if (ImGui::MenuItem("   Hide the life bar", nullptr, a.hide_life)) { a.hide_life = !a.hide_life; settings_save(); }
+    ImGui::EndDisabled();
 }
 
 void calibration_window() {

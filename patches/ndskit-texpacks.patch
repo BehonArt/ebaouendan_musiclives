@@ -1,0 +1,466 @@
+diff --git a/runtime/display.h b/runtime/display.h
+index f1aa497..ea4cbc1 100644
+--- a/runtime/display.h
++++ b/runtime/display.h
+@@ -1,5 +1,7 @@
+ // ndskit runtime — the host: the window, the compositor, pictures, the sound out.
+ #pragma once
++#include <string>
++#include <vector>
+ #include "nds.h"
+ #include <string>
+ 
+@@ -56,7 +58,13 @@ struct DisplayFx {
+ };
+ void display_set_fx(const DisplayFx& fx);
+ const DisplayFx& display_fx();
+-const char* display_fx_glsl();          // its GLSL: fx_light(q) and its uniforms
++const char* display_fx_glsl();
++
++// Texture packs (texpack.cpp): folders of <hash>.png pictures that replace the 3D's
++// textures, the first listed winning; empty: none.
++void display_set_texture_packs(const std::vector<std::string>& dirs);
++// Textures not drawn at all (their hashes, as a dump names them): an empty list draws all.
++void display_set_texture_hidden(const std::vector<uint64_t>& hashes);          // its GLSL: fx_light(q) and its uniforms
+ bool display_turbo();
+ // Where a screen (0 upper, 1 lower) is in the window now, in pixels; false if the layout hides it.
+ bool display_screen_rect(int screen, float* x, float* y, float* w, float* h);
+diff --git a/runtime/gl.h b/runtime/gl.h
+index 0a42f63..d0ad173 100644
+--- a/runtime/gl.h
++++ b/runtime/gl.h
+@@ -62,6 +62,7 @@
+     X(PFNGLTEXTURESTORAGE2DPROC, glTextureStorage2D)                                                \
+     X(PFNGLTEXTURESUBIMAGE2DPROC, glTextureSubImage2D)                                              \
+     X(PFNGLTEXTUREPARAMETERIPROC, glTextureParameteri)                                              \
++    X(PFNGLGENERATETEXTUREMIPMAPPROC, glGenerateTextureMipmap)                                      \
+     X(PFNGLTEXTUREBUFFERPROC, glTextureBuffer)                                                      \
+     X(PFNGLBINDTEXTUREUNITPROC, glBindTextureUnit)                                                  \
+     X(PFNGLDELETETEXTURESPROC, glDeleteTextures)                                                    \
+@@ -88,3 +89,9 @@ struct GlTarget { GLuint fbo = 0, color = 0, attr = 0, depth = 0, fbo2 = 0, out
+ bool render_init();
+ void render_target(GlTarget& t, int scale);           // (re)made at 256x192 times scale
+ GLuint render_draw(const Render3dJob& job, GlTarget& t); // the job's picture into t; its texture (rows bottom first)
++// texpack.cpp: a texture's hash (what it shows), a pack's picture of it (0: none), packs or a dump in use
++uint64_t texpack_hash(const Render3dJob& job, uint32_t teximage_param, uint32_t pltt_base, bool with_palette = true);
++GLuint texpack_lookup(const Render3dJob& job, uint32_t teximage_param, uint32_t pltt_base, uint64_t hash,
++                      uint32_t* tint = nullptr);   // tint: RGB8 to multiply the picture by (white: none)
++bool texpack_active();
++constexpr GLuint kTexHidden = 0xFFFFFFFFu;            // texpack_lookup: the texture's polygons are not drawn
+diff --git a/runtime/render_gl.cpp b/runtime/render_gl.cpp
+index cdaab76..3e1c18c 100644
+--- a/runtime/render_gl.cpp
++++ b/runtime/render_gl.cpp
+@@ -43,6 +43,7 @@
+ #include <cstdlib>
+ #include <cstddef>
+ #include <string>
++#include <unordered_map>
+ #include <vector>
+ 
+ namespace {
+@@ -97,6 +98,9 @@ noperspective in float v_z;
+ flat in uvec4 v_poly;
+ layout(binding = 0) uniform usamplerBuffer u_tex;   // the texture slots, bytes
+ layout(binding = 1) uniform usamplerBuffer u_pal;   // the texture-palette slots, halfwords
++layout(binding = 2) uniform sampler2D u_hdtex;      // a texture pack's picture of this run's texture
++uniform int u_hd;                                  // 1: the texture is u_hdtex's (texpack.cpp)
++uniform vec4 u_tint;                               // the picture multiplied by this (a t<shape> picture)
+ uniform uint u_disp;                                // DISP3DCNT
+ uniform uint u_alpharef;
+ uniform uint u_wbuf;
+@@ -192,7 +196,14 @@ void main() {
+     }
+     bool textured = (u_disp & 1u) != 0u && (tp >> 26 & 7u) != 0u;
+     if (textured) {
+-        uvec4 t = texel(tp, v_poly.z, ivec2(floor(tc * 16.0 + 1.0 / 64.0)) >> 4);   // the DS keeps 1/16 texel
++        uvec4 t;
++        if (u_hd != 0) {                              // a pack's picture, filtered, over the texture's shape
++            vec2 size = vec2(float(8 << int(tp >> 20 & 7u)), float(8 << int(tp >> 23 & 7u)));
++            vec4 c = texture(u_hdtex, tc / size) * vec4(u_tint.rgb, 1.0);
++            t = uvec4(uvec3(round(c.rgb * 63.0)), uint(round(c.a * 31.0)));
++        } else {
++            t = texel(tp, v_poly.z, ivec2(floor(tc * 16.0 + 1.0 / 64.0)) >> 4);   // the DS keeps 1/16 texel
++        }
+         if (mode == 1u) {
+             if (t.a == 0u) rgb = vc;
+             else if (t.a == 31u) rgb = t.rgb;
+@@ -275,7 +286,7 @@ struct Vtx {
+ };
+ 
+ GLuint prog, vao, vbo, texbuf, palbuf, textex, paltex, fog_prog, empty_vao, fx_prog;
+-GLint fx_z, fx_kind, fx_u, fx_u2;
++GLint fx_z, fx_kind, fx_u, fx_u2, loc_hd, loc_tint;
+ float g_far = -1, g_near = 2;                     // the opaque polygons' depths this frame
+ size_t vbo_cap;
+ GLint loc_disp, loc_alpharef, loc_wbuf, loc_toon;
+@@ -290,6 +301,8 @@ bool render_init() {
+     loc_alpharef = glGetUniformLocation(prog, "u_alpharef");
+     loc_wbuf = glGetUniformLocation(prog, "u_wbuf");
+     loc_toon = glGetUniformLocation(prog, "u_toon");
++    loc_hd = glGetUniformLocation(prog, "u_hd");
++    loc_tint = glGetUniformLocation(prog, "u_tint");
+     fog_prog = gl_program(kFullVS, kFogFS);
+     if (!fog_prog) return false;
+     std::string fxfs = kFxFS;
+@@ -448,10 +461,14 @@ static void draw_polys(const Render3dJob& J, GlTarget& T) {
+     static std::vector<Vtx> vs;
+     // kind: 0 opaque, 1 translucent, 2 translucent + depth, 3 lines, 4 shadow mask (ID 0),
+     // 5 shadow (ID 1-63), 6 shadow + depth
+-    struct Run { GLint first; GLsizei n; int kind; };
++    struct Run { GLint first; GLsizei n; int kind; GLuint hd; uint32_t wrap, tint; };   // hd: a pack's texture (texpack.cpp)
+     static std::vector<Run> runs;
+     vs.clear();
+     runs.clear();
++    struct Hd { GLuint tex; uint32_t tint; };
++    static std::unordered_map<uint64_t, Hd> hd_of;   // this frame's textures: (TEXIMAGE_PARAM, PLTT_BASE) -> pack texture
++    hd_of.clear();
++    bool packs = texpack_active();
+     g_far = -1;
+     g_near = 2;
+     bool snap = T.scale == 1;
+@@ -460,6 +477,20 @@ static void draw_polys(const Render3dJob& J, GlTarget& T) {
+         if (p.attr & 0x4000) nds_once("render", 3, "3D: the equal depth test (drawn as less)");
+         int kind = alpha == 0 ? 3 : !p.translucent ? 0 : (p.attr & 0x800) ? 2 : 1;
+         if (mode == 3 && alpha) kind = (p.attr >> 24 & 63) == 0 ? 4 : (p.attr & 0x800) ? 6 : 5;
++        GLuint hd = 0;                                  // a pack's picture of its texture, or hidden
++        uint32_t tint = 0xFFFFFF;
++        if (packs && (p.tex >> 26 & 7) && (J.disp3dcnt & 1)) {
++            uint64_t key = (uint64_t)p.tex << 32 | p.pal;
++            auto it = hd_of.find(key);
++            if (it == hd_of.end()) {
++                Hd h{0, 0xFFFFFF};
++                h.tex = texpack_lookup(J, p.tex, p.pal, texpack_hash(J, p.tex, p.pal), &h.tint);
++                it = hd_of.emplace(key, h).first;
++            }
++            hd = it->second.tex;
++            tint = it->second.tint;
++        }
++        if (hd == kTexHidden) continue;
+         GLint first = (GLint)vs.size();
+         auto put = [&](const GxVertex& g) {
+             Vtx v;
+@@ -484,9 +515,11 @@ static void draw_polys(const Render3dJob& J, GlTarget& T) {
+         } else {
+             for (uint32_t i = 1; i + 1 < p.n; ++i) { put(g[0]); put(g[i]); put(g[i + 1]); }
+         }
++        uint32_t wrap = hd ? (p.tex >> 16 & 0xF) : 0;
+         GLsizei n = (GLsizei)vs.size() - first;
+-        if (!runs.empty() && runs.back().kind == kind) runs.back().n += n;
+-        else runs.push_back({first, n, kind});
++        if (!runs.empty() && runs.back().kind == kind && runs.back().hd == hd && runs.back().wrap == wrap && runs.back().tint == tint)
++            runs.back().n += n;
++        else runs.push_back({first, n, kind, hd, wrap, tint});
+     }
+     size_t bytes = vs.size() * sizeof(Vtx);
+     if (bytes > vbo_cap) {
+@@ -551,6 +584,14 @@ static void draw_polys(const Render3dJob& J, GlTarget& T) {
+             glDisablei(GL_BLEND, 1);
+         }
+         glDepthMask(r.kind == 1 || r.kind == 5 ? GL_FALSE : GL_TRUE);
++        glProgramUniform1i(prog, loc_hd, r.hd ? 1 : 0);
++        if (r.hd) {                                     // the DS's repeat and flip, as the picture's wrap
++            auto mode = [](bool rep, bool flip) { return !rep ? GL_CLAMP_TO_EDGE : flip ? GL_MIRRORED_REPEAT : GL_REPEAT; };
++            glTextureParameteri(r.hd, GL_TEXTURE_WRAP_S, mode(r.wrap & 1, r.wrap & 4));
++            glTextureParameteri(r.hd, GL_TEXTURE_WRAP_T, mode(r.wrap & 2, r.wrap & 8));
++            glBindTextureUnit(2, r.hd);
++            glProgramUniform4f(prog, loc_tint, (r.tint & 255) / 255.0f, (r.tint >> 8 & 255) / 255.0f, (r.tint >> 16 & 255) / 255.0f, 1);
++        }
+         glDrawArrays(r.kind == 3 ? GL_LINES : GL_TRIANGLES, r.first, r.n);
+         if (r.kind == 5 || r.kind == 6) glDisable(GL_STENCIL_TEST);
+     }
+diff --git a/runtime/runtime.cmake b/runtime/runtime.cmake
+index a3ccccf..e4e1773 100644
+--- a/runtime/runtime.cmake
++++ b/runtime/runtime.cmake
+@@ -10,7 +10,7 @@ add_library(ndskit_core OBJECT ${_rt}/core.cpp ${_rt}/interp.cpp)
+ add_library(ndskit_stub OBJECT ${_rt}/services_stub.cpp)
+ add_library(ndskit_machine OBJECT
+     ${_rt}/coro.cpp ${_rt}/machine.cpp ${_rt}/bios.cpp ${_rt}/mmio.cpp ${_rt}/system.cpp
+-    ${_rt}/video.cpp ${_rt}/gpu2d.cpp ${_rt}/gx.cpp ${_rt}/render_gl.cpp ${_rt}/display.cpp ${_rt}/audio.cpp ${_rt}/png.cpp
++    ${_rt}/video.cpp ${_rt}/gpu2d.cpp ${_rt}/gx.cpp ${_rt}/render_gl.cpp ${_rt}/texpack.cpp ${_rt}/display.cpp ${_rt}/audio.cpp ${_rt}/png.cpp
+     ${_rt}/cart.cpp ${_rt}/spi.cpp ${_rt}/sound.cpp ${_rt}/input.cpp)
+ find_package(SDL3 REQUIRED CONFIG)
+ target_link_libraries(ndskit_machine PUBLIC SDL3::SDL3)
+diff --git a/runtime/texpack.cpp b/runtime/texpack.cpp
+new file mode 100644
+index 0000000..e726db6
+--- /dev/null
++++ b/runtime/texpack.cpp
+@@ -0,0 +1,276 @@
++// Texture packs: the 3D's textures replaced by pictures of any resolution, and
++// dumped to make them.
++//
++// A texture is known by a hash of what it shows (texpack_hash): its format,
++// size, colour-0 transparency, texels and the palette entries it uses; not its
++// place in VRAM, so the same picture has the same name in every run. A pack is
++// a folder of <hash>.png files (16 hex digits), RGBA, of the texture's shape at
++// any size, or s<hash>.png for a texture's shape (its texels without the
++// palette: one picture for every palette it is drawn with, a white ring the
++// game tints, say), or t<hash>.png, a shape's picture multiplied by the colour
++// the texture shows most (its palette's: a glow that cycles colours keeps
++// cycling); a polygon using a texture the pack has samples that picture instead
++// (filtered, mipmapped), its colour and alpha combined as the DS's texel's. The
++// first pack listed that has a hash wins. --port tex-dump=DIR writes each
++// texture a run draws, decoded, as DIR/<hash>.png (the way to find one), with
++// DIR/index.txt (hash, format, size, the frame first seen).
++//
++// Options: --port tex-pack=DIR[;DIR...], --port tex-dump=DIR; display.h's
++// display_set_texture_packs() at run time.
++#include "display.h"
++#include "gl.h"
++#include "nds.h"
++#include "render3d.h"
++#include <SDL3/SDL.h>
++#include <algorithm>
++#include <cstdio>
++#include <cstring>
++#include <filesystem>
++#include <set>
++#include <string>
++#include <unordered_map>
++#include <vector>
++
++namespace {
++
++namespace fs = std::filesystem;
++
++std::vector<std::string> g_packs;                       // their folders, first wins
++std::unordered_map<uint64_t, std::string> g_files;      // hash -> its picture (from the packs)
++std::unordered_map<uint64_t, std::string> g_shapes;     // shape hash -> its picture (s<hash>.png)
++std::unordered_map<uint64_t, std::string> g_tinted;     // shape hash -> its picture, to tint (t<hash>.png)
++std::unordered_map<uint64_t, uint32_t> g_tint;          // a texture's hash -> the colour it shows most (RGB8)
++std::unordered_map<uint64_t, GLuint> g_loaded;          // hash -> its texture (0: could not load)
++bool g_packs_read;
++std::string g_dump;
++std::set<uint64_t> g_dumped;
++std::set<uint64_t> g_hidden;                            // display_set_texture_hidden
++std::FILE* g_index;
++
++uint32_t c6(uint32_t c5) { return c5 == 0 ? 0 : c5 * 2 + 1; }
++uint8_t c8(uint32_t c6v) { return (uint8_t)(c6v << 2 | c6v >> 4); }
++
++struct Tex {
++    const uint8_t* vram;                                // 512 KiB
++    const uint8_t* pal;                                 // 96 KiB
++    uint32_t p, pb;
++    int w, h, fmt;
++    uint32_t addr, pbase;                               // bytes; halfwords
++    uint8_t rd8(uint32_t a) const { return vram[a & 0x7FFFF]; }
++    uint16_t rd16(uint32_t a) const { return (uint16_t)(rd8(a) | rd8(a + 1) << 8); }
++    uint32_t rd32(uint32_t a) const { return rd16(a) | (uint32_t)rd16(a + 2) << 16; }
++    uint16_t palw(uint32_t i) const { i %= 0xC000; return (uint16_t)(pal[i * 2] | pal[i * 2 + 1] << 8); }
++    Tex(const Render3dJob& J, uint32_t tp, uint32_t pbv) : vram(J.tex.data()), pal(J.texpal.data()), p(tp), pb(pbv) {
++        w = 8 << (p >> 20 & 7);
++        h = 8 << (p >> 23 & 7);
++        fmt = p >> 26 & 7;
++        addr = (p & 0xFFFF) << 3;
++        pbase = fmt == 2 ? pb << 2 : pb << 3;
++    }
++    // the texel, as the 3D's shader decodes it: rgb 0-63, alpha 0-31
++    void texel(int s, int t, uint32_t out[4]) const {
++        uint32_t i = (uint32_t)(t * w + s);
++        bool tr0 = p & 0x20000000;
++        auto put = [&](uint16_t c, uint32_t a) { out[0] = c6(c & 31); out[1] = c6(c >> 5 & 31); out[2] = c6(c >> 10 & 31); out[3] = a; };
++        switch (fmt) {
++        case 1: { uint8_t b = rd8(addr + i); uint32_t a = b >> 5; put(palw(pbase + (b & 31)), a * 4 + (a >> 1)); return; }
++        case 2: { uint32_t x = rd8(addr + i / 4) >> (2 * (i & 3)) & 3; if (tr0 && !x) put(0, 0); else put(palw(pbase + x), 31); return; }
++        case 3: { uint32_t x = rd8(addr + i / 2) >> (4 * (i & 1)) & 15; if (tr0 && !x) put(0, 0); else put(palw(pbase + x), 31); return; }
++        case 4: { uint32_t x = rd8(addr + i); if (tr0 && !x) put(0, 0); else put(palw(pbase + x), 31); return; }
++        case 5: {
++            uint32_t blk = addr + (uint32_t)((t >> 2) * (w >> 2) + (s >> 2)) * 4;
++            uint32_t x = rd32(blk) >> ((t & 3) * 8 + (s & 3) * 2) & 3;
++            uint32_t slot = blk >> 17;
++            uint32_t ia = 0x20000 + ((blk & 0x1FFFF) >> 1) + (slot == 2 ? 0x10000 : 0);
++            uint16_t pw = rd16(ia);
++            uint32_t base = pbase + (pw & 0x3FFF) * 2, mode = pw >> 14;
++            uint16_t ca = palw(base), cb = palw(base + 1);
++            if (x == 0) { put(ca, 31); return; }
++            if (x == 1) { put(cb, 31); return; }
++            if (mode == 0) { if (x == 2) put(palw(base + 2), 31); else put(0, 0); return; }
++            if (mode == 2) { put(palw(base + x), 31); return; }
++            uint32_t ra[3] = {c6(ca & 31), c6(ca >> 5 & 31), c6(ca >> 10 & 31)}, rb[3] = {c6(cb & 31), c6(cb >> 5 & 31), c6(cb >> 10 & 31)};
++            if (mode == 1 && x == 3) { out[0] = out[1] = out[2] = out[3] = 0; return; }
++            for (int k = 0; k < 3; ++k)
++                out[k] = mode == 1 ? (ra[k] + rb[k]) / 2 : x == 2 ? (ra[k] * 5 + rb[k] * 3) / 8 : (ra[k] * 3 + rb[k] * 5) / 8;
++            out[3] = 31;
++            return;
++        }
++        case 6: { uint8_t b = rd8(addr + i); put(palw(pbase + (b & 7)), b >> 3); return; }
++        default: { uint16_t c = rd16(addr + i * 2); put(c, (c & 0x8000) ? 31 : 0); return; }
++        }
++    }
++};
++
++uint64_t fnv(uint64_t h, const void* d, size_t n) {
++    auto p = static_cast<const uint8_t*>(d);
++    for (size_t i = 0; i < n; ++i) h = (h ^ p[i]) * 0x100000001B3ull;
++    return h;
++}
++
++void options() {                                        // --port tex-pack, tex-dump: once
++    static bool done;
++    if (done) return;
++    done = true;
++    if (g_cfg.port.count("tex-pack")) {
++        std::string s = g_cfg.port.at("tex-pack");
++        for (size_t a = 0; a <= s.size();) {
++            size_t b = s.find(';', a);
++            if (b == std::string::npos) b = s.size();
++            if (b > a) g_packs.push_back(s.substr(a, b - a));
++            a = b + 1;
++        }
++    }
++    if (g_cfg.port.count("tex-dump")) g_dump = g_cfg.port.at("tex-dump");
++}
++
++void read_packs() {
++    g_packs_read = true;
++    g_files.clear();
++    g_shapes.clear();
++    g_tinted.clear();
++    for (auto it = g_packs.rbegin(); it != g_packs.rend(); ++it) {   // the first listed, read last, wins
++        std::error_code ec;
++        for (const auto& e : fs::directory_iterator(*it, ec)) {
++            std::string n = e.path().filename().string();
++            bool shape = n.size() == 21 && (n[0] == 's' || n[0] == 't');
++            if ((n.size() != 20 && !shape) || n.substr(n.size() - 4) != ".png") continue;
++            char* end = nullptr;
++            uint64_t h = std::strtoull(n.substr(shape ? 1 : 0, 16).c_str(), &end, 16);
++            if (end && *end == '\0') (!shape ? g_files : n[0] == 's' ? g_shapes : g_tinted)[h] = e.path().string();
++        }
++    }
++    if (!g_packs.empty())
++        nds_note("3D: texture packs: %zu pictures, %zu shapes, in %zu folder(s)", g_files.size(), g_shapes.size(), g_packs.size());
++}
++
++}  // namespace
++
++uint64_t texpack_hash(const Render3dJob& J, uint32_t tp, uint32_t pb, bool with_palette) {
++    Tex t(J, tp, pb);
++    uint64_t h = 0xCBF29CE484222325ull;
++    uint32_t head[4] = {(uint32_t)t.fmt, (uint32_t)t.w, (uint32_t)t.h, (tp >> 29) & 1};
++    h = fnv(h, head, sizeof head);
++    static const int bpp[8] = {0, 8, 2, 4, 8, 2, 8, 16};
++    uint32_t bytes = (uint32_t)(t.w * t.h * bpp[t.fmt] / 8);
++    for (uint32_t i = 0; i < bytes; ++i) { uint8_t b = t.rd8(t.addr + i); h = (h ^ b) * 0x100000001B3ull; }
++    static const int colours[8] = {0, 32, 4, 16, 256, 0, 8, 0};
++    uint32_t n = (uint32_t)colours[t.fmt];
++    if (t.fmt == 5) {                                    // the blocks' palette words, and the entries they reach
++        uint32_t blocks = (uint32_t)(t.w * t.h / 16), top = 0;
++        for (uint32_t b = 0; b < blocks; ++b) {
++            uint32_t blk = t.addr + b * 4, slot = blk >> 17;
++            uint16_t pw = t.rd16(0x20000 + ((blk & 0x1FFFF) >> 1) + (slot == 2 ? 0x10000 : 0));
++            h = fnv(h, &pw, 2);
++            top = std::max(top, (uint32_t)(pw & 0x3FFF) * 2 + 4);
++        }
++        n = std::min(top, 1024u);
++    }
++    if (with_palette)
++        for (uint32_t i = 0; i < n; ++i) { uint16_t c = t.palw(t.pbase + i); h = fnv(h, &c, 2); }
++    return h;
++}
++
++// The replacement's texture for a hash (0: none), and the dump of a texture new to this run.
++GLuint texpack_lookup(const Render3dJob& J, uint32_t tp, uint32_t pb, uint64_t h, uint32_t* tint) {
++    if (tint) *tint = 0xFFFFFF;
++    options();
++    if (!g_packs_read) read_packs();
++    if (!g_dump.empty() && g_dumped.insert(h).second) {
++        Tex t(J, tp, pb);
++        std::vector<uint8_t> px((size_t)t.w * t.h * 4);
++        uint32_t c[4];
++        for (int y = 0; y < t.h; ++y)
++            for (int x = 0; x < t.w; ++x) {
++                t.texel(x, y, c);
++                uint8_t* o = &px[((size_t)y * t.w + x) * 4];
++                o[0] = c8(c[0]); o[1] = c8(c[1]); o[2] = c8(c[2]); o[3] = (uint8_t)(c[3] * 255 / 31);
++            }
++        std::error_code ec;
++        fs::create_directories(g_dump, ec);
++        char name[32];
++        std::snprintf(name, sizeof name, "%016llx.png", (unsigned long long)h);
++        if (SDL_Surface* s = SDL_CreateSurfaceFrom(t.w, t.h, SDL_PIXELFORMAT_ABGR8888, px.data(), t.w * 4)) {
++            SDL_SavePNG(s, (fs::path(g_dump) / name).string().c_str());
++            SDL_DestroySurface(s);
++        }
++        if (!g_index) g_index = std::fopen((fs::path(g_dump) / "index.txt").string().c_str(), "a");
++        if (g_index) {
++            std::fprintf(g_index, "%016llx fmt %d %dx%d frame %llu tr0 %d shape s%016llx\n", (unsigned long long)h, t.fmt,
++                         t.w, t.h, (unsigned long long)J.frame, (int)(tp >> 29 & 1),
++                         (unsigned long long)texpack_hash(J, tp, pb, false));
++            std::fflush(g_index);
++        }
++    }
++    if (!g_hidden.empty() && g_hidden.count(h)) return kTexHidden;
++    auto f = g_files.find(h);
++    uint64_t key = h;
++    if (f == g_files.end()) {                           // its shape, any palette
++        if (g_shapes.empty() && g_tinted.empty()) return 0;
++        uint64_t shape = texpack_hash(J, tp, pb, false);
++        auto fs = g_shapes.find(shape);
++        if (fs != g_shapes.end()) {
++            f = fs;
++            key = shape ^ 0x5348415045ull;
++        } else {
++            auto ft = g_tinted.find(shape);
++            if (ft == g_tinted.end()) return 0;
++            f = ft;
++            key = shape ^ 0x54494E54ull;                // to tint: by the colour it shows most
++            auto c = g_tint.find(h);
++            if (c == g_tint.end()) {
++                Tex t(J, tp, pb);
++                std::unordered_map<uint32_t, int> n;
++                uint32_t px[4];
++                for (int y = 0; y < t.h; ++y)
++                    for (int x = 0; x < t.w; ++x) {
++                        t.texel(x, y, px);
++                        if (px[3]) ++n[c8(px[0]) | c8(px[1]) << 8 | c8(px[2]) << 16];
++                    }
++                uint32_t best = 0xFFFFFF;
++                int most = 0;
++                for (auto& [col, k] : n)
++                    if (k > most) { most = k; best = col; }
++                c = g_tint.emplace(h, best).first;
++            }
++            if (tint) *tint = c->second;
++        }
++    }
++    auto l = g_loaded.find(key);
++    if (l != g_loaded.end()) return l->second;
++    GLuint id = 0;
++    SDL_Surface* s = SDL_LoadPNG(f->second.c_str());
++    SDL_Surface* rgba = s ? SDL_ConvertSurface(s, SDL_PIXELFORMAT_ABGR8888) : nullptr;
++    if (rgba) {
++        int levels = 1;
++        for (int m = std::max(rgba->w, rgba->h); m > 1; m >>= 1) ++levels;
++        glCreateTextures(GL_TEXTURE_2D, 1, &id);
++        glTextureStorage2D(id, levels, GL_RGBA8, rgba->w, rgba->h);
++        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
++        glTextureSubImage2D(id, 0, 0, 0, rgba->w, rgba->h, GL_RGBA, GL_UNSIGNED_BYTE, rgba->pixels);
++        glGenerateTextureMipmap(id);
++        glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
++        glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
++    } else {
++        nds_note("3D: texture pack: cannot load %s", f->second.c_str());
++    }
++    if (rgba) SDL_DestroySurface(rgba);
++    if (s) SDL_DestroySurface(s);
++    return g_loaded[key] = id;
++}
++
++bool texpack_active() {
++    options();
++    return !g_packs.empty() || !g_dump.empty() || !g_hidden.empty();
++}
++
++void display_set_texture_hidden(const std::vector<uint64_t>& hashes) { g_hidden = std::set<uint64_t>(hashes.begin(), hashes.end()); }
++
++void display_set_texture_packs(const std::vector<std::string>& dirs) {
++    options();
++    g_packs = dirs;
++    for (auto& [h, id] : g_loaded)
++        if (id) glDeleteTextures(1, &id);
++    g_loaded.clear();
++    read_packs();
++}

@@ -41,6 +41,12 @@ if (Test-Path $customs) {
         if ($LASTEXITCODE -ge 8) { throw "robocopy failed on $($d.Name)" }
     }
 }
+# the skins (texture packs: Display > Skin), beside the ROM too
+$skins = Join-Path $root "skins"
+if ($Game -eq "EBA" -and (Test-Path $skins)) {
+    robocopy $skins (Join-Path $dest "skins") /E /NJH /NJS /NFL /NDL /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { throw "robocopy failed on skins" }
+}
 $bat = @"
 @echo off
 rem $title, recompiled: the game in a window with the options bar.

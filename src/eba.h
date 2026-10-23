@@ -56,6 +56,9 @@ struct Game {
     uint32_t replaying = 0;             // nonzero: the judge plays the replay array back
     uint32_t replay = 0;                // the replay's Array {data, capacity, count}, +0xC its cursor
     uint32_t approach = 0, hit_radius = 0;   // .data the game sets per stage: frames a note shows; the hit test's extra px
+    uint32_t gauge_on = 0;              // s32: 0, the life gauge neither fills nor drains (the song setup sets 1)
+    std::vector<uint64_t> life_bar;     // the life bar's textures (texpack hashes): hidden with No-Fail
+    const char* skins_dir = "";         // the skins' folder (texture packs made for this game), "": none
     const char* customs_dir = "customs";
     std::vector<const char*> stages;    // the story's stages by index (the charts' stems: SS05, OS03, s03)
     float menu_button_x = 0.5f;         // the CUSTOMS button across the main menu's lower screen (0 left .. 1 right)
@@ -96,7 +99,8 @@ void timing_options();                  // --port's timing options
 // ---- the game's own play (eba_play.cpp): autoplay, replays, assists ---------------------
 // over what the game sets (per stage and difficulty): the frames a note shows, in percent
 // (0: the game's own); the hit circle's extra pixels (0: none)
-struct Assists { int approach_pct = 0, hit_extra = 0; };
+// No-Fail: the life gauge stays as it starts (the game's own switch); hide_life: its bar is not drawn
+struct Assists { int approach_pct = 0, hit_extra = 0; bool no_fail = false, hide_life = true; };
 Assists& assists();
 void play_options();                                // --port autoplay=N replay=PATH replay-save=PATH ...
 void play_frame(uint64_t vblank);                   // each frame: the flags, the replay, the assists
@@ -111,6 +115,17 @@ Effects& effects();
 void fx_options();                                  // --port fx[=off] fx-intensity=N
 void fx_frame(uint64_t vblank);
 void fx_judged(int grade, int number);             // each tap the judge judges (eba_timing.cpp)
+
+// ---- skins (eba_skins.cpp): texture packs for the notes' pictures ----------------------
+// <skins_dir>/<name>/ (beside the ROM, else here), a pack of pictures by texture hash
+// (tools/make_texture_pack.py makes one from an osu! skin); <skins_dir>/_hd-rings/ the
+// approach circles redrawn smooth. The skin first, then the rings.
+struct Skin { std::string name; bool hd_rings = false; };   // name "": the game's own
+Skin& skin();
+std::vector<std::string> skins_list();                 // the skins found
+bool hd_rings_available();
+void skins_apply();                                    // after a change: the packs to the renderer
+void skins_options();                                  // --port skin=NAME hd-rings[=off]
 
 // ---- Customs (eba_customs.cpp) -----------------------------------------------------------
 struct Custom {

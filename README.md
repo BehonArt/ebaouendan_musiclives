@@ -35,7 +35,8 @@ EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
 - **Game:** screenshot (F12), quit (Esc).
 - **Display:** resolution (Auto, or 1x to 6x), layout (vertical, side by
   side, top screen only, bottom screen only; F9 cycles), frame rate (DS,
-  60, 120, 240, uncapped), fullscreen (F11, Alt+Enter), low latency.
+  60, 120, 240, uncapped), filter, skin and HD approach circles (EBA),
+  fullscreen (F11, Alt+Enter), low latency.
 - **Input:** button mode on or off, up to four hit keys (click one, then
   press a key; right-click clears), the connected gamepads, the key map.
 - **Timing:** the offset (-8 to +8 frames), the sound's latency (1 to 6
@@ -173,6 +174,47 @@ what the judge (`Note::Judge`) reads of the session besides the touch:
   approach is scaled from the game's value (+30%, +65%, -20%), the radius
   widened by 5 or 11 px. Off, they are left alone. `--port approach=PCT`,
   `--port hit-extra=PX`.
+- **No-Fail (EBA, the Assist menu):** in a song, the life gauge's switch
+  (s32 `0x020B40C8`, which the song's setup sets to 1 and Training turns
+  off) is held at 0, so no judgement fills or drains it; off mid-song, it is
+  set back to 1. **Hide the life bar** (on by default) leaves out its four
+  textures (texture-pack hashes `0ec7e029992bd7fb`, `a0a30d9776046f10`,
+  `13b4c2330acd0315`, `f59404e8a94ac33e`) meanwhile. Customs keep no score
+  with it. Checked headless, The Anthem with no input: Regroup? by frame
+  8,000 without it; still playing at 13,000 with it (no other drain kills).
+  `--port no-fail`, `--port hide-life=off`.
+
+## Skins and texture packs (EBA, `src/eba_skins.cpp`, ndskit `texpack.cpp`)
+
+The 3D renderer can draw a PNG in place of any DS texture (patch
+`ndskit-texpacks.patch`). A texture is named by a hash of its texels (and the
+palette entries it uses); a pack is a folder of pictures:
+
+- `<hash>.png`: that texture exactly;
+- `s<shape>.png`: its texels under any palette (the shape hash, without it);
+- `t<shape>.png`: likewise, multiplied by the colour the texture shows most
+  (a glow whose palette cycles keeps cycling).
+
+Any size: the picture is sampled (mipmapped, smooth) over the texture's
+coordinates and wrap. `--port tex-dump=DIR` writes every texture drawn, as
+PNG, with `index.txt` (hash, format, size, frame, shape); `--port
+tex-pack=DIR[;DIR]` loads packs (the first wins).
+
+**Skins** (Display > Skin) are packs in `skins/<name>/` beside the ROM (a
+play folder's) or here; `skins/_hd-rings/` is **HD approach circles**, the
+three approach rings redrawn smooth (under a skin's own). Pictures only:
+the game's sounds stay. `tools/make_texture_pack.py` makes both:
+
+    py -3 tools/make_texture_pack.py skin "F:\osu!\Skins\ebo-hd" "skins/Elite Beat Osu! HD"
+    py -3 tools/make_texture_pack.py hd-rings skins/_hd-rings
+
+From an osu! skin's @2x images it builds EBA's four circle atlases (hitcircle
+tinted by the skin's combo colour nearest each atlas's, its overlay, its
+numbers 1-15, the reverse arrow), the approach rings, the slider ball and
+glow, the judgements, the miss X, the spinner and SPIN!, each fitted to the
+DS picture's box (from a dump of all four difficulties, `--dump`). EBA's
+textures are the same on every difficulty. `skins/` is not in git (a skin's
+art is its author's).
 
 ## Effects (all three games, optional, `src/eba_fx.cpp`)
 
@@ -304,6 +346,9 @@ they reproduce the submodule's working tree exactly:
   headless without a script. Headless runs are byte-identical before and
   after it (EBA, 3,000 VBlanks through the menus: RAM, VRAM, save and
   screenshots).
+- `ndskit-texpacks.patch`: texture packs and dumps (`runtime/texpack.cpp`,
+  the fragment shader's `u_hdtex`), hidden textures
+  (`display_set_texture_hidden`), `display_set_texture_packs`.
 
 The discovery fixes, both to report upstream (drafts in `upstream/`):
 1. `Program.run()` gave up after 4 refuse passes and wiped everything, so
@@ -322,7 +367,7 @@ The discovery fixes, both to report upstream (drafts in `upstream/`):
 Re-apply after updating the submodule:
 
     cd ndskit
-    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch
+    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch ../patches/ndskit-texpacks.patch
 
 ## Toolchain
 

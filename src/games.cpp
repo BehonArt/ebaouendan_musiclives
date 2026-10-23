@@ -50,6 +50,9 @@ Game make_eba() {
     g.again = {126, 103, 640, 650, 236, 178};   // the map centres on the stage last played
     g.autoplay = 0x234; g.replaying = 0x138; g.replay = 0xA0;
     g.approach = 0x020B4704; g.hit_radius = 0x020B22E0;
+    g.gauge_on = 0x020B40C8;
+    g.life_bar = {0x0ec7e029992bd7fbull, 0xa0a30d9776046f10ull, 0x13b4c2330acd0315ull, 0xf59404e8a94ac33eull};
+    g.skins_dir = "skins";
     g.difficulties = {"Breezin'", "Cruisin'", "Sweatin'", "Hard Rock"};
     g.stages = {"SS01", "SS02", "SS06", "SS04", "SS05", "SS09", "SS10", "SS03", "SS08", "SS11", "SS13", "SS12",
                 "SSB03", "SS07", "SS15A", "SS15B", "SSB02", "SSB01", "SS14"};   // the table at 0x020B3EE4

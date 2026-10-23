@@ -9,13 +9,17 @@
 //   the judge returns each event's result once its frame comes. A song's run
 //   is saved to a file as it ends (a window's: <out>/replays/); --port
 //   replay=FILE plays one back into the buffer the game makes for its own.
+// - No-Fail (EBA): the life gauge's switch (0x020B40C8, set by the song's setup) held
+//   at 0 in a song: no hit fills it, no miss drains it; its bar can be hidden.
 // - Assists (EBA): the frames a note shows before its beat (0x020B4704) and the
 //   hit test's extra radius (0x020B22E0), .data the game sets for each stage
 //   (75 to 100 frames seen): scaled and widened from the game's own value.
 //
 // Options (ndsrun --port): autoplay=N; replay=FILE; replay-save=FILE (a
-// headless run's save); approach=PERCENT; hit-extra=PX.
+// headless run's save); approach=PERCENT; hit-extra=PX; no-fail[=off];
+// hide-life[=off].
 #include "eba.h"
+#include "display.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cstdio>
@@ -116,6 +120,8 @@ void play_options() {
     if (o.count("replay")) load_replay(o.at("replay"));
     if (o.count("approach")) assists().approach_pct = std::atoi(o.at("approach").c_str());
     if (o.count("hit-extra")) assists().hit_extra = std::atoi(o.at("hit-extra").c_str());
+    if (o.count("no-fail")) assists().no_fail = o.at("no-fail") != "off";
+    if (o.count("hide-life")) assists().hide_life = o.at("hide-life") != "off";
     if (g_autoplay) nds_note("eba play: the game's own autoplay (%d)", g_autoplay);
 }
 
@@ -138,6 +144,17 @@ void play_frame(uint64_t) {
 
     uint32_t s = session();
     bool song = scene_is_song();
+    // No-Fail: in a song, the gauge's switch off (the song's setup turns it on); off again
+    // mid-song, on. Its bar hidden meanwhile, if asked.
+    static bool gauge_off, life_hidden;
+    bool no_fail = g.gauge_on && assists().no_fail && song;
+    if (no_fail) { wr(g.gauge_on, 0); gauge_off = true; }
+    else if (gauge_off) { if (song) wr(g.gauge_on, 1); gauge_off = false; }
+    bool hide = no_fail && assists().hide_life && !g.life_bar.empty();
+    if (hide != life_hidden) {
+        display_set_texture_hidden(hide ? g.life_bar : std::vector<uint64_t>{});
+        life_hidden = hide;
+    }
     if (song && !g_was_song) g_injected = false;    // (it says the last song was a replay until the next)
     if (s && g.autoplay) {
         if (song && g_autoplay) { wr(s + g.autoplay, (uint32_t)g_autoplay); g_autoplay_set = true; }

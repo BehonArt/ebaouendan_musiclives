@@ -1,5 +1,5 @@
-// The settings: the window's (display.h), the sound's latency, button mode's
-// and the timing offset, in a file of KEY=VALUE lines in SDL's folder for the
+// The settings: the window's (display.h), the sound's latency, button mode's,
+// the timing offset, the assists, the effects and the skin, in a file of KEY=VALUE lines in SDL's folder for the
 // user's settings, one a game (on Windows %APPDATA%\eba-recomp\EBA\settings.ini,
 // ...\OE2\, ...\OE1\). A window's
 // run reads it at its first frame and the options bar writes it at each
@@ -65,6 +65,10 @@ void settings_load() {
     effects().on = num("fx", 0) != 0;
     effects().intensity = std::clamp((int)num("fx_intensity", 70), 10, 100);
     effects().flashes = num("fx_flashes", 1) != 0;
+    assists().no_fail = num("no_fail", 0) != 0;
+    assists().hide_life = num("hide_life", 1) != 0;
+    skin().name = v.count("skin") ? v["skin"] : "";
+    skin().hd_rings = num("hd_rings", 0) != 0;
     nds_note("eba: settings from %s", p.c_str());
 }
 
@@ -86,6 +90,8 @@ void settings_save() {
     std::fprintf(f, "fx=%d\nfx_intensity=%d\nfx_flashes=%d\n", effects().on ? 1 : 0, effects().intensity,
                  effects().flashes ? 1 : 0);
     std::fprintf(f, "approach_pct=%d\nhit_extra=%d\n", assists().approach_pct, assists().hit_extra);
+    std::fprintf(f, "no_fail=%d\nhide_life=%d\n", assists().no_fail ? 1 : 0, assists().hide_life ? 1 : 0);
+    std::fprintf(f, "skin=%s\nhd_rings=%d\n", skin().name.c_str(), skin().hd_rings ? 1 : 0);
     std::fclose(f);
 }
 
@@ -95,6 +101,7 @@ void init() {
     timing_options();
     play_options();
     fx_options();
+    skins_options();
     customs_init();
 }
 
