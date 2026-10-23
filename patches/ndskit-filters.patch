@@ -1,0 +1,165 @@
+diff --git a/runtime/display.cpp b/runtime/display.cpp
+index 4b94165..5358979 100644
+--- a/runtime/display.cpp
++++ b/runtime/display.cpp
+@@ -176,11 +176,44 @@ void main() {
+ const char* kOutFS = R"(#version 450
+ layout(binding = 0) uniform sampler2D u_pic;      // both screens at the scale, upper above lower, rows bottom first
+ uniform vec4 u_view;                              // the layout's rectangle in the window: x, y (bottom), w, h
+-uniform vec4 u_size;                              // the picture's size in texels, the scale (texels a DS pixel)
++uniform vec4 u_size;                              // the picture's size in texels, the scale (texels a DS pixel), the filter
+ uniform vec4 u_canvas;                            // the layout's size in DS pixels
+ uniform vec4 u_top, u_bottom;                     // each screen's place in it (x, y), shown (z)
+ layout(location = 0) out vec4 o_col;
+ 
++// a DS pixel of a screen (its centre in the picture; clamped to the screen's edges)
++vec3 cell(vec2 d, float base) {
++    float sc = u_size.z;
++    d = clamp(d, vec2(0.0), vec2(255.0, 191.0));
++    return texture(u_pic, vec2((d.x + 0.5) * sc, base + (192.0 - (d.y + 0.5)) * sc) / u_size.xy).rgb;
++}
++
++// the weights of 4 taps at offsets -1, 0, 1, 2 for a fraction x: Catmull-Rom (b 0) or the cubic B-spline (b 1)
++vec4 cubic(float x, float b) {
++    float x2 = x * x, x3 = x2 * x;
++    vec4 cr = vec4(-0.5 * x3 + x2 - 0.5 * x, 1.5 * x3 - 2.5 * x2 + 1.0, -1.5 * x3 + 2.0 * x2 + 0.5 * x, 0.5 * x3 - 0.5 * x2);
++    vec4 bs = vec4((1.0 - x) * (1.0 - x) * (1.0 - x), 3.0 * x3 - 6.0 * x2 + 4.0, -3.0 * x3 + 3.0 * x2 + 3.0 * x + 1.0, x3) / 6.0;
++    return mix(cr, bs, b);
++}
++
++// the smoothing filters, on the DS's pixels (the 2D is blocks of the scale; the 3D is resampled with it)
++vec3 filtered(vec2 local, float base, int f) {
++    vec2 p = local - 0.5;                         // DS pixel centres at whole numbers
++    vec2 i0 = floor(p), fr = p - i0;
++    if (f == 1)
++        return mix(mix(cell(i0, base), cell(i0 + vec2(1, 0), base), fr.x),
++                   mix(cell(i0 + vec2(0, 1), base), cell(i0 + vec2(1, 1), base), fr.x), fr.y);
++    float b = f == 3 ? 1.0 : 0.0;
++    vec4 wx = cubic(fr.x, b), wy = cubic(fr.y, b);
++    vec3 sum = vec3(0.0);
++    for (int j = 0; j < 4; ++j) {
++        vec3 row = vec3(0.0);
++        for (int m = 0; m < 4; ++m) row += wx[m] * cell(i0 + vec2(m - 1, j - 1), base);
++        sum += wy[j] * row;
++    }
++    return clamp(sum, 0.0, 1.0);
++}
++
+ void main() {
+     vec2 win = vec2(gl_FragCoord.x - u_view.x, u_view.w - (gl_FragCoord.y - u_view.y));
+     o_col = vec4(0.0, 0.0, 0.0, 1.0);
+@@ -197,7 +230,10 @@ void main() {
+     vec2 lo = vec2(0.5, base + 0.5), hi = vec2(256.0 * sc - 0.5, base + 192.0 * sc - 0.5);
+     vec2 k = u_view.zw / u_canvas.xy / sc;        // window pixels a texel
+     vec2 t = vec2(local.x * sc, base + (192.0 - local.y) * sc);   // the pixel's centre in texels
+-    if (k.x >= 1.0) {
++    int f = int(u_size.w + 0.5);
++    if (f > 0 && k.x * sc > 1.0) {                // a smoothing filter, while the screens are shown larger than the DS's
++        o_col = vec4(filtered(local, base, f), 1.0);
++    } else if (k.x >= 1.0) {
+         // sharp bilinear: each texel whole over the integer part of the ratio, blended across its edges
+         vec2 p = max(floor(k), vec2(1.0));
+         vec2 f = fract(t) - 0.5;
+@@ -399,6 +435,7 @@ void apply_changes() {
+         size_window(s);
+         if (cur.layout != old.layout) nds_note("display: %s", display_layout_name(cur.layout));
+     }
++    if (cur.filter != old.filter) nds_note("display: the %s filter", display_filter_name(cur.filter));
+     if (cur.fps != old.fps || cur.low_latency != old.low_latency) {
+         float hz = 0;
+         if (const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(win))) hz = dm->refresh_rate;
+@@ -409,13 +446,22 @@ void apply_changes() {
+ 
+ }  // namespace
+ 
+-const DisplaySettings& display_settings() { return cur; }
++const DisplaySettings& display_settings() { return changed ? want : cur; }   // a change not yet applied is the one asked for
+ 
+ void display_change(const DisplaySettings& s) {
+     want = s;
+     changed = true;
+ }
+ 
++const char* display_filter_name(int f) {
++    switch (f) {
++    case 1: return "bilinear";
++    case 2: return "bicubic";
++    case 3: return "soft";
++    default: return "sharp";
++    }
++}
++
+ const char* display_layout_name(NdsLayout l) {
+     switch (l) {
+     case NdsLayout::SideBySide: return "side by side";
+@@ -538,6 +584,7 @@ bool display_open(bool vis) {
+             start.fullscreen = g_cfg.fullscreen;
+             start.layout = (NdsLayout)std::clamp(g_cfg.layout, 0, 3);
+             start.low_latency = g_cfg.low_latency;
++            start.filter = std::clamp(g_cfg.filter, 0, 3);
+         }
+         changed = false;
+         cur = want = start;
+@@ -633,7 +680,7 @@ bool display_frame() {
+         glClear(GL_COLOR_BUFFER_BIT);
+         glUseProgram(out_prog);
+         glProgramUniform4f(out_prog, loc_out_view, r[0], wh - r[1] - r[3], r[2], r[3]);   // y from the bottom, as GL counts
+-        glProgramUniform4f(out_prog, loc_out_size, (float)pw, (float)ph, (float)scale, 0);
++        glProgramUniform4f(out_prog, loc_out_size, (float)pw, (float)ph, (float)scale, (float)cur.filter);
+         glProgramUniform4f(out_prog, loc_out_canvas, g.w, g.h, 0, 0);
+         glProgramUniform4f(out_prog, loc_out_top, g.x[0], g.y[0], g.show[0] ? 1.0f : 0.0f, 0);
+         glProgramUniform4f(out_prog, loc_out_bottom, g.x[1], g.y[1], g.show[1] ? 1.0f : 0.0f, 0);
+diff --git a/runtime/display.h b/runtime/display.h
+index 94f2b76..bc321ba 100644
+--- a/runtime/display.h
++++ b/runtime/display.h
+@@ -23,7 +23,10 @@ struct DisplaySettings {
+     int fps = 0;                        // as --fps: 0 the DS's pace, 60 120 240, -1 uncapped
+     bool fullscreen = false;
+     bool low_latency = false;           // wait for each picture to be drawn before the next (no frames queued)
++    int filter = 0;                     // the picture's filter on the DS's pixels: 0 sharp, 1 bilinear,
++                                        // 2 bicubic (Catmull-Rom), 3 soft (B-spline)
+ };
++const char* display_filter_name(int f);
+ const DisplaySettings& display_settings();
+ void display_change(const DisplaySettings& s);
+ const char* display_layout_name(NdsLayout l);
+diff --git a/runtime/main.cpp b/runtime/main.cpp
+index 58226d6..4b97d3b 100644
+--- a/runtime/main.cpp
++++ b/runtime/main.cpp
+@@ -1,7 +1,7 @@
+ // ndskit runtime — ndsrun: a cartridge's recompiled programs on the runtime.
+ //
+ //     ndsrun GAME.nds [--window] [--scale N] [--fullscreen] [--fps ds|60|120|240|uncapped]
+-//                     [--layout stacked|side|top|bottom] [--low-latency] [--audio-latency FRAMES]
++//                     [--layout stacked|side|top|bottom] [--filter sharp|bilinear|bicubic|soft] [--low-latency] [--audio-latency FRAMES]
+ //                     [--mute] [--wav FILE] [--out DIR] [--vblanks N] [--port KEY[=VALUE] ...]
+ //                     [--replace-file NAME=PATH ...]
+ //                     [--save FILE] [--save-size BYTES] [--shots V,V,...] [--shot-every N] [--input SCRIPT] [--trace]
+@@ -63,6 +63,13 @@ int main(int argc, char** argv) {
+             if (cfg.layout < 0) { std::fprintf(stderr, "--layout is stacked, side, top or bottom\n"); return 2; }
+         }
+         else if (a == "--low-latency") cfg.low_latency = true;
++        else if (a == "--filter") {
++            std::string v = next();
++            const char* names[] = {"sharp", "bilinear", "bicubic", "soft"};
++            cfg.filter = -1;
++            for (int f = 0; f < 4; ++f) if (v == names[f]) cfg.filter = f;
++            if (cfg.filter < 0) { std::fprintf(stderr, "--filter is sharp, bilinear, bicubic or soft\n"); return 2; }
++        }
+         else if (a == "--audio-latency") cfg.audio_latency = std::atof(next().c_str());
+         else if (a == "--fps") {
+             std::string v = next();
+diff --git a/runtime/nds.h b/runtime/nds.h
+index d1bae55..8d4f7c3 100644
+--- a/runtime/nds.h
++++ b/runtime/nds.h
+@@ -35,6 +35,7 @@ struct NdsConfig {
+     int layout = 0;                     // the screens: 0 one above the other, 1 side by side, 2 the upper alone,
+                                         // 3 the lower alone (display.h's NdsLayout)
+     bool low_latency = false;           // no picture queued ahead of the display (display.cpp)
++    int filter = 0;                     // --filter: the picture's filter (display.h)
+     double audio_latency = 3;           // the sound queued ahead of the device, in frames (audio.cpp)
+     std::vector<uint64_t> shots;        // headless: both screens as PNGs at these VBlanks
+     uint64_t shot_every = 0;            // ... and every N VBlanks

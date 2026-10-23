@@ -59,6 +59,18 @@ void display_menu() {
             }
         ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Filter")) {
+        struct { const char* name; const char* tip; } f[] = {
+            {"Sharp", "The DS's pixels, crisp (the default)."},
+            {"Bilinear", "Pixels blended with their neighbours: soft."},
+            {"Bicubic", "Smooth curves between the pixels, still fairly crisp."},
+            {"Soft", "The most blended (a B-spline): the least pixelated."}};
+        for (int i = 0; i < 4; ++i) {
+            if (ImGui::MenuItem(f[i].name, nullptr, s.filter == i)) { s.filter = i; change(s); }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", f[i].tip);
+        }
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("Frame rate")) {
         struct { const char* name; int fps; } r[] = {
             {"DS (59.83, accurate)", 0}, {"60", 60}, {"120", 120}, {"240", 240}, {"Uncapped", -1}};

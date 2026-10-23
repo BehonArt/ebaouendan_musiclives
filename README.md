@@ -78,6 +78,7 @@ F11).
 | `--low-latency` | waits for each picture to be drawn before the next (glFinish), so the driver queues none ahead of the display. |
 | `--audio-latency F` | the sound queued ahead of the device, in frames (3 by default; 1.5 held without a dropout at 60). |
 | `--scale N` | composes both screens at N times the DS's resolution (1-6): 1x 256x384, 2x 512x768, 3x 768x1152, 4x 1024x1536, 5x 1280x1920, 6x 1536x2304 (the first to cover a 4K display's height). The 3D draws at that resolution; the 2D layers stay the DS's pixels, sharp. The window opens at that size, fitted to the display; a larger window gets a sharp-bilinear upscale, a smaller one the mean of the pixels it covers (supersampling). Without `--scale` the picture follows the window's size, as before. |
+| `--filter sharp\|bilinear\|bicubic\|soft` | the picture's filter, on the DS's pixels (Display > Filter): sharp as before; bilinear soft; bicubic (Catmull-Rom) smooth but fairly crisp; soft (a cubic B-spline) the most blended. The 3D is resampled with the 2D. |
 | `--fullscreen` | the whole display, letterboxed at the DS's shape. F11 or Alt+Enter toggles it. |
 | `--fps ds` | the default: the DS's 59.83 frames a second, presented with the vertical sync (on a 60 Hz display one frame shows twice every 5.8 s). |
 | `--fps 60` / `120` / `240` | the game at exactly 60 frames a second (0.29% faster than the DS, the sound resampled with it: about 5 cents, inaudible), each frame shown 1, 2 or 4 times. On a display at that refresh rate the vertical sync is the clock, so every frame lasts the same: no judder. On another display, paced by the clock. |
@@ -258,6 +259,9 @@ they reproduce the submodule's working tree exactly:
   recompiles a function as `f_ADDR_orig` with `f_ADDR` in its place,
   calling the hook a port sets with `arm_set_hook` (ArmModule::hooks). One
   of ndskit's own known gaps ("no hooks yet").
+- `ndskit-filters.patch`: `--filter` and the out pass's smoothing filters;
+  `display_settings()` reports a change not yet applied (the options bar
+  saved the old value).
 - `ndskit-customs-runtime.patch`: what Customs needs of the runtime:
   `--replace-file NAME=PATH`, muting sound channels (`sound_set_muted`) and
   reading one (`sound_channel`), turbo (`display_set_turbo`: frames neither
@@ -285,7 +289,7 @@ The discovery fixes, both to report upstream (drafts in `upstream/`):
 Re-apply after updating the submodule:
 
     cd ndskit
-    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch
+    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch
 
 ## Toolchain
 
