@@ -1,8 +1,10 @@
 """Texture packs for EBA's 3D (ndskit/runtime/texpack.cpp): pictures named by the
 hash of the DS texture they replace, at 8x its size.
 
-    python tools/make_texture_pack.py hd-rings OUT [--dump DIR]
+    python tools/make_texture_pack.py hd-rings OUT [--width K] [--dump DIR]
         sharp approach circles: the game's three rings redrawn, smooth, where they are
+        (--width: their thickness times K, 0.5 half as thick; the menu's Thin is 0.6,
+        Thinner 0.35, in skins/_hd-rings-thin, skins/_hd-rings-thinner)
     python tools/make_texture_pack.py skin SKIN_DIR OUT [--dump DIR]
         an osu! skin's hit objects (visuals only): circles in the combo colours with
         their overlay and numbers, the approach circle, slider ball, reverse arrows,
@@ -122,13 +124,13 @@ def write(out, name, img):
     img.save(os.path.join(out, name + ".png"))
 
 
-def hd_rings(dump, out):
+def hd_rings(dump, out, width=1.0):
     _, by_shape = dump_index(dump)
     for shape in APPROACH:
         ds = Image.open(by_shape[shape])
         cx, cy, r, t = ring_fit(ds)
-        write(out, "s" + shape, hd_ring((ds.width * S, ds.height * S), cx * S, cy * S, r * S, t * S))
-    print("hd-rings: %d rings in %s" % (len(APPROACH), out))
+        write(out, "s" + shape, hd_ring((ds.width * S, ds.height * S), cx * S, cy * S, r * S, max(1.5, t * S * width)))
+    print("hd-rings: %d rings (width x%g) in %s" % (len(APPROACH), width, out))
 
 
 class Skin:
@@ -286,6 +288,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("hd-rings")
     a.add_argument("out")
+    a.add_argument("--width", type=float, default=1.0)
     a.add_argument("--dump", default=os.path.join(ROOT, "build", "texdump2_n2"))
     b = sub.add_parser("skin")
     b.add_argument("skin")
@@ -293,7 +296,7 @@ def main():
     b.add_argument("--dump", default=os.path.join(ROOT, "build", "texdump2_n2"))
     args = ap.parse_args()
     if args.cmd == "hd-rings":
-        hd_rings(args.dump, args.out)
+        hd_rings(args.dump, args.out, args.width)
     else:
         skin_pack(args.skin, args.dump, args.out)
 

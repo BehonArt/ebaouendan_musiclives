@@ -119,13 +119,14 @@ void fx_judged(int grade, int number);             // each tap the judge judges 
 // ---- skins (eba_skins.cpp): texture packs for the notes' pictures ----------------------
 // <skins_dir>/<name>/ (beside the ROM, else here), a pack of pictures by texture hash
 // (tools/make_texture_pack.py makes one from an osu! skin); <skins_dir>/_hd-rings/ the
-// approach circles redrawn smooth. The skin first, then the rings.
-struct Skin { std::string name; bool hd_rings = false; };   // name "": the game's own
+// approach circles redrawn smooth, _hd-rings-thin/ and _hd-rings-thinner/ thinner. The
+// skin first, then the rings.
+struct Skin { std::string name; int hd_rings = 0; };   // name "": the game's own; rings 0 off, 1 normal, 2 thin, 3 thinner
 Skin& skin();
 std::vector<std::string> skins_list();                 // the skins found
-bool hd_rings_available();
+bool hd_rings_available(int width);                    // 1 normal, 2 thin, 3 thinner
 void skins_apply();                                    // after a change: the packs to the renderer
-void skins_options();                                  // --port skin=NAME hd-rings[=off]
+void skins_options();                                  // --port skin=NAME hd-rings[=off|thin|thinner]
 
 // ---- Customs (eba_customs.cpp) -----------------------------------------------------------
 struct Custom {

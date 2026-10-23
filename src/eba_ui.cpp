@@ -39,75 +39,80 @@ void change(const DisplaySettings& s) {
     settings_save();
 }
 
-// The skins (eba_skins.cpp): texture packs over the notes' pictures.
-void skin_menu() {
-    Skin& k = skin();
-    if (ImGui::BeginMenu("Skin")) {
-        auto names = skins_list();
-        if (ImGui::MenuItem("The game's own", nullptr, k.name.empty())) { k.name.clear(); skins_apply(); settings_save(); }
-        for (auto& n : names)
-            if (ImGui::MenuItem(n.c_str(), nullptr, k.name == n)) { k.name = n; skins_apply(); settings_save(); }
-        if (names.empty()) ImGui::TextDisabled("(no skins in the %s folder)", game().skins_dir);
-        ImGui::Separator();
-        ImGui::TextDisabled("Pictures only: the game's sounds stay.");
-        ImGui::EndMenu();
-    }
-    if (hd_rings_available()) {
-        if (ImGui::MenuItem("HD approach circles", nullptr, k.hd_rings)) { k.hd_rings = !k.hd_rings; skins_apply(); settings_save(); }
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("The shrinking rings drawn smooth at any resolution (a skin's own come first).");
-    }
+// The menus have no submenus: in a small window one cannot sit beside its menu and
+// covers it. Each choice is a list under a grey heading instead.
+void heading(const char* t) {
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", t);
 }
 
 void display_menu() {
     DisplaySettings s = display_settings();
-    if (ImGui::BeginMenu("Resolution")) {
-        if (ImGui::MenuItem("Auto (follows the window)", nullptr, s.scale == 0)) { s.scale = 0; change(s); }
-        for (int n = 1; n <= kMaxScale; ++n) {
-            char t[64];
-            std::snprintf(t, sizeof t, "%dx  (%dx%d a screen)%s", n, 256 * n, 192 * n, n == kMaxScale ? "  4K" : "");
-            if (ImGui::MenuItem(t, nullptr, s.scale == n)) { s.scale = n; change(s); }
+    heading("Resolution");
+    if (ImGui::MenuItem("Auto (follows the window)", nullptr, s.scale == 0)) { s.scale = 0; change(s); }
+    for (int n = 1; n <= kMaxScale; ++n) {
+        char t[64];
+        std::snprintf(t, sizeof t, "%dx  (%dx%d a screen)%s", n, 256 * n, 192 * n, n == kMaxScale ? "  4K" : "");
+        if (ImGui::MenuItem(t, nullptr, s.scale == n)) { s.scale = n; change(s); }
+    }
+    ImGui::Separator();
+    heading("Layout (F9 cycles)");
+    const char* names[] = {"Vertical (one above the other)", "Side by side", "Top screen only", "Bottom screen only"};
+    for (int l = 0; l < 4; ++l)
+        if (ImGui::MenuItem(names[l], nullptr, (int)s.layout == l)) {
+            s.layout = (NdsLayout)l;
+            change(s);
         }
-        ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu("Layout")) {
-        const char* names[] = {"Vertical (one above the other)", "Side by side", "Top screen only", "Bottom screen only"};
-        for (int l = 0; l < 4; ++l)
-            if (ImGui::MenuItem(names[l], l == 0 ? "F9 cycles" : nullptr, (int)s.layout == l)) {
-                s.layout = (NdsLayout)l;
-                change(s);
-            }
-        ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu("Filter")) {
-        struct { const char* name; const char* tip; } f[] = {
-            {"Sharp", "The DS's pixels, crisp (the default)."},
-            {"Bilinear", "Pixels blended with their neighbours: soft."},
-            {"Bicubic", "Smooth curves between the pixels, still fairly crisp."},
-            {"Soft", "The most blended (a B-spline): the least pixelated."}};
-        for (int i = 0; i < 4; ++i) {
-            if (ImGui::MenuItem(f[i].name, nullptr, s.filter == i)) { s.filter = i; change(s); }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", f[i].tip);
-        }
-        ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu("Frame rate")) {
-        struct { const char* name; int fps; } r[] = {
-            {"DS (59.83, accurate)", 0}, {"60", 60}, {"120", 120}, {"240", 240}, {"Uncapped", -1}};
-        for (auto& x : r)
-            if (ImGui::MenuItem(x.name, nullptr, s.fps == x.fps)) { s.fps = x.fps; change(s); }
-        ImGui::Separator();
-        ImGui::TextDisabled("60/120/240 run the game at 60 (0.29%% fast),");
-        ImGui::TextDisabled("smooth on a display at that rate.");
-        ImGui::EndMenu();
-    }
-    if (*game().skins_dir) {
-        ImGui::Separator();
-        skin_menu();
+    ImGui::Separator();
+    heading("Frame rate");
+    struct { const char* name; int fps; } r[] = {
+        {"DS (59.83, accurate)", 0}, {"60", 60}, {"120", 120}, {"240", 240}, {"Uncapped", -1}};
+    for (auto& x : r) {
+        if (ImGui::MenuItem(x.name, nullptr, s.fps == x.fps)) { s.fps = x.fps; change(s); }
+        if (x.fps > 0 && ImGui::IsItemHovered())
+            ImGui::SetTooltip("Runs the game at 60 (0.29%% fast): smooth on a display at this rate.");
     }
     ImGui::Separator();
     if (ImGui::MenuItem("Fullscreen", "F11 / Alt+Enter", s.fullscreen)) { s.fullscreen = !s.fullscreen; change(s); }
     if (ImGui::MenuItem("Low latency", nullptr, s.low_latency)) { s.low_latency = !s.low_latency; change(s); }
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Wait for each picture to be drawn: no frames queued in the driver.");
+}
+
+// The picture's filter; the skins (eba_skins.cpp): texture packs over the notes' pictures.
+void look_menu() {
+    DisplaySettings s = display_settings();
+    heading("Filter");
+    struct { const char* name; const char* tip; } f[] = {
+        {"Sharp", "The DS's pixels, crisp (the default)."},
+        {"Bilinear", "Pixels blended with their neighbours: soft."},
+        {"Bicubic", "Smooth curves between the pixels, still fairly crisp."},
+        {"Soft", "The most blended (a B-spline): the least pixelated."}};
+    for (int i = 0; i < 4; ++i) {
+        if (ImGui::MenuItem(f[i].name, nullptr, s.filter == i)) { s.filter = i; change(s); }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", f[i].tip);
+    }
+    if (!*game().skins_dir) return;
+    Skin& k = skin();
+    ImGui::Separator();
+    heading("Skin (pictures only: the game's sounds stay)");
+    auto skins = skins_list();
+    if (ImGui::MenuItem("The game's own", nullptr, k.name.empty())) { k.name.clear(); skins_apply(); settings_save(); }
+    for (auto& n : skins)
+        if (ImGui::MenuItem(n.c_str(), nullptr, k.name == n)) { k.name = n; skins_apply(); settings_save(); }
+    if (skins.empty()) ImGui::TextDisabled("(no skins in the %s folder)", game().skins_dir);
+    if (!hd_rings_available(1)) return;
+    ImGui::Separator();
+    heading("HD approach circles");
+    const char* widths[] = {"Off (the game's own)", "Normal", "Thin", "Thinner"};
+    for (int w = 0; w < 4; ++w) {
+        if ((w == 0 || hd_rings_available(w)) && ImGui::MenuItem(widths[w], nullptr, k.hd_rings == w)) {
+            k.hd_rings = w;
+            skins_apply();
+            settings_save();
+        }
+        if (w && ImGui::IsItemHovered())
+            ImGui::SetTooltip("The shrinking rings drawn smooth at any resolution (a skin's own come first).");
+    }
 }
 
 void input_menu() {
@@ -206,8 +211,7 @@ void assist_menu() {
     ImGui::Separator();
     if (ImGui::MenuItem("No-Fail", nullptr, a.no_fail)) { a.no_fail = !a.no_fail; settings_save(); }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("The life gauge stays where it starts: misses never end the song.\n"
-                          "Customs keep no score with it.");
+        ImGui::SetTooltip("The life gauge stays where it starts: misses never end the song.");
     ImGui::BeginDisabled(!a.no_fail);
     if (ImGui::MenuItem("   Hide the life bar", nullptr, a.hide_life)) { a.hide_life = !a.hide_life; settings_save(); }
     ImGui::EndDisabled();
@@ -303,6 +307,7 @@ void draw(int, int) {
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Display")) { display_menu(); ImGui::EndMenu(); }
+        if (ImGui::BeginMenu("Look")) { look_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Input")) { input_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Timing")) { timing_menu(); ImGui::EndMenu(); }
         if (game().approach && ImGui::BeginMenu("Assist")) { assist_menu(); ImGui::EndMenu(); }

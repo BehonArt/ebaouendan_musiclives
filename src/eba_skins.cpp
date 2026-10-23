@@ -4,9 +4,10 @@
 // numbers, the approach circles, the slider ball, the judgements, the spinner;
 // pictures only, the game's sounds stay). The skins' folder is the game's
 // skins_dir beside the ROM (a play folder's), else here; its _hd-rings folder
-// holds the approach circles redrawn smooth, the HD approach circles option.
+// holds the approach circles redrawn smooth, the HD approach circles option
+// (_hd-rings-thin, _hd-rings-thinner: the same, thinner).
 //
-// Options (ndsrun --port): skin=NAME; hd-rings[=off].
+// Options (ndsrun --port): skin=NAME; hd-rings[=off|thin|thinner].
 #include "eba.h"
 #include "display.h"
 #include <algorithm>
@@ -17,7 +18,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
-constexpr const char* kHdRings = "_hd-rings";
+const char* const kHdRings[] = {"", "_hd-rings", "_hd-rings-thin", "_hd-rings-thinner"};
 
 fs::path root() {
     if (!*game().skins_dir) return {};
@@ -43,10 +44,11 @@ std::vector<std::string> skins_list() {
     return v;
 }
 
-bool hd_rings_available() {
+bool hd_rings_available(int width) {
+    if (width < 1 || width > 3) return false;
     fs::path r = root();
     std::error_code ec;
-    return !r.empty() && fs::is_directory(r / kHdRings, ec);
+    return !r.empty() && fs::is_directory(r / kHdRings[width], ec);
 }
 
 void skins_apply() {
@@ -58,7 +60,7 @@ void skins_apply() {
         if (fs::is_directory(r / skin().name, ec)) packs.push_back((r / skin().name).string());
         else nds_note("eba skins: no skin %s in %s", skin().name.c_str(), r.string().c_str());
     }
-    if (skin().hd_rings && hd_rings_available()) packs.push_back((r / kHdRings).string());
+    if (hd_rings_available(skin().hd_rings)) packs.push_back((r / kHdRings[skin().hd_rings]).string());
     static bool applied;
     if (packs.empty() && !applied) return;          // the game's own: nothing to change
     display_set_texture_packs(packs);
@@ -68,7 +70,10 @@ void skins_apply() {
 void skins_options() {
     const auto& o = g_cfg.port;
     if (o.count("skin")) skin().name = o.at("skin");
-    if (o.count("hd-rings")) skin().hd_rings = o.at("hd-rings") != "off";
+    if (o.count("hd-rings")) {
+        const std::string& w = o.at("hd-rings");
+        skin().hd_rings = w == "off" ? 0 : w == "thin" ? 2 : w == "thinner" ? 3 : 1;
+    }
     skins_apply();
 }
 

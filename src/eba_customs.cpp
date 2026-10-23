@@ -519,7 +519,7 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
         std::copy(t.grades, t.grades + 4, now.grades);
         pending = true;
         unranked = autoplay() ? "autoplay" : replay_playing() ? "a replay"
-                 : assists().hit_extra > 0 ? "a wider hit circle" : assists().no_fail && game().gauge_on ? "No-Fail" : nullptr;
+                 : assists().hit_extra > 0 ? "a wider hit circle" : nullptr;
     }
     if (pending && sc && !song) {                       // the ending's comic after a clear; Regroup? after a fail
         pending = false;

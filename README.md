@@ -35,8 +35,12 @@ EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
 - **Game:** screenshot (F12), quit (Esc).
 - **Display:** resolution (Auto, or 1x to 6x), layout (vertical, side by
   side, top screen only, bottom screen only; F9 cycles), frame rate (DS,
-  60, 120, 240, uncapped), filter, skin and HD approach circles (EBA),
-  fullscreen (F11, Alt+Enter), low latency.
+  60, 120, 240, uncapped), fullscreen (F11, Alt+Enter), low latency.
+- **Look:** the filter; EBA's skin and HD approach circles (off, normal,
+  thin, thinner).
+
+No menu has submenus (in a small window ImGui puts one over its menu): each
+choice is a list under a grey heading.
 - **Input:** button mode on or off, up to four hit keys (click one, then
   press a key; right-click clears), the connected gamepads, the key map.
 - **Timing:** the offset (-8 to +8 frames), the sound's latency (1 to 6
@@ -179,8 +183,8 @@ what the judge (`Note::Judge`) reads of the session besides the touch:
   off) is held at 0, so no judgement fills or drains it; off mid-song, it is
   set back to 1. **Hide the life bar** (on by default) leaves out its four
   textures (texture-pack hashes `0ec7e029992bd7fb`, `a0a30d9776046f10`,
-  `13b4c2330acd0315`, `f59404e8a94ac33e`) meanwhile. Customs keep no score
-  with it. Checked headless, The Anthem with no input: Regroup? by frame
+  `13b4c2330acd0315`, `f59404e8a94ac33e`) meanwhile. Customs keep their
+  score with it. Checked headless, The Anthem with no input: Regroup? by frame
   8,000 without it; still playing at 13,000 with it (no other drain kills).
   `--port no-fail`, `--port hide-life=off`.
 
@@ -202,11 +206,15 @@ tex-pack=DIR[;DIR]` loads packs (the first wins).
 
 **Skins** (Display > Skin) are packs in `skins/<name>/` beside the ROM (a
 play folder's) or here; `skins/_hd-rings/` is **HD approach circles**, the
-three approach rings redrawn smooth (under a skin's own). Pictures only:
-the game's sounds stay. `tools/make_texture_pack.py` makes both:
+three approach rings redrawn smooth (under a skin's own), with Thin and
+Thinner variants in `_hd-rings-thin/` (0.6x as thick) and
+`_hd-rings-thinner/` (0.35x). Pictures only: the game's sounds stay.
+`tools/make_texture_pack.py` makes both:
 
     py -3 tools/make_texture_pack.py skin "F:\osu!\Skins\ebo-hd" "skins/Elite Beat Osu! HD"
     py -3 tools/make_texture_pack.py hd-rings skins/_hd-rings
+    py -3 tools/make_texture_pack.py hd-rings skins/_hd-rings-thin --width 0.6
+    py -3 tools/make_texture_pack.py hd-rings skins/_hd-rings-thinner --width 0.35
 
 From an osu! skin's @2x images it builds EBA's four circle atlases (hitcircle
 tinted by the skin's combo colour nearest each atlas's, its overlay, its
