@@ -1,8 +1,11 @@
 # Findings from the EBA decompilation that the recomp can use
 
-Source: the matching decomp at `F:\dxvk_remix\Claude\eba-decomp` (commit `64179bc`,
-188 functions byte-matched). Everything below is read from code that compiles to
-the exact original bytes, unless marked *unverified*. Addresses are EBA USA ARM9.
+Source: the matching decomp at `F:\dxvk_remix\Claude\eba-decomp` (sections 1–10 at
+commit `64179bc`, 188 functions byte-matched; sections 11–17 added at `04b4a78`, 276
+functions). Sections 1–10 are read from code that compiles to the exact original
+bytes, unless marked *unverified*. Sections 11–17 are mostly traced from the
+disassembly (and, for the scene table, by running the game's own factory under
+unicorn); each says which. Addresses are EBA USA ARM9.
 
 ## 1. The game has its own autoplay (session +0x234)
 
@@ -59,12 +62,14 @@ stats from the game's own point of view.
 
 | Off | Meaning |
 |---|---|
-| +0x000 | difficulty (4 = a mode that skips replay recording) |
-| +0x008 | stage index into `gStageTable` 0x020b3ee4 |
+| +0x000 | difficulty; **4 = Training** (the main menu's TRAINING button sets it; Training skips replay recording) |
+| +0x008 | stage index into `gStageTable` 0x020b3ee4 (the chart loader uses it unless +0xB4 or +0xC8 == 2; Training uses -1) |
+| +0x010 | zeroed by the attract demo and Training before their songs (meaning unknown) |
+| +0x090 | stylus-trail recorder: `Array` of 6-byte `{u16 frame, u16 x, u16 y}`, appended in the song scene whenever the touch position changes (not while replaying, and only if 0x020cd460 != 0) |
 | +0x0A0 | replay `Array<ReplayEvent>` (section 2); +0xAC = cursor |
-| +0x0B4 | when nonzero, suppresses the hit sound/effect call in `Judge` |
-| +0x0C8 | play mode: 1 changes which note is "current"; 2 = per-stage `btl/%s` judgement-mark graphics |
-| +0x0CC | Combo: +0x08 x, +0x10 z, +0x14 count (s16), +0x16 max (s16), +0x30 broken flag |
+| +0x0B4 | **attract-demo flag**: the demo sets it (section 11); it also suppresses the hit sound/effect call in `Judge` and fades the BGM stream in |
+| +0x0C8 | play mode: 1 changes which note is "current"; 2 = per-stage `btl/%s` judgement-mark graphics, per-player Combos at +0x150 |
+| +0x0CC | Combo: +0x04 **KIAI (life) gauge** (fx32; the debug line prints it /4096), +0x08 x, +0x10 z, +0x14 count (s16), +0x16 max (s16), +0x30 broken flag (section 12) |
 | +0x0F8 | score (= Combo +0x2C) |
 | +0x100 | second Combo, used while replaying |
 | +0x138 | replaying flag |
@@ -143,7 +148,10 @@ These are the knobs for an approach-rate or hit-radius option in the PC port.
 | Game object | `gGame` 0x020cd22c (0x11e0 bytes, built in `NitroMain`) |
 | Frame pacing | `OS_WaitVBlankIntr` 0x0200acf8, `OS_WaitIrq` 0x020078dc |
 | Game RNG (LCG) | `*(0x020c28b0) + 0x59cc` state, +0x59d0 multiplier, +0x59d4 increment; seed/pin it for deterministic tests |
-| Input | `gInput` 0x020be8a8 (+0 pad trigger, touch x/y, previous touch; 0xffff = no touch) |
+| Input | `gInput` 0x020be8a8 (+0 pad trigger, touch x/y, previous touch; 0xffff = no touch). A new touch is `prevTouchX == 0xffff && touchX != 0xffff` |
+| Game per-frame update | `Game::func_02054318` 0x02054318 (runs the scene, decodes its result word, section 11) |
+| Scene factory / switch | `func_02052ca4` (id → `new` scene) / `func_020536c8(game, id, flagA, flagB)` |
+| Chart loader | in tu_020b4158 (~0x0205ca00): builds `data/seq/%s_%s.seq`, the `coop` variants and `demo%02d.seq`, then reads the header tunables (section 13) |
 
 ## 8. Sprite/Effect layout (for an HD layer)
 
@@ -178,6 +186,149 @@ discovery.
 
 Byte-matched C from `eba-decomp/src/` is equivalent by construction. The recomp can
 swap generated functions for it one at a time: Note/NoteTap/NoteSlider/NoteSpinner
-methods first, about 120 functions so far. This is the "recomp as test oracle" plan
+methods first (the note system is now nearly complete), then the scene base class
+and the first three small scenes. This is the "recomp as test oracle" plan
 in reverse. It is also where a source-level fix for the 60-group chart limit would go
 once that code is decompiled.
+
+## 11. Scenes: ids, the factory, and a direct route into a song
+
+*Traced from the disassembly; the id table comes from running the game's factory
+under unicorn (`eba-decomp/tools/scene_ids.py`). The scene base class and three small
+scenes are byte-matched.*
+
+**Scene base** (vtable 0x020b3b38, 10 slots): dtors, `v02` load (TRUE when ready),
+`v03` start, `v04(frames)` run a frame, `v05`, `v06` next-scene result (0 = stay),
+`v07(s32)`, `v08`, `v09`. Fields: +0x08 the scene's own id, +0x10 frame counter,
++0x14 the result `v06` hands back.
+
+**Result word** (`Game::func_02054318` 0x02054318 decodes it every frame):
+
+| Bits | Effect |
+|---|---|
+| `(r & 0xff0000) == 0x10000` | switch to scene `r & 0xffff` via `func_020536c8` |
+| 0x40000000 | flag passed to the switch (`func_0205376c` on the game object) |
+| 0x20000000 | reset the display: `func_02063050(0x020cd37c)`, `func_020331b4/02033738(*0x020c2f1c)` |
+| 0x80000000 | start the new scene (`func_02052374`) |
+
+Every transition in the game uses all four flags, so scene ids appear as
+`0xe001xxxx`. Built scenes are cached by id (`func_02052b8c`).
+
+**Id → scene** (`func_02052ca4`):
+
+| Id | Scene (vtable) | Notes |
+|---|---|---|
+| 0x20b | picture (0x020b4ae4) | **first scene at boot**: shows `misc/msg`, tap or timeout → 0x01 |
+| 0x80 | (0x020b5114) | first scene instead of 0x20b when booted as a Download Play child (`*(u16*)0x027FFC40 == 2`) |
+| 0x01 | (0x020b3cf0) | after the boot picture |
+| 0x03 | SceneTitle (0x020b3d78) | |
+| 0x04 | SceneMainMenu (0x020b7288) | |
+| 0x05 | SceneDifficulty (0x020b736c) | main menu `CHRSEL` |
+| 0x06 | SceneMap (0x020b7528) | |
+| 0x07 | options (0x020b7c74) | main menu `OPTION` |
+| 0x100 | SceneSong (0x020b65a0) | every song, including the attract demo |
+| 0x101 | Training song (0x020b9b50, a SceneSong subclass) | main menu `TRAINING` (sets session +0 = 4); also the title's tap target while flag 0x020cd234 is set (first run?) |
+| 0x102 | SceneComicOpening (0x020b64f0) | map → comic → song |
+| 0x103 / 0x104 / 0x105 | SceneComicEnding / SceneRegroup / SceneResults | chosen by the song scene |
+| 0x200 | 2D animation by difficulty (0x020b4a4c) | → 0x201 |
+| 0x202 | multiplayer (0x020b4dac) | main menu `M_SELECT` |
+| 0x205 | Download Play host (0x020b4bdc) | sends `data/rom/btlnchild.srl` + `data/mbicon.nbfc/nbfp`; `BTN_SEND` / `BTN_BACK`; goes to 0x88 if the wireless worker `*0x020c2e44` is NULL |
+| 0x88 | wireless error/child scene | one of two scenes, picked by boot type |
+| others | 0x08–0x15, 0x81–0x8a, 0x106–0x108, 0x201–0x208 | not identified yet |
+
+**The attract demo** (`SceneTitle_v04` 0x02053d78; the main menu has the same code):
+after 2400 idle frames (40 s) it sets session +0xB4 = 1, +0x234 = 4 (random
+autoplay), +0 = 1 (Cruisin'), +0x10 = 0, its own +0x14 = 0xe0010100, and starts a
+fade to black with `func_02032080(*0x020c2f1c, -16, 0)`. `SceneTitle_v06` releases
+0xe0010100 only once the main screen brightness `*(s16*)(*0x020c2f1c + 0x17C)` reaches
+-16. The demo plays `data/seq/demo%02d.seq`. A touch after its first 60 frames
+fades the music out over 15 frames and returns to the title (0xe0010003).
+
+**Lead for Customs (unverified):** the same jump with the demo flags left at 0
+(session +0xB4 = 0, +0x234 = 0) and Customs' usual +0 / +8 pokes should start the
+chosen stage straight from the title. That would skip the menu, difficulty, map and
+card taps. The demo shows the song scene runs without the menus. What it doesn't
+prove is that nothing the map or comic sets (+0x10, +0xC8, players) is needed for a
+normal stage, so check a headless run against the current route. Recipe: while the
+current scene's vtable is 0x020b3d78, write session +0 / +8, set
+`*(u32*)(scene + 0x14) = 0xe0010100`, and call or force the fade.
+
+## 12. Life (KIAI) gauge and combo rules
+
+*From byte-matched `Note::func_02067ad8`, `func_02067c3c`, `func_02067fa4`; the gauge
+flag's writers are traced.*
+
+- **Gauge per judgement:** delta = `table[result]` from 0x020b3ec4 (defaults 300:
+  +10, 100: +5, 50: 0, miss: -50; ×4096 as fx32). It is added to Combo +0x10, and
+  Combo +0x08 + delta is passed to `func_020550b4` (sets the gauge target). The
+  current value the debug line shows is Combo +0x04.
+- **Miss:** an extra drain of `combo count × *0x020cd238` (combo-break penalty),
+  then count = 0 and the broken flag is set. The top screen shakes
+  (`func_0205dae4(0x020cd2fc, clock, 0x5000, 3, 1, 20, 0)`), the agents' break
+  reaction plays, and sound 0x15 is used (0x16 on Hard Rock).
+- **Combo** caps at 1000; the max is kept at Combo +0x16.
+- **Group end:** the worst result in the finished group goes to `func_02055260`
+  (the group bonus). It plays sound 11 if every note was a 300, else 10, then a
+  pop-up (`func_02069d38`).
+- **Gauge on/off:** every gain and drain above is skipped while
+  `*(s32*)0x020b40c8 == 0`. The song setup (0x0205cdd8) sets it to 1; the Training
+  scene turns it off and on. **A No-Fail assist is writing 0 there after the song
+  starts.** Unverified: whether the gauge's passive drain over time (not found
+  yet) also checks it.
+- Hit sounds: per-note sound index (note +0x08) into the s16 table 0x020cd2b4,
+  played on channel `*0x020cd2ac`.
+
+## 13. Each chart's header carries gameplay tuning (Customs Studio)
+
+*Traced from the disassembly.* At load, the chart loader reads a version from the
+`.seq` stream, then `func_02054688(stream, version)` copies a run of header values
+into globals. Each chart can carry its own difficulty tuning; the .data values are
+only defaults.
+
+Write order: 0x020b3ec4 (16 bytes: the four gauge deltas, section 12), 0x020cd238
+(combo-break drain), then 0x020b3e6c, 3e60, 3e70, 3e74, 3e64, 3e98, 3e94, 3e90
+(version ≥ 8), 0x020cd23c, 3eac, 3eb8, 3e84, 3e80, 3e7c, 3e78, 3e8c, 3e88, 3ea4,
+3e68 (version ≥ 9), 3e9c (version ≥ 11, two of its values doubled). Only the first
+two are identified.
+
+For the Studio this explains why a custom's drain follows the chart it was built
+from. A per-custom gauge setting would be an edit to these header fields.
+
+## 14. Debug features inside songs
+
+*Traced.*
+
+- With session +0x230 (debug) set, **X cycles the game's autoplay 0→4** during a
+  song (`func_02082e0c`: `autoplay = (autoplay + 1) % 5`).
+- With the perf overlay on (`gDebugPerfDisplay` 0x020cd230, section 3), the song
+  scene prints `DBG:%d KIAI:%4d BGM:%07d` on debug-console row 21: the autoplay
+  value, the KIAI gauge (Combo +0x04 / 4096) and the BGM stream position.
+
+## 15. Fades and visible planes (resources `*0x020c2f1c`)
+
+*Byte-matched in the three small scenes.*
+
+- +0x17C / +0x180: main / sub screen brightness (s16; -16 = black, 0 = normal).
+  `func_02032080(res, target, screen)` starts a fade. Scenes wait on these values
+  before switching, so the HD layer can read them to fade its own overlays in step
+  with the game.
+- +0x587C: the planes shown (DISPCNT bits 8–12, BG0–3 + OBJ), mirrored at +0x174;
+  `ShowPlanes(mask)` ORs bits in and writes DISPCNT.
+
+## 16. Wireless paths the recomp will hit
+
+`M_SELECT` → 0x202 (multiplayer) and the Download Play host 0x205 need the
+wireless worker at `*0x020c2e44`. With no worker, 0x205's frame function returns
+0xe0010088 (scene 0x88) at once. If wireless stays stubbed, those menu entries
+lead to that scene; hiding or redirecting them is a recomp-side choice.
+
+## 17. The approach circle (for an HD redraw)
+
+*Byte-matched / near-matched (class at vtable 0x020b49a4, methods 0x0206f3b0–0x0206f5b8).*
+
+- Between `appear` and `time` the ring scale is
+  `size * (time - now) / (time - appear) + 1.0`, times the note's `scale` field.
+- It hides itself once the scale reaches 0 or below.
+- It swaps between three circle textures: the smallest whose limit (`circle +0x08`)
+  covers the current scale (`func_0206f5b8`).
+- An HD layer can draw one high-res ring at that scale and ignore the texture swaps.
