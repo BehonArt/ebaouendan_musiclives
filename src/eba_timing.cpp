@@ -38,6 +38,7 @@ void judge(ArmContext& c, ArmFunc original) {
     int grade = (int)c.r[0];
     if (grade < 0 || grade > 3) return;
     ++g_grades[grade];
+    fx_judged(grade, g_main[(note + game().number) & 0x3FFFFF]);
     bool tapped = grade < 3 || now - g_offset < time;   // a miss after the note is no tap at all
     if (tapped) {
         g_taps.push_back(now - time);

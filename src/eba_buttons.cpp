@@ -192,6 +192,7 @@ void hook(NdsInput& in, uint64_t vbl) {
     if (!m.init) { m.init = true; eba::init(); }
     eba::debug_pokes(vbl);
     eba::play_frame(vbl);                           // autoplay, replays, assists
+    eba::fx_frame(vbl);                             // the light behind the 3D
     if (eba::customs_frame(in, vbl)) return;        // Customs' autopilot drives the game to its stage
     if (eba::ui_wants_mouse()) in.pen = false;      // the mouse is on the options bar
     if (!eba::buttons().on) return;

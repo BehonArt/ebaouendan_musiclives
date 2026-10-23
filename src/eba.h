@@ -40,6 +40,7 @@ struct Game {
     int scene_depth = 0;
     Scenes scenes{};
     uint32_t session = 0, score = 0;    // the session's pointer; its score's offset
+    uint32_t combo = 0;                 // the session's combo count (s16), as the game shows it
     uint32_t song_channels = 0;         // the song's stream (muted for HD audio)
     int skip_x = 0, skip_y = 0;         // a comic's SKIP
     std::vector<RouteStep> route;       // Customs' autopilot on the known save
@@ -103,6 +104,13 @@ void set_autoplay(int n);                           // 0 off, 1 every note a 300
 int autoplay();
 bool replay_playing();                              // a recorded run is being played back
 std::string last_replay();                          // the file the last song's run was saved to
+
+// ---- light behind the 3D (eba_fx.cpp) ---------------------------------------------------
+struct Effects { bool on = false; int intensity = 70; bool flashes = true; };   // off by default
+Effects& effects();
+void fx_options();                                  // --port fx[=off] fx-intensity=N
+void fx_frame(uint64_t vblank);
+void fx_judged(int grade, int number);             // each tap the judge judges (eba_timing.cpp)
 
 // ---- Customs (eba_customs.cpp) -----------------------------------------------------------
 struct Custom {

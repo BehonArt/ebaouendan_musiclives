@@ -143,6 +143,27 @@ void timing_menu() {
     if (ImGui::MenuItem("Calibrate...", nullptr, g_calibration)) g_calibration = !g_calibration;
 }
 
+// Light behind the 3D in a song (eba_fx.cpp), off by default.
+void effects_menu() {
+    Effects& e = effects();
+    bool eba = game().id == std::string("EBA");
+    if (ImGui::MenuItem(eba ? "Spotlights behind the Agents" : "Fire behind the squad", nullptr, e.on)) {
+        e.on = !e.on;
+        settings_save();
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip(eba ? "Spotlights rise behind the Agents in a song, swinging with each hit,\n"
+                                "brighter as the combo grows."
+                              : "Fire rises behind the squad in a song, taller as the combo grows.");
+    if (ImGui::MenuItem(eba ? "Elite Beat flashes" : "Bursts on perfect groups", nullptr, e.flashes)) {
+        e.flashes = !e.flashes;
+        settings_save();
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("A flash when a group of notes ends all 300.");
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
+    if (ImGui::SliderInt("Intensity", &e.intensity, 10, 100, "%d%%")) settings_save();
+}
+
 // The game's own tuning (eba_play.cpp), over what it sets for each stage: how long notes
 // show, how wide the hit circle is.
 void assist_menu() {
@@ -253,6 +274,7 @@ void draw(int, int) {
         if (ImGui::BeginMenu("Input")) { input_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Timing")) { timing_menu(); ImGui::EndMenu(); }
         if (game().approach && ImGui::BeginMenu("Assist")) { assist_menu(); ImGui::EndMenu(); }
+        if (ImGui::BeginMenu("Effects")) { effects_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Help")) {
             if (ImGui::MenuItem("Shortcuts")) g_shortcuts = true;
             if (ImGui::MenuItem("About")) g_about = true;

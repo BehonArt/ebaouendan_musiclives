@@ -38,7 +38,7 @@ Game make_eba() {
     g.judge = 0x020681D8;
     g.scene_root = 0x020CD1FC; g.scene_depth = 3;
     g.scenes = {0x020B3D78, 0x020B7288, 0x020B736C, 0x020B7528, 0x020B64F0, 0x020B65A0, 0x020B6448, 0x020B62C0, 0x020B66C8};
-    g.session = 0x020CD248; g.score = 0xF8;
+    g.session = 0x020CD248; g.score = 0xF8; g.combo = 0xE0;   // the Combo at +0xCC: count +0x14, score +0x2C
     g.song_channels = 0xC0;
     g.skip_x = 238; g.skip_y = 183;
     // the title, Single Player, the difficulty and OK, The Anthem's card, OK
@@ -68,7 +68,7 @@ Game make_oe2() {
     g.scene_root = 0x020D70F4; g.scene_depth = 2;
     g.scenes = {0x020ADA5C, 0x020ADC98, 0x020ADD50, 0x020ADEC4, 0x020B0820, 0x020B0888, 0x020B07BC, 0x020B0668,
                 0x020B0978};
-    g.session = 0x020A7A88; g.score = 0x10C;
+    g.session = 0x020A7A88; g.score = 0x10C; g.combo = 0xF4;
     g.song_channels = 0xC0;
     g.skip_x = 238; g.skip_y = 183;
     // the title, ひとりで応援 (alone), OK on the difficulty, the map's book (the next
@@ -100,7 +100,7 @@ Game make_oe1() {
     g.scene_root = 0x0208ED68; g.scene_depth = 2;
     g.scenes = {0x020886E0, 0x02089D4C, 0x020887D8, 0x02088C34, 0x02089624, 0x02088A2C, 0x020896D0, 0x02088AAC,
                 0x02088B08};
-    g.session = 0x0208F58C; g.stage = 4; g.score = 0xD4;
+    g.session = 0x0208F58C; g.stage = 4; g.score = 0xD4; g.combo = 0xBC;
     g.song_channels = 0xC0;
     g.skip_x = 238; g.skip_y = 183;
     // the title, ひとりで応援 (alone), OK on the difficulty, the first stage's man on the map, OK

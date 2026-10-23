@@ -62,6 +62,9 @@ void settings_load() {
     set_offset((int)num("offset", 0));
     assists().approach_pct = (int)num("approach_pct", 0);
     assists().hit_extra = (int)num("hit_extra", 0);
+    effects().on = num("fx", 0) != 0;
+    effects().intensity = std::clamp((int)num("fx_intensity", 70), 10, 100);
+    effects().flashes = num("fx_flashes", 1) != 0;
     nds_note("eba: settings from %s", p.c_str());
 }
 
@@ -80,6 +83,8 @@ void settings_save() {
         std::fprintf(f, "button_key%d=%s\n", i + 1, b.keys[i] ? SDL_GetScancodeName((SDL_Scancode)b.keys[i]) : "");
     std::fprintf(f, "offset=%d\n", offset());
     std::fprintf(f, "filter=%d\n", s.filter);
+    std::fprintf(f, "fx=%d\nfx_intensity=%d\nfx_flashes=%d\n", effects().on ? 1 : 0, effects().intensity,
+                 effects().flashes ? 1 : 0);
     std::fprintf(f, "approach_pct=%d\nhit_extra=%d\n", assists().approach_pct, assists().hit_extra);
     std::fclose(f);
 }
@@ -89,6 +94,7 @@ void init() {
     buttons_options();
     timing_options();
     play_options();
+    fx_options();
     customs_init();
 }
 

@@ -1,0 +1,280 @@
+diff --git a/runtime/display.cpp b/runtime/display.cpp
+index 5358979..39c3034 100644
+--- a/runtime/display.cpp
++++ b/runtime/display.cpp
+@@ -76,7 +76,8 @@ bool turbo;                                             // display_set_turbo
+ float refresh_hz;
+ GlTarget t_win, t_one;                                  // the 3D at the picture's scale, and at 1
+ GLuint comp_prog, words_tex, empty_vao;
+-GLint loc_atop, loc_view;
++GLint loc_atop, loc_view, loc_fx_kind, loc_fx, loc_fx2;
++DisplayFx fx;
+ GLuint out_prog, pic_fbo, pic_tex;                      // the screens composed at the scale
+ int pic_scale;
+ GLint loc_out_view, loc_out_size, loc_out_canvas, loc_out_top, loc_out_bottom;
+@@ -114,6 +115,8 @@ uniform vec4 u_view;                              // the screens' rectangle in t
+ uniform int u_atop;                               // engine A on the upper screen
+ layout(location = 0) out vec4 o_col;
+ 
++@FX@
++
+ uint blend(uint a, uint b, uint eva, uint evb) {
+     uint o = 0u;
+     for (int s = 0; s < 18; s += 6) o |= min(((a >> s & 63u) * eva + (b >> s & 63u) * evb + 8u) >> 4, 63u) << s;
+@@ -147,6 +150,12 @@ void main() {
+         c3 = q.r | q.g << 6 | q.b << 12;
+         a3 = uint(round(t.a * 31.0));
+     }
++    if (mode == 1u && u_fx_kind != 0 && isA) {      // the port's light on what lies under the 3D
++        vec3 l = fx_light(vec2(ds.x, ds.y - (upper ? 0.0 : 192.0)));
++        uint o = 0u;
++        for (int s = 0; s < 18; s += 6) o |= min((c >> s & 63u) + uint(l[s / 6] * 63.0), 63u) << s;
++        c = o;
++    }
+     if (mode == 1u) {
+         if (a3 != 0u) {
+             if ((w.x & (1u << 26)) != 0u) {
+@@ -172,6 +181,53 @@ void main() {
+ }
+ )";
+ 
++// A port's light (DisplayFx), in GLSL for the compose pass and the 3D's own pass:
++// fx_light(q) at a pixel of the 3D's screen (x 0-256, y 0-192 down), RGB 0-1.
++const char* kFxLightGLSL = R"(
++uniform int u_fx_kind;                            // 0 none, 1 spotlights, 2 fire
++uniform vec4 u_fx;                                // time (s), level, pulse, flash
++uniform vec4 u_fx2;                               // heat, phase, beams
++float fx_hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
++float fx_noise(vec2 p) {
++    vec2 i = floor(p), f = fract(p);
++    f = f * f * (3.0 - 2.0 * f);
++    return mix(mix(fx_hash(i), fx_hash(i + vec2(1, 0)), f.x), mix(fx_hash(i + vec2(0, 1)), fx_hash(i + vec2(1, 1)), f.x), f.y);
++}
++float fx_fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 4; ++i) { v += a * fx_noise(p); p *= 2.03; a *= 0.5; } return v; }
++vec3 fx_light(vec2 q) {
++    float t = u_fx.x, level = u_fx.y, pulse = u_fx.z, flash = u_fx.w, heat = u_fx2.x, phase = u_fx2.y;
++    int beams = int(u_fx2.z + 0.5);
++    vec3 l = vec3(0.0);
++    if (u_fx_kind == 1) {
++        // spotlights from below the stage, spread across it, swung by the beat (phase)
++        const vec3 col[4] = vec3[4](vec3(1.0, 0.92, 0.75), vec3(1.0, 0.75, 0.35), vec3(0.7, 0.85, 1.0), vec3(1.0, 0.6, 0.8));
++        for (int i = 0; i < 4; ++i) {
++            if (i >= beams) break;
++            float u = beams == 1 ? 0.5 : float(i) / float(beams - 1);   // 0 .. 1 across
++            vec2 o = vec2(36.0 + 184.0 * u, 205.0);      // their feet just below the screen
++            // leaning in towards the middle, each swung about its own lean by the beat
++            float a = (0.5 - u) * 0.55 + 0.28 * sin(phase * 1.5708 + float(i) * 2.1) + 0.05 * sin(t * 0.7 + float(i));
++            vec2 d = q - o;
++            float ang = atan(d.x, -d.y) - a;      // from straight up
++            float w = 0.11 + 0.04 * pulse + 0.06 * flash;
++            float beam = smoothstep(w, w * 0.3, abs(ang)) * smoothstep(240.0, 20.0, length(d));
++            l += col[i] * beam * (0.8 + 0.4 * smoothstep(60.0, 0.0, length(d)));   // brightest at the foot
++        }
++        l *= level * (0.7 + 0.5 * pulse);
++        l += vec3(1.0, 0.8, 0.3) * flash * level * 0.6 * smoothstep(210.0, 0.0, distance(q, vec2(128.0, 140.0)));
++    } else if (u_fx_kind == 2) {
++        // fire rising from the bottom, taller with the combo (heat), brighter on hits
++        float h = 40.0 + 130.0 * heat + 25.0 * flash;
++        float y = (192.0 - q.y) / h;
++        float n = fx_fbm(vec2(q.x * 0.045, q.y * 0.03 + t * 2.2)) + 0.35 * fx_fbm(vec2(q.x * 0.11, q.y * 0.08 + t * 3.7));
++        float f = clamp(1.0 - y + (n - 0.55) * 1.4, 0.0, 1.0);
++        f = pow(f, 1.6) * level * (0.6 + 0.4 * pulse + 0.6 * flash);
++        l = mix(vec3(0.9, 0.12, 0.0), vec3(1.0, 0.85, 0.3), clamp(f * 1.3 - 0.2, 0.0, 1.0)) * f;
++    }
++    return l;
++}
++)";
++
+ // the composed picture to the window, in the layout
+ const char* kOutFS = R"(#version 450
+ layout(binding = 0) uniform sampler2D u_pic;      // both screens at the scale, upper above lower, rows bottom first
+@@ -473,6 +529,10 @@ const char* display_layout_name(NdsLayout l) {
+ 
+ void display_set_hooks(const DisplayHooks& h) { hooks = h; }
+ 
++void display_set_fx(const DisplayFx& f) { fx = f; }
++const DisplayFx& display_fx() { return fx; }
++const char* display_fx_glsl() { return kFxLightGLSL; }
++
+ void display_set_turbo(bool on) {
+     if (on == turbo) return;
+     turbo = on;
+@@ -560,10 +620,15 @@ bool display_open(bool vis) {
+     if (!ctx) { nds_note("display: no OpenGL 4.5 context: %s", SDL_GetError()); return false; }
+     if (!gl_load()) return false;
+     if (!render_init()) return false;
+-    comp_prog = gl_program(kCompVS, kCompFS);
++    std::string comp = kCompFS;                         // the light's code in its place
++    comp.replace(comp.find("@FX@"), 4, kFxLightGLSL);
++    comp_prog = gl_program(kCompVS, comp.c_str());
+     if (!comp_prog) return false;
+     loc_view = glGetUniformLocation(comp_prog, "u_view");
+     loc_atop = glGetUniformLocation(comp_prog, "u_atop");
++    loc_fx_kind = glGetUniformLocation(comp_prog, "u_fx_kind");
++    loc_fx = glGetUniformLocation(comp_prog, "u_fx");
++    loc_fx2 = glGetUniformLocation(comp_prog, "u_fx2");
+     out_prog = gl_program(kCompVS, kOutFS);
+     if (!out_prog) return false;
+     loc_out_view = glGetUniformLocation(out_prog, "u_view");
+@@ -660,6 +725,9 @@ bool display_frame() {
+     glUseProgram(comp_prog);
+     glProgramUniform4f(comp_prog, loc_view, 0, 0, (float)pw, (float)ph);
+     glProgramUniform1i(comp_prog, loc_atop, gpu2d_top_is_a() ? 1 : 0);
++    glProgramUniform1i(comp_prog, loc_fx_kind, fx.kind);
++    glProgramUniform4f(comp_prog, loc_fx, fx.time, fx.level, fx.pulse, fx.flash);
++    glProgramUniform4f(comp_prog, loc_fx2, fx.heat, fx.phase, (float)fx.beams, 0);
+     glBindTextureUnit(0, words_tex);
+     glBindTextureUnit(1, pic);
+     glBindVertexArray(empty_vao);
+diff --git a/runtime/display.h b/runtime/display.h
+index bc321ba..f1aa497 100644
+--- a/runtime/display.h
++++ b/runtime/display.h
+@@ -45,6 +45,18 @@ SDL_Window* display_window();           // the window, for a port's UI (nullptr
+ // Turbo: the game as fast as it runs, a picture every 20 frames, no sound (a
+ // port's own way through menus, behind its loading screen).
+ void display_set_turbo(bool on);
++
++// A port's light behind engine A's 3D (its pixels where the 3D is the top layer, under the
++// 3D): kind 0 none, 1 spotlights, 2 fire; times in seconds, the rest 0 to 1.
++struct DisplayFx {
++    int kind = 0;
++    float time = 0, level = 0, pulse = 0, flash = 0, heat = 0, phase = 0;
++    int beams = 3;                      // spotlights
++    bool debug = false;                 // drawn in front of everything (to see it)
++};
++void display_set_fx(const DisplayFx& fx);
++const DisplayFx& display_fx();
++const char* display_fx_glsl();          // its GLSL: fx_light(q) and its uniforms
+ bool display_turbo();
+ // Where a screen (0 upper, 1 lower) is in the window now, in pixels; false if the layout hides it.
+ bool display_screen_rect(int screen, float* x, float* y, float* w, float* h);
+diff --git a/runtime/render_gl.cpp b/runtime/render_gl.cpp
+index 54efcda..cdaab76 100644
+--- a/runtime/render_gl.cpp
++++ b/runtime/render_gl.cpp
+@@ -33,6 +33,7 @@
+ //
+ // NDSKIT_POLYS=1 in the environment prints each frame's polygons as they
+ // are drawn (their attributes, screen positions, texture coordinates, w).
++#include "display.h"
+ #include "gl.h"
+ #include "nds.h"
+ #include "render3d.h"
+@@ -41,6 +42,7 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstddef>
++#include <string>
+ #include <vector>
+ 
+ namespace {
+@@ -67,6 +69,26 @@ void main() {
+ }
+ )";
+ 
++// A port's light (display.h's DisplayFx) on what lies farthest in the 3D: drawn after the
++// polygons at a depth just in front of the farthest opaque one, so only it (the stage's
++// background) and the clear plane are lit, not what stands before it.
++const char* kFxVS = R"(#version 450
++uniform vec4 u_zs;                      // the light's depth (0-1), the scale
++void main() {
++    vec2 p = vec2(gl_VertexID == 1 ? 3.0 : -1.0, gl_VertexID == 2 ? 3.0 : -1.0);
++    gl_Position = vec4(p, u_zs.x * 2.0 - 1.0, 1.0);
++}
++)";
++const char* kFxFS = R"(#version 450
++uniform vec4 u_zs;
++layout(location = 0) out vec4 o_col;
++@FX@
++void main() {
++    vec2 q = vec2(gl_FragCoord.x / u_zs.y, 192.0 - gl_FragCoord.y / u_zs.y);
++    o_col = vec4(fx_light(q), 0.0);
++}
++)";
++
+ const char* kFS = R"(#version 450
+ in vec3 v_col;
+ in vec2 v_tc;
+@@ -252,7 +274,9 @@ struct Vtx {
+     uint32_t poly[4];
+ };
+ 
+-GLuint prog, vao, vbo, texbuf, palbuf, textex, paltex, fog_prog, empty_vao;
++GLuint prog, vao, vbo, texbuf, palbuf, textex, paltex, fog_prog, empty_vao, fx_prog;
++GLint fx_z, fx_kind, fx_u, fx_u2;
++float g_far = -1, g_near = 2;                     // the opaque polygons' depths this frame
+ size_t vbo_cap;
+ GLint loc_disp, loc_alpharef, loc_wbuf, loc_toon;
+ GLint fl_disp, fl_wbuf, fl_col, fl_off, fl_table;
+@@ -268,6 +292,15 @@ bool render_init() {
+     loc_toon = glGetUniformLocation(prog, "u_toon");
+     fog_prog = gl_program(kFullVS, kFogFS);
+     if (!fog_prog) return false;
++    std::string fxfs = kFxFS;
++    fxfs.replace(fxfs.find("@FX@"), 4, display_fx_glsl());
++    fx_prog = gl_program(kFxVS, fxfs.c_str());
++    if (fx_prog) {
++        fx_z = glGetUniformLocation(fx_prog, "u_zs");
++        fx_kind = glGetUniformLocation(fx_prog, "u_fx_kind");
++        fx_u = glGetUniformLocation(fx_prog, "u_fx");
++        fx_u2 = glGetUniformLocation(fx_prog, "u_fx2");
++    }
+     fl_disp = glGetUniformLocation(fog_prog, "u_disp");
+     fl_wbuf = glGetUniformLocation(fog_prog, "u_wbuf");
+     fl_col = glGetUniformLocation(fog_prog, "u_fogcol");
+@@ -351,6 +384,33 @@ GLuint render_draw(const Render3dJob& J, GlTarget& T) {
+     glClearNamedFramebufferfv(T.fbo, GL_COLOR, 1, fog);
+     glClearNamedFramebufferfv(T.fbo, GL_DEPTH, 0, &depth);
+     if (J.valid && !J.polys.empty()) draw_polys(J, T);
++    const DisplayFx& fx = display_fx();
++    if (fx.kind && fx_prog && J.valid && g_far > g_near) {
++        // the light, additive on the colour (its alpha kept), where the depth lies behind it
++        float z = fx.debug ? 0.0f : g_far - std::max(0.0005f, 0.02f * (g_far - g_near));
++        static bool told;
++        if (!told) { told = true; nds_note("3D: the port's light at depth %.4f (the opaque polygons %.4f to %.4f)", z, g_near, g_far); }
++        glUseProgram(fx_prog);
++        glProgramUniform4f(fx_prog, fx_z, z, (float)T.scale, 0, 0);
++        glProgramUniform1i(fx_prog, fx_kind, fx.kind);
++        glProgramUniform4f(fx_prog, fx_u, fx.time, fx.level, fx.pulse, fx.flash);
++        glProgramUniform4f(fx_prog, fx_u2, fx.heat, fx.phase, (float)fx.beams, 0);
++        glEnable(GL_DEPTH_TEST);
++        glDepthFunc(GL_LESS);
++        glDepthMask(GL_FALSE);
++        glEnablei(GL_BLEND, 0);
++        glBlendFuncSeparatei(0, GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
++        glBlendEquationSeparatei(0, GL_FUNC_ADD, GL_FUNC_ADD);
++        glColorMaski(1, GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
++        glBindVertexArray(empty_vao);
++        glDrawArrays(GL_TRIANGLES, 0, 3);
++        glBindVertexArray(0);
++        glColorMaski(1, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
++        glDisablei(GL_BLEND, 0);
++        glDisable(GL_DEPTH_TEST);
++        glDepthMask(GL_TRUE);
++        glUseProgram(0);
++    }
+     if (J.disp3dcnt & 0x20) nds_once("render", 1, "3D: edge marking asked for (not drawn)");
+     if (!(J.disp3dcnt & 0x80)) return T.color;
+ 
+@@ -392,6 +452,8 @@ static void draw_polys(const Render3dJob& J, GlTarget& T) {
+     static std::vector<Run> runs;
+     vs.clear();
+     runs.clear();
++    g_far = -1;
++    g_near = 2;
+     bool snap = T.scale == 1;
+     for (const GxPoly& p : J.polys) {
+         uint32_t mode = p.attr >> 4 & 3, alpha = p.attr >> 16 & 31;
+@@ -408,6 +470,11 @@ static void draw_polys(const Render3dJob& J, GlTarget& T) {
+             v.col[0] = g.r; v.col[1] = g.g; v.col[2] = g.b;
+             v.tc[0] = g.s; v.tc[1] = g.t;
+             v.wraw = (float)g.w;
++            if (kind == 0) {
++                float d = J.wbuffer ? std::clamp((float)g.w / 16777215.0f, 0.0f, 1.0f) : v.pos[2];
++                g_far = std::max(g_far, d);
++                g_near = std::min(g_near, d);
++            }
+             v.poly[0] = p.attr; v.poly[1] = p.tex; v.poly[2] = p.pal; v.poly[3] = 0;
+             vs.push_back(v);
+         };

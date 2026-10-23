@@ -174,6 +174,27 @@ what the judge (`Note::Judge`) reads of the session besides the touch:
   widened by 5 or 11 px. Off, they are left alone. `--port approach=PCT`,
   `--port hit-extra=PX`.
 
+## Effects (all three games, optional, `src/eba_fx.cpp`)
+
+Off by default (Effects menu; `--port fx`, `--port fx-intensity=N`). Nothing
+shows before a 30x combo (the first combo burst); a broken combo fades it out
+until the next 30x. The combo is the game's own counter (session `+0xE0` EBA,
+`+0xF4` Ouendan 2, `+0xBC` Ouendan 1: each Combo's count, 0x2C before its
+score; slider ticks counted, as shown). EBA's combo bursts (the Agent
+portrait) come at 30, 60, 100 and 150, not 90.
+
+- **EBA:** spotlights rising from below the stage behind the Agents: 2 from
+  30x, 3 from 60x, 4 from 100x; each judged hit swings them a step (so they
+  move on the song's beats); a gold flash when a group ends all 300 (Elite
+  Beat flashes, a toggle).
+- **Ouendan 1 and 2:** fire rising behind the squad, taller as the combo
+  grows (full by 150x), a burst on an all-300 group: over the games' own fire.
+- **Where:** in the 3D frame, a pass after the polygons at a depth just in
+  front of the farthest opaque one (the stage's background), so the Agents,
+  the notes (both 3D) and the HUD are not lit; and under the 3D where a 2D
+  background shows through it (the compose pass). `--port fx-debug` draws it
+  in front of everything; `--port combo-log` logs the combo.
+
 ## Customs (all three games)
 
 A mode of its own, apart from the campaign: songs charted over story stages,
@@ -271,6 +292,9 @@ they reproduce the submodule's working tree exactly:
 - `ndskit-filters.patch`: `--filter` and the out pass's smoothing filters;
   `display_settings()` reports a change not yet applied (the options bar
   saved the old value).
+- `ndskit-effects.patch`: a port's light behind the 3D (`DisplayFx`,
+  `display_set_fx`): its GLSL shared by the compose pass and a pass in
+  the 3D renderer after the polygons.
 - `ndskit-customs-runtime.patch`: what Customs needs of the runtime:
   `--replace-file NAME=PATH`, muting sound channels (`sound_set_muted`) and
   reading one (`sound_channel`), turbo (`display_set_turbo`: frames neither
@@ -298,7 +322,7 @@ The discovery fixes, both to report upstream (drafts in `upstream/`):
 Re-apply after updating the submodule:
 
     cd ndskit
-    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch
+    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch
 
 ## Toolchain
 
