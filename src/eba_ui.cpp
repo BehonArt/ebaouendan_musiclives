@@ -79,7 +79,7 @@ void input_menu() {
     Buttons& b = buttons();
     if (ImGui::MenuItem("Button mode", nullptr, b.on)) { b.on = !b.on; settings_save(); }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("In a song, a gamepad's face buttons or the keys below hit the notes:\n"
+        ImGui::SetTooltip("In a song, a gamepad's face buttons, its d-pad or the keys below hit the notes:\n"
                           "tap on the beat, hold through sliders, mash for spinners.");
     ImGui::Separator();
     ImGui::TextDisabled("Hit keys (keyboard)");
@@ -129,6 +129,23 @@ void timing_menu() {
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("The sound queued ahead of the device: less is sooner, too little crackles.");
     ImGui::Separator();
     if (ImGui::MenuItem("Calibrate...", nullptr, g_calibration)) g_calibration = !g_calibration;
+}
+
+// The game's own tuning (eba_play.cpp), over what it sets for each stage: how long notes
+// show, how wide the hit circle is.
+void assist_menu() {
+    Assists& a = assists();
+    ImGui::TextDisabled("Approach (how long a note shows before its beat)");
+    struct { const char* name; int pct; } app[] = {
+        {"Normal (the game's own)", 0}, {"Slow  (+30%)", 130}, {"Slower  (+65%)", 165}, {"Fast  (-20%)", 80}};
+    for (auto& x : app)
+        if (ImGui::MenuItem(x.name, nullptr, a.approach_pct == x.pct)) { a.approach_pct = x.pct; settings_save(); }
+    ImGui::TextDisabled("(from the next song)");
+    ImGui::Separator();
+    ImGui::TextDisabled("Hit circle leniency (Customs keep no score above Normal)");
+    struct { const char* name; int px; } rad[] = {{"Normal", 0}, {"Generous  (+5 px)", 5}, {"Very generous  (+11 px)", 11}};
+    for (auto& x : rad)
+        if (ImGui::MenuItem(x.name, nullptr, a.hit_extra == x.px)) { a.hit_extra = x.px; settings_save(); }
 }
 
 void calibration_window() {
@@ -223,6 +240,7 @@ void draw(int, int) {
         if (ImGui::BeginMenu("Display")) { display_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Input")) { input_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Timing")) { timing_menu(); ImGui::EndMenu(); }
+        if (game().approach && ImGui::BeginMenu("Assist")) { assist_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Help")) {
             if (ImGui::MenuItem("Shortcuts")) g_shortcuts = true;
             if (ImGui::MenuItem("About")) g_about = true;

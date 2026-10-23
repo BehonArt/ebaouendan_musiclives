@@ -24,6 +24,7 @@ namespace {
 bool g_open;
 char g_diff = 'h';
 bool g_diff_set;
+bool g_autoplay;                        // Play with the game's own autoplay (no score kept)
 
 // ---- images (BMP, from the bake) -----------------------------------------------------------
 struct Tex { GLuint id = 0; int w = 0, h = 0; };
@@ -134,7 +135,7 @@ void customs_window() {
         ImGui::End();
         return;
     }
-    if (!g_diff_set) { g_diff = now ? custom_difficulty() : 'h'; g_diff_set = true; }
+    if (!g_diff_set) { g_diff = now ? custom_difficulty() : 'h'; g_autoplay = autoplay() != 0; g_diff_set = true; }
     ImGui::TextWrapped("Songs charted over the story's stages. Each plays as its own mode, with its own save and "
                        "scores: your campaign is never touched.");
     ImGui::Text("Difficulty:");
@@ -143,7 +144,14 @@ void customs_window() {
         if (ImGui::GetItemRectMax().x + w < ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x) ImGui::SameLine();
         if (ImGui::RadioButton(customs_difficulty_name(d), g_diff == d)) g_diff = d;
     }
-    if (now && ImGui::Button("Back to campaign")) { preview_stop(); customs_back_to_campaign(); }
+    ImGui::Checkbox("Autoplay", &g_autoplay);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("The game plays every note itself, each a 300 (its own autoplay).\n"
+                          "To watch or listen to a custom: no score is kept.");
+    if (now) {
+        ImGui::SameLine();
+        if (ImGui::Button("Back to campaign")) { preview_stop(); customs_back_to_campaign(); }
+    }
     ImGui::Separator();
     float fs = ImGui::GetFontSize();
     float art_w = std::clamp(ImGui::GetContentRegionAvail().x * 0.3f, fs * 7, fs * 12);
@@ -170,7 +178,7 @@ void customs_window() {
             bool here = now && now->tag == c.tag;
             if (ImGui::Button(here ? "Play again" : "Play", ImVec2(std::min(fs * 8, ImGui::GetContentRegionAvail().x), 0))) {
                 preview_stop();
-                customs_launch(c, g_diff);
+                customs_launch(c, g_diff, g_autoplay);
             }
             ImGui::TableNextColumn();                   // the stage it replaces: its card and its own preview
             ImGui::PushTextWrapPos(0);
@@ -201,7 +209,8 @@ void loading_screen() {
     ImGui::SetCursorPos(ImVec2((vp->Size.x - w) * 0.5f, vp->Size.y * 0.12f));
     image(*c, "art", w);
     char t[256];
-    std::snprintf(t, sizeof t, "Loading  %s  (%s)...", c->title.c_str(), customs_difficulty_name(custom_difficulty()));
+    std::snprintf(t, sizeof t, "Loading  %s  (%s%s)...", c->title.c_str(), customs_difficulty_name(custom_difficulty()),
+                  autoplay() ? ", autoplay" : "");
     ImGui::SetCursorPosX((vp->Size.x - ImGui::CalcTextSize(t).x) * 0.5f);
     ImGui::Text("%s", t);
     ImGui::End();

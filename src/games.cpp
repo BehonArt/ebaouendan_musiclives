@@ -47,6 +47,9 @@ Game make_eba() {
                {3650, 126, 103, g.scenes.map}, {4300, 236, 178, g.scenes.map}};
     g.difficulty_rows = {153, 119, 78, 45};
     g.card_from = 3662; g.card_to = 3662; g.hand_over = 4310;
+    g.again = {126, 103, 640, 650, 236, 178};   // the map centres on the stage last played
+    g.autoplay = 0x234; g.replaying = 0x138; g.replay = 0xA0;
+    g.approach = 0x020B4704; g.hit_radius = 0x020B22E0;
     g.difficulties = {"Breezin'", "Cruisin'", "Sweatin'", "Hard Rock"};
     g.customs_dir = "customs";
     return g;
@@ -73,6 +76,8 @@ Game make_oe2() {
                {4750, 238, 183, g.scenes.map}};
     g.route_tap = 9;                    // the card's OK misses a 3-frame tap
     g.card_from = 4364; g.card_to = 4364; g.hand_over = 4760;  // the card sets its stage by 4362
+    g.again = {160, 88, 440, 450, 238, 183};    // the stage last played: its character, in the middle
+    g.autoplay = 0x27C; g.replaying = 0x15C; g.replay = 0xA0;   // from its judge (EBA's +0x234, +0x138)
     g.difficulties = {"Kigaru (easy)", "Kakan (normal)", "Gekiretsu (hard)", "Karei (insane)"};
     g.customs_dir = "customs_oe2";
     g.menu_button_x = 0.0f;             // the strip's right holds 応援スタイルを選ぶべし

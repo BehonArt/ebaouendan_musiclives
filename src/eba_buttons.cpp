@@ -1,4 +1,4 @@
-// Button mode: a gamepad's face buttons, or a key, in place of the
+// Button mode: a gamepad's face buttons or d-pad, or a key, in place of the
 // stylus in a song. A press puts the stylus on the note the game is judging
 // now, for two frames, and the game judges that tap as its own: the same
 // windows, the same score. On a slider, held, the stylus follows its ball
@@ -6,7 +6,8 @@
 // faster around its centre; it slows down when the presses stop. The mouse,
 // when it is down, wins. In a stage's opening or ending comic a hit button
 // presses its SKIP. Elsewhere the buttons are the DS's as before (south B,
-// east A, west Y, north X); in a song and a comic, the face buttons are hits only.
+// east A, west Y, north X); in a song and a comic, the face buttons and the
+// d-pad are hits only (both sets: alternating them makes fast streams easier).
 //
 // What it reads of the game (EBA's addresses, the stock USA ARM9, found
 // 2026-10-22; Ouendan 2's are its own, the fields the same: games.cpp):
@@ -49,8 +50,8 @@ using eba::in_main;
 using eba::rd;
 using eba::rh;
 
-constexpr uint32_t kFaceKeys = 0xC03;               // DS A, B, X, Y
-constexpr uint32_t kFacePad = 0xF;                  // the gamepad's south, east, west, north
+constexpr uint32_t kFaceKeys = 0xCF3;               // DS A, B, X, Y and the d-pad
+constexpr uint32_t kFacePad = 0x780F;               // the gamepad's south, east, west, north; d-pad up, down, left, right
 constexpr int kTapFrames = 2;                       // a tap holds the stylus this long
 constexpr double kSpinBoost = 2.0 / 60;             // a press adds 2 turns a second ...
 constexpr double kSpinDecay = 0.9715;               // ... which halve in 0.4 s without presses
@@ -160,13 +161,13 @@ bool ball(const Slider& s, int now, int& x, int& y) {
     return true;
 }
 
-// The hit buttons held: the gamepad's face buttons and the keys, one bit each.
+// The hit buttons held: the gamepad's face buttons and d-pad, and the keys, one bit each.
 uint32_t hit_buttons(const NdsInput& in) {
     uint32_t held = in.pad & kFacePad;
     if (in.keyboard)
         for (int i = 0; i < 4; ++i) {
             int sc = eba::buttons().keys[i];
-            if (sc > 0 && sc < SDL_SCANCODE_COUNT && in.keyboard[sc]) held |= 1u << (8 + i);
+            if (sc > 0 && sc < SDL_SCANCODE_COUNT && in.keyboard[sc]) held |= 1u << (16 + i);
         }
     return held;
 }
@@ -190,6 +191,7 @@ void skip_comic(NdsInput& in) {
 void hook(NdsInput& in, uint64_t vbl) {
     if (!m.init) { m.init = true; eba::init(); }
     eba::debug_pokes(vbl);
+    eba::play_frame(vbl);                           // autoplay, replays, assists
     if (eba::customs_frame(in, vbl)) return;        // Customs' autopilot drives the game to its stage
     if (eba::ui_wants_mouse()) in.pen = false;      // the mouse is on the options bar
     if (!eba::buttons().on) return;
@@ -222,7 +224,7 @@ void hook(NdsInput& in, uint64_t vbl) {
     if (m.log && g_cfg.port.count("buttons-trace") && vbl % 15 == 0)
         nds_note("eba buttons: song frame %d: current #%d kind %d state %d time %d at %08X; slider %08X held %X",
                  now, have ? cur.number : -1, cur.kind, cur.state, cur.time, cur.at, m.slider.at, held);
-    in.keys &= ~(in.pad_keys & kFaceKeys);          // in a song the face buttons are hits, not the DS's
+    in.keys &= ~(in.pad_keys & kFaceKeys);          // in a song the face buttons and d-pad are hits, not the DS's
     int presses = __builtin_popcount(held & ~m.held_prev);
     m.held_prev = held;
     bool mouse = in.pen;

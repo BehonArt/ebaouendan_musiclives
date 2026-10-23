@@ -8,6 +8,7 @@ target_sources(ndsrun PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../src/games.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_buttons.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_timing.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/eba_play.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_settings.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_customs.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_customs_ui.cpp

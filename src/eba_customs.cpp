@@ -53,6 +53,8 @@ std::map<std::string, CustomScore> g_scores;
 // the autopilot: the route through the menus on the known save (Game::route)
 bool g_auto;
 bool g_failed;
+bool g_again_asked;                     // the same custom again, from the map (Game::again)
+uint64_t g_again_at;                    // its route's first frame (0: none)
 uint32_t g_scene_prev;
 bool g_show_after;
 
@@ -249,7 +251,7 @@ const char* difficulty_name(char d) { return game().difficulties[difficulty_inde
 const std::vector<Custom>& customs() { return g_catalog; }
 const Custom* custom_playing() { return g_playing; }
 char custom_difficulty() { return g_difficulty; }
-bool customs_autopilot() { return g_auto; }
+bool customs_autopilot() { return g_auto || g_again_at || g_again_asked; }
 bool customs_autopilot_failed() { return g_failed; }
 const char* customs_difficulty_name(char d) { return difficulty_name(d); }
 uint32_t scene() {
@@ -300,8 +302,17 @@ void customs_init() {
     nds_note("eba customs: %zu in %s (%s)", g_catalog.size(), g_dir.c_str(), game().id);
 }
 
-void customs_launch(const Custom& c, char d) {
+void customs_launch(const Custom& c, char d, bool autoplay) {
     namespace fs = std::filesystem;
+    set_autoplay(autoplay ? 1 : 0);
+    const Game& g = game();
+    if (g_playing && g_playing->tag == c.tag && g.again.ok && g.scenes.map && scene() == g.scenes.map && !g_auto) {
+        g_difficulty = d;                               // this run has the custom's files: the map again, no new run
+        g_again_asked = true;
+        nds_note("eba customs: %s again (%s%s), from the map", c.title.c_str(), difficulty_name(d),
+                 autoplay ? ", autoplay" : "");
+        return;
+    }
     std::string session_save = (fs::path(g_dir) / "session.sav").string();
     std::error_code ec;
     fs::copy_file(fs::path(g_dir) / "pristine.sav", session_save, fs::copy_options::overwrite_existing, ec);
@@ -311,6 +322,7 @@ void customs_launch(const Custom& c, char d) {
                                   "--port", "customs-dir=" + g_dir, "--port", "custom=" + c.tag,
                                   "--port", std::string("difficulty=") + d, "--port", "campaign-save=" + campaign};
     if (display_settings().fullscreen) a.push_back("--fullscreen");   // the new run starts as this one is (F11 too)
+    if (autoplay) { a.push_back("--port"); a.push_back("autoplay=1"); }
     for (const auto& f : c.files) {                     // files/ holds each by its name, '/' as "__"
         std::string name = f;
         for (size_t i = 0; (i = name.find('/', i)) != std::string::npos; i += 2) name.replace(i, 1, "__");
@@ -318,7 +330,8 @@ void customs_launch(const Custom& c, char d) {
         a.push_back(f + "=" + (fs::path(c.dir) / "files" / name).string());
     }
     for (const auto& [k, v] : g_cfg.port)               // keep the other --port options (buttons-log, offset...)
-        if (k != "custom" && k != "difficulty" && k != "campaign-save" && k != "customs-dir") {
+        if (k != "custom" && k != "difficulty" && k != "campaign-save" && k != "customs-dir" && k != "autoplay" &&
+            k != "replay") {
             a.push_back("--port");
             a.push_back(v.empty() ? k : k + "=" + v);
         }
@@ -332,7 +345,7 @@ void customs_back_to_campaign() {
                                   "--out", g_cfg.out};
     if (display_settings().fullscreen) a.push_back("--fullscreen");
     for (const auto& [k, v] : g_cfg.port)
-        if (k != "custom" && k != "difficulty" && k != "campaign-save" && k != "poke") {
+        if (k != "custom" && k != "difficulty" && k != "campaign-save" && k != "poke" && k != "autoplay" && k != "replay") {
             a.push_back("--port");
             a.push_back(v.empty() ? k : k + "=" + v);
         }
@@ -348,6 +361,7 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
     // a song of Customs mode ending: its score to the scores file, the Customs screen after the results
     static bool pending;                                // a song over, its score kept until the next scene says how
     static CustomScore now;
+    static const char* unranked;                        // why its score is not kept (autoplay, a replay, an assist)
     if (g_playing && song && !was_song) { timing_reset(); hd_start(); }
     if (g_playing && song) hd_frame(rd(g.clock));
     if (g_playing && !song && was_song) hd_stop();
@@ -358,6 +372,8 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
         TimingStats t = timing_stats();
         std::copy(t.grades, t.grades + 4, now.grades);
         pending = true;
+        unranked = autoplay() ? "autoplay" : replay_playing() ? "a replay"
+                 : assists().hit_extra > 0 ? "a wider hit circle" : nullptr;
     }
     if (pending && sc && !song) {                       // the ending's comic after a clear; Regroup? after a fail
         pending = false;
@@ -367,12 +383,13 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
         nds_note("eba customs: %s %s: score %u (300 x%d, 100 x%d, 50 x%d, miss x%d)%s", g_playing->title.c_str(),
                  difficulty_name(g_difficulty), now.score, now.grades[0], now.grades[1], now.grades[2], now.grades[3],
                  now.cleared ? ", cleared" : "");
+        if (unranked) nds_note("eba customs: played with %s: the score is not kept", unranked);
         int notes = now.grades[0] + now.grades[1] + now.grades[2] + now.grades[3];
         auto better = [&](const CustomScore& a, const CustomScore& b) {   // the score, else (none known) the grades
             if (a.score != b.score) return a.score > b.score;
             return a.grades[0] * 3 + a.grades[1] * 2 + a.grades[2] > b.grades[0] * 3 + b.grades[1] * 2 + b.grades[2];
         };
-        if (notes && (better(now, best) || (now.cleared && !best.cleared))) {
+        if (notes && !unranked && (better(now, best) || (now.cleared && !best.cleared))) {
             best = now;
             save_scores();
         }
@@ -383,6 +400,43 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
     if (sc != g_scene_prev && (g_cfg.port.count("scene-log") || (g_playing && g_cfg.port.count("timing-log"))))
         nds_note("eba customs: scene %08X at VBlank %llu", sc, (unsigned long long)vbl);
     g_scene_prev = sc;
+    if (g_playing && g_cfg.port.count("customs-again") && vbl == std::strtoull(g_cfg.port.at("customs-again").c_str(), nullptr, 10))
+        customs_launch(*g_playing, g_difficulty, autoplay() != 0);   // a test's Play once more, at that VBlank
+    if (g_again_asked) {                                // the same custom again: the map's card, its stage set, OK
+        g_again_asked = false;
+        g_again_at = vbl + 1;
+        display_set_turbo(true);
+    }
+    if (g_again_at) {
+        const auto& a = g.again;
+        in = NdsInput();
+        if (vbl < g_again_at) return true;
+        uint64_t t = vbl - g_again_at;
+        if ((t == 0 || t == (uint64_t)a.ok) && sc != k.map) {
+            nds_note("eba customs: the map's route found scene %08X, not the map: stopped", sc);
+            g_again_at = 0;
+            g_failed = true;
+            display_set_turbo(false);
+            return false;
+        }
+        const uint64_t hold = 9;                        // a script's tap, as the map was learned with
+        if (t < hold) { in.pen = true; in.x = a.x; in.y = a.y; }
+        if (t >= (uint64_t)a.ok && t < a.ok + hold) { in.pen = true; in.x = a.ok_x; in.y = a.ok_y; }
+        if (t == (uint64_t)a.card) {
+            uint32_t s = session();
+            if (s) {
+                uint32_t d = (uint32_t)difficulty_index(g_difficulty);
+                g_main[(s + 8) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
+                std::memcpy(g_main + (s & 0x3FFFFF), &d, 4);
+            }
+        }
+        if (t >= a.ok + hold + 1) {
+            g_again_at = 0;
+            display_set_turbo(false);
+            nds_note("eba customs: on its way into %s again", g_playing->stage.c_str());
+        }
+        return true;
+    }
     if (!g_auto) return false;
 
     // the autopilot: the route on the known save, each step checked against the scene it needs

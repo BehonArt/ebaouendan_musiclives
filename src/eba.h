@@ -42,6 +42,14 @@ struct Game {
     std::array<int, 4> difficulty_rows{};
     uint64_t card_from = 0, card_to = 0, hand_over = 0;   // the stage and difficulty set; the player's
     std::array<const char*, 4> difficulties{};            // e n h x
+    // the map again, Customs played once more without a new run: the card to tap, the
+    // frames to its stage being set and to OK, OK's place
+    struct { int x = 0, y = 0, card = 0, ok = 0, ok_x = 0, ok_y = 0; } again;
+    // the session's fields of the game's own play (eba_play.cpp; the decomp's Note::Judge)
+    uint32_t autoplay = 0;              // its autoplay: 1/2/3 always 300/100/50, 4 random
+    uint32_t replaying = 0;             // nonzero: the judge plays the replay array back
+    uint32_t replay = 0;                // the replay's Array {data, capacity, count}, +0xC its cursor
+    uint32_t approach = 0, hit_radius = 0;   // .data the game sets per stage: frames a note shows; the hit test's extra px
     const char* customs_dir = "customs";
     float menu_button_x = 0.5f;         // the CUSTOMS button across the main menu's lower screen (0 left .. 1 right)
 };
@@ -75,6 +83,18 @@ TimingStats timing_stats();             // the taps since the last reset
 void timing_reset();
 void timing_options();                  // --port's timing options
 
+// ---- the game's own play (eba_play.cpp): autoplay, replays, assists ---------------------
+// over what the game sets (per stage and difficulty): the frames a note shows, in percent
+// (0: the game's own); the hit circle's extra pixels (0: none)
+struct Assists { int approach_pct = 0, hit_extra = 0; };
+Assists& assists();
+void play_options();                                // --port autoplay=N replay=PATH replay-save=PATH ...
+void play_frame(uint64_t vblank);                   // each frame: the flags, the replay, the assists
+void set_autoplay(int n);                           // 0 off, 1 every note a 300 (the game's own)
+int autoplay();
+bool replay_playing();                              // a recorded run is being played back
+std::string last_replay();                          // the file the last song's run was saved to
+
 // ---- Customs (eba_customs.cpp) -----------------------------------------------------------
 struct Custom {
     std::string tag, dir, title, artist, stage, replaces;
@@ -91,7 +111,7 @@ const char* customs_difficulty_name(char d);
 bool customs_autopilot();               // the route to the stage is being driven (turbo)
 bool customs_autopilot_failed();
 CustomScore custom_best(const std::string& tag, char difficulty);
-void customs_launch(const Custom& c, char difficulty);   // a Customs run instead of this one
+void customs_launch(const Custom& c, char difficulty, bool autoplay);   // a Customs run (or the map again)
 void customs_back_to_campaign();
 bool customs_frame(NdsInput& in, uint64_t vblank);       // true: the autopilot drives the input
 bool customs_take_show_request();       // a custom's song is over: the Customs screen, once

@@ -58,6 +58,8 @@ void settings_load() {
         if (v.count(k)) b.keys[i] = v[k].empty() ? 0 : SDL_GetScancodeFromName(v[k].c_str());
     }
     set_offset((int)num("offset", 0));
+    assists().approach_pct = (int)num("approach_pct", 0);
+    assists().hit_extra = (int)num("hit_extra", 0);
     nds_note("eba: settings from %s", p.c_str());
 }
 
@@ -75,6 +77,7 @@ void settings_save() {
     for (int i = 0; i < 4; ++i)
         std::fprintf(f, "button_key%d=%s\n", i + 1, b.keys[i] ? SDL_GetScancodeName((SDL_Scancode)b.keys[i]) : "");
     std::fprintf(f, "offset=%d\n", offset());
+    std::fprintf(f, "approach_pct=%d\nhit_extra=%d\n", assists().approach_pct, assists().hit_extra);
     std::fclose(f);
 }
 
@@ -82,6 +85,7 @@ void init() {
     if (g_cfg.window) settings_load();
     buttons_options();
     timing_options();
+    play_options();
     customs_init();
 }
 

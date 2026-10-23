@@ -143,9 +143,37 @@ each note's fields) is at the top of `src/eba_buttons.cpp`;
 `tools/eba_notes.py` inspects a RAM dump.
 
 In the stage's opening and ending comics, a face button (or a hit key) also
-taps SKIP at the lower right.
+taps SKIP at the lower right (EBA and Ouendan 2).
 
-## Customs (EBA)
+The d-pad hits like the face buttons (in songs and comics), so a stream can
+alternate between the two sets; keyboard hit keys have bits of their own.
+
+## The game's own play (`src/eba_play.cpp`, from the decomp)
+
+The matching decompilation (`eba-decomp`, `docs/DECOMP_FINDINGS.md`) showed
+what the judge (`Note::Judge`) reads of the session besides the touch:
+
+- **Autoplay:** session `+0x234` (EBA) / `+0x27C` (Ouendan 2, the same load
+  in its judge): 1, 2, 3 judge every note 300, 100, 50 on its own frame; 4 at
+  random. `--port autoplay=N`. Checked: EBA's The Anthem, 257 at 300 and
+  cleared (spinners too); Ouendan 2's Samurai Blue, 362 at 300 and cleared.
+- **Replays:** every judged tap goes into the session's replay `Array` (`+0xA0`:
+  data, capacity, count; 8-byte events: frame judged, the note's time, kind,
+  result, a new group). A window's run saves each song's to
+  `<out>/replays/GAME_TAG_stage_time.rep` as it ends (`--port replay-save=FILE`
+  headless); `--port replay=FILE` loads one into the buffer the game makes
+  for its own (as the song starts) and sets the replaying field (`+0x138` /
+  `+0x15C`). Checked: a run pressing 4 frames late, recorded and played back
+  with no input, gives the same 241 judgements. The game's replay mode
+  does not drain the life gauge: a recorded fail plays back to a clear.
+- **Assists (EBA, the Assist menu):** the frames a note shows (`0x020B4704`)
+  and the hit test's extra radius (`0x020B22E0`) are .data the game sets for
+  each stage (75 frames for The Anthem, 99 for Makes No Difference): the
+  approach is scaled from the game's value (+30%, +65%, -20%), the radius
+  widened by 5 or 11 px. Off, they are left alone. `--port approach=PCT`,
+  `--port hit-extra=PX`.
+
+## Customs (EBA, Ouendan 2)
 
 A mode of its own, apart from the campaign: songs charted over story stages,
 each with its own scores and HD audio. An orange **CUSTOMS** button sits at
@@ -167,7 +195,16 @@ lists each custom: its art and an HD preview, its best score per difficulty,
   and the clock's rate per custom. `--port hd=off` plays the DS stream.
 - **Scores** go to `customs/scores.ini`, never the campaign's save: the best
   per custom and difficulty, with the grades and whether it was cleared
-  (the ending comic follows a clear, Regroup a fail).
+  (the ending comic follows a clear, Regroup a fail). None is kept for a run
+  with autoplay, a replay or a wider hit circle.
+- **Autoplay** (a checkbox on the Customs screen): the game's own, to watch
+  or hear a custom.
+- **Again, without the reboot:** Play on the same custom from the map after
+  its results (any difficulty, autoplay or not) skips the new run: the map
+  is centred on the stage just played, so the autopilot taps it (EBA its
+  marker, Ouendan 2 its character), sets the stage and difficulty as the
+  card shows, and presses OK, about 11 s of game time in turbo. Another
+  custom still needs a run of its own (each replaces the same sound data).
 - **Back to campaign** (on the Customs screen and in the Game menu) starts a
   run on the campaign's save again.
 
@@ -177,6 +214,11 @@ SS10), Girls Just Want to Have Fun (SS11). `tools/extract_customs.py` takes
 each custom's files from its built ROM; `tools/bake_customs.py` makes the
 placeholder art, the stage cards and both previews, and the HD timing.
 `customs/` is not committed (the songs' audio).
+
+Ouendan 2's four, in `customs_oe2/` (`--game OE2` for both tools): Hohoemi no
+Bakudan (over Real Life Real Heart, OS02), I Want You (VISTA, OSB02), Madder
+(Kibun Jojo, OS03), Takedown (Music Hour, OS05). Its facts (clock, notes,
+judge, scenes, session) are in `src/games.cpp`.
 
 ## Local ndskit patches
 
