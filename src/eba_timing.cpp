@@ -32,7 +32,7 @@ void judge(ArmContext& c, ArmFunc original) {
     uint32_t note = c.r[0];
     int now = (int)c.r[1];
     if (!in_main(note)) { original(c); return; }
-    int time = (int)(rd(note + 0x14) >> 16);
+    int time = (int)(rd(note_field(note, 0x14)) >> 16);
     c.r[1] = (uint32_t)(now - g_offset);
     original(c);
     int grade = (int)c.r[0];
@@ -44,7 +44,7 @@ void judge(ArmContext& c, ArmFunc original) {
         if (g_taps.size() > kKeep) g_taps.pop_front();
     }
     if (g_log)
-        nds_note("eba timing: #%d judged %s at song frame %d (%+d, judged as %+d)%s", rd(note + 4) >> 24,
+        nds_note("eba timing: #%d judged %s at song frame %d (%+d, judged as %+d)%s", g_main[(note + game().number) & 0x3FFFFF],
                  grade == 0 ? "300" : grade == 1 ? "100" : grade == 2 ? "50" : "miss", now, now - time,
                  now - g_offset - time, tapped ? "" : ", no tap");
 }

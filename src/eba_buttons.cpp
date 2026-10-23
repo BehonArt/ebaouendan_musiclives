@@ -66,14 +66,14 @@ struct Note {
 Note note_at(uint32_t a) {
     Note n;
     n.at = a;
-    uint32_t w4 = rd(a + 4), t = rd(a + 0x14);
+    uint32_t w4 = rd(a + 4), t = rd(eba::note_field(a, 0x14));
     n.kind = w4 & 0xFF;
     n.state = (w4 >> 8) & 0xFF;
-    n.number = w4 >> 24;
+    n.number = g_main[(a + eba::game().number) & 0x3FFFFF];
     n.appear = t & 0xFFFF;
     n.time = t >> 16;
-    n.x = (int)rd(a + 0x18);
-    n.y = (int)rd(a + 0x1C);
+    n.x = (int)rd(eba::note_field(a, 0x18));
+    n.y = (int)rd(eba::note_field(a, 0x1C));
     return n;
 }
 
@@ -104,7 +104,7 @@ struct Mode {
 bool manager_ok(uint32_t a) {
     const eba::Game& g = eba::game();
     if (!in_main(a) || rd(a) != g.manager) return false;
-    uint32_t arr = rd(a + 0x70), n = rd(a + 0x74);
+    uint32_t arr = rd(a + g.notes), n = rd(a + g.notes + 8);
     if (!in_main(arr) || n == 0 || n > 2048) return false;
     uint32_t first = rd(arr), vt = in_main(first) ? rd(first) : 0;
     return vt == g.tap || vt == g.slider || vt == g.spinner;
@@ -124,7 +124,7 @@ uint32_t manager(uint64_t vbl) {
 
 // The note the game judges now (state 4), else the next one to come.
 bool current(uint32_t mgr, Note& out) {
-    uint32_t arr = rd(mgr + 0x70), n = rd(mgr + 0x74);
+    uint32_t arr = rd(mgr + eba::game().notes), n = rd(mgr + eba::game().notes + 8);
     bool upcoming = false;
     for (uint32_t i = 0; i < n; ++i) {
         uint32_t a = rd(arr + 4 * i);
@@ -139,10 +139,10 @@ bool current(uint32_t mgr, Note& out) {
 Slider slider_at(uint32_t s) {
     Slider r;
     r.at = s;
-    r.time = (int)(rd(s + 0x14) >> 16);
-    r.path = rd(s + 0x40);
-    r.n = (int)rd(s + 0x44);
-    r.passes = std::max(1, (int)rd(s + 0x4C));
+    r.time = (int)(rd(eba::note_field(s, 0x14)) >> 16);
+    r.path = rd(eba::note_field(s, 0x40));
+    r.n = (int)rd(eba::note_field(s, 0x44));
+    r.passes = std::max(1, (int)rd(eba::note_field(s, 0x4C)));
     if (!in_main(r.path) || r.n <= 0 || r.n > 4096) r.at = 0;
     return r;
 }
@@ -218,7 +218,7 @@ void hook(NdsInput& in, uint64_t vbl) {
             held = 1;
         }
         if (m.slider.at) { int bx, by; if (ball(m.slider, now, bx, by)) held |= 1; }   // the same button, held on
-        if (have && cur.kind == 2 && now >= cur.time - (int)rd(cur.at + 0x40) && now <= cur.time)
+        if (have && cur.kind == 2 && now >= cur.time - (int)rd(eba::note_field(cur.at, 0x40)) && now <= cur.time)
             held |= (++m.auto_mash % 8 < 4) ? 4 : 0;    // 4 frames down, 4 up: 7.5 presses a second
     }
     if (m.log && g_cfg.port.count("buttons-trace") && vbl % 15 == 0)

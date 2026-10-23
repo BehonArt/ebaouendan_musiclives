@@ -7,7 +7,7 @@ custom's cartridge from the stock ROM at the start.
     python tools/extract_customs.py roms/EBA.nds TAG [TAG ...]
     python tools/extract_customs.py roms/OE2.nds --game OE2 TAG [TAG ...]
 
-EBA's go to customs/, Ouendan 2's to customs_oe2/.
+EBA's go to customs/, Ouendan 2's to customs_oe2/, Ouendan 1's to customs_oe1/
 """
 import argparse
 import json
@@ -20,6 +20,7 @@ from ndskit.rom import Rom  # noqa: E402
 
 RH = r"F:\dxvk_remix\Claude\EBAHD Old\rom_hacking"
 OE2_ROMS = RH + r"\ouendan2\patched_roms"
+OE1_ROMS = RH + r"\ouendan1\patched_roms"
 
 GAMES = {
     "EBA": {
@@ -59,6 +60,24 @@ GAMES = {
                               "Takedown", "HUNTR/X", "OS05", "Music Hour"),
             "OSB02_IWantYou": (OE2_ROMS + r"\Keep These\Ouendan 2 (IWantYou2X).nds",
                                "I Want You", "CZR", "OSB02", "VISTA"),
+        },
+    },
+    "OE1": {
+        "dir": "customs_oe1",
+        "save": RH + r"\original_roms\Osu! Tatakae! Ouendan (Japan).sav",
+        # the story's stages: the session's index n is s<n+1> (sprintf "%c%02d")
+        "stages": ["s%02d" % n for n in range(1, 16)],
+        "customs": {
+            "s03_DangerZone": (OE1_ROMS + r"\Osu Tatakae Ouendan (DangerZone_GutsDaZe).nds",
+                               "Danger Zone", "Kenny Loggins", "s03", "Guts Da Ze"),
+            "s08_JustCantWait": (OE1_ROMS + r"\Osu Tatakae Ouendan (JustCantWait_h).nds",
+                                 "I Just Can't Wait to Be King", "The Lion King", "s08", "Thrill"),
+            "s11_IThinkImOkay": (OE1_ROMS + r"\Osu Tatakae Ouendan (IThinkImOkay_Violin_x).nds",
+                                 "I Think I'm OKAY", "Machine Gun Kelly", "s11", "One Night Carnival"),
+            "s12_Home": (OE1_ROMS + r"\Osu Tatakae Ouendan (Home_OverTheDistance).nds",
+                         "Home", "Charlie Puth feat. Hikaru Utada", "s12", "Over the Distance"),
+            "s14_ThroughTheNight": (OE1_ROMS + r"\Osu Tatakae Ouendan (ThroughTheNight).nds",
+                                    "Through the Night", "Grum", "s14", "Shanghai Honey"),
         },
     },
 }

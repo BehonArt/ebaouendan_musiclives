@@ -17,6 +17,7 @@ void init();
 inline uint32_t rd(uint32_t a) { uint32_t v; std::memcpy(&v, g_main + (a & 0x3FFFFFu), 4); return v; }
 inline int16_t rh(uint32_t a) { int16_t v; std::memcpy(&v, g_main + (a & 0x3FFFFFu), 2); return v; }
 inline bool in_main(uint32_t a) { return a >= 0x02000000u && a < 0x02400000u; }
+// a note's field, at EBA's offset (from +0x14 on, Ouendan 1's are 4 later): see note_field below
 
 // ---- the game (games.cpp) ----------------------------------------------------------------
 // What the port reads and writes of one game; 0 where it is not known (that
@@ -30,6 +31,10 @@ struct Game {
     uint32_t clock = 0;                 // the song's clock, frames
     uint32_t manager = 0, tap = 0, slider = 0, spinner = 0;   // the notes' manager's and notes' vtables
     uint32_t heap = 0;                  // where to look for the manager from
+    uint32_t notes = 0x70;              // the manager's Array of notes (+4 its capacity, +8 its count)
+    uint32_t shift = 0;                 // a note's fields from +0x14 on are this much later (Ouendan 1: 4)
+    uint32_t number = 7;                // the byte of a note's combo number
+    uint32_t stage = 8;                 // the session's stage index
     uint32_t judge = 0;                 // the judge (recompiled with --hook)
     uint32_t scene_root = 0;            // the scene's vtable, scene_depth reads from here
     int scene_depth = 0;
@@ -54,6 +59,9 @@ struct Game {
     float menu_button_x = 0.5f;         // the CUSTOMS button across the main menu's lower screen (0 left .. 1 right)
 };
 const Game& game();
+inline uint32_t note_field(uint32_t note, uint32_t eba_offset) {   // a note's field, given at EBA's offset
+    return note + eba_offset + (eba_offset >= 0x14 ? game().shift : 0);
+}
 const std::vector<uint32_t>& all_judges();          // every game's judge (hooks are set where emitted)
 int difficulty_index(char d);                       // e n h x: 0 .. 3, the session's
 

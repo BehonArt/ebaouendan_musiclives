@@ -426,7 +426,7 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
             uint32_t s = session();
             if (s) {
                 uint32_t d = (uint32_t)difficulty_index(g_difficulty);
-                g_main[(s + 8) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
+                g_main[(s + g.stage) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
                 std::memcpy(g_main + (s & 0x3FFFFF), &d, 4);
             }
         }
@@ -460,7 +460,7 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
         if (s) {
             uint32_t d = (uint32_t)difficulty_index(g_difficulty);
             if (vbl == g.card_from && rd(s) != d) nds_note("eba customs: difficulty %u on the card, set to %u", rd(s), d);
-            g_main[(s + 8) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
+            g_main[(s + g.stage) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
             std::memcpy(g_main + (s & 0x3FFFFF), &d, 4);
         }
     }

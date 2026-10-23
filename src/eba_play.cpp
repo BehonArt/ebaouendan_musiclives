@@ -68,7 +68,7 @@ bool load_replay(const std::string& path) {
 void save_replay(uint32_t s) {
     const Game& g = game();
     uint32_t arr = s + g.replay, data = rd(arr), n = rd(arr + 8);
-    if (!in_main(data) || !n || n > 8192) return;
+    if (!g.replay || !in_main(data) || !n || n > 8192) return;
     std::string path;
     const auto& o = g_cfg.port;
     if (o.count("replay-save")) path = o.at("replay-save");
@@ -82,14 +82,14 @@ void save_replay(uint32_t s) {
         std::strftime(t, sizeof t, "%Y%m%d-%H%M%S", std::localtime(&now));
         const Custom* c = custom_playing();
         char name[160];
-        std::snprintf(name, sizeof name, "%s_%s_%u_%s.rep", g.id, c ? c->tag.c_str() : "stage", rd(s + 8), t);
+        std::snprintf(name, sizeof name, "%s_%s_%u_%s.rep", g.id, c ? c->tag.c_str() : "stage", rd(s + g.stage), t);
         path = (dir / name).string();
     } else return;
     std::FILE* f = std::fopen(path.c_str(), "wb");
     if (!f) { nds_note("eba replay: cannot write %s", path.c_str()); return; }
     char id[4] = {};
     std::memcpy(id, g.id, std::min<size_t>(4, std::strlen(g.id)));
-    uint32_t h[4] = {rd(s + 8), rd(s), n, g.score ? rd(s + g.score) : 0};
+    uint32_t h[4] = {rd(s + g.stage), rd(s), n, g.score ? rd(s + g.score) : 0};
     std::fwrite(kMagic, 8, 1, f);
     std::fwrite(id, 4, 1, f);
     std::fwrite(h, 4, 4, f);
@@ -148,9 +148,9 @@ void play_frame(uint64_t) {
         uint32_t arr = s + g.replay, data = rd(arr), cap = rd(arr + 4), count = rd(arr + 8);
         uint32_t n = (uint32_t)(g_replay.size() / 8);
         if (in_main(data) && cap && count == 0) {
-            if (rd(s + 8) != g_replay_stage || rd(s) != g_replay_diff)
+            if (rd(s + g.stage) != g_replay_stage || rd(s) != g_replay_diff)
                 nds_note("eba replay: recorded on stage %u difficulty %u, this is %u, %u", g_replay_stage, g_replay_diff,
-                         rd(s + 8), rd(s));
+                         rd(s + g.stage), rd(s));
             if (n > cap) {
                 nds_note("eba replay: %u events, the game's buffer holds %u: not played", n, cap);
                 g_replay.clear();

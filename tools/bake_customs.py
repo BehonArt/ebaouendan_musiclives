@@ -37,6 +37,7 @@ WORK = os.path.join(ROOT, "build", "bake")
 RH = r"F:\dxvk_remix\Claude\EBAHD Old\rom_hacking"
 TESTRUN = RH + r"\testrun01"
 TESTRUN2 = RH + r"\ouendan2\testrunouendan2"
+TESTRUN1 = RH + r"\ouendan1\testrunouendan1"
 PATCHED = RH + r"\patched_roms\Elite Beat Agents (FG_%s).diffs.json"
 FPS = 59.8261                               # VBlanks a second
 RATE = 32728                                # ndsrun's WAV rate
@@ -72,6 +73,26 @@ GAMES = {
             "OS05_Takedown": "Huntrix - Takedown (Lyrics)   K-Pop Demon Hunters_15401.wav",
             "OSB02_IWantYou": "OMB02_IWantYou_15401.wav"}[tag]),
         hd_dir=TESTRUN2),
+    "OE1": dict(
+        exe=os.path.join(ROOT, "build", "oe1", "recomp", "b", "ndsrun.exe"), rom=os.path.join(ROOT, "roms", "OE1.nds"),
+        customs=os.path.join(ROOT, "customs_oe1"),
+        # its card shows the map's man tapped, whatever the session says: the stage's own opening
+        # comic instead (the session's stage, *0x0208F58C + 4, set as the card is open), and the
+        # preview from its song's start (the comic skipped)
+        route="700:tap:128:150,1350:tap:150:48,2050:tap:236:183,3050:tap:160:76,3450:tap:236:183,4450:PAD_SOUTH:3",
+        poke=(0x0208ED74, 3300), card_shot=4400, preview=(4520, 5720), skip=3700, song_until=8200,
+        hd={"s03_DangerZone": "S03_DangerZone.mp3",
+            "s08_JustCantWait": "M08_justcantwaittobeking.mp3",
+            "s11_IThinkImOkay": "IThinkImOkay_S11.mp3",
+            "s12_Home": "M12_Home.mp3",
+            "s14_ThroughTheNight": "Grum - Through The Night.mp3"},
+        built=lambda tag: os.path.join(TESTRUN1, {
+            "s03_DangerZone": "S03_DangerZone_15401.wav",
+            "s08_JustCantWait": "M08_justcantwaittobeking_15401.wav",
+            "s11_IThinkImOkay": "IThinkImOkay_S11_15401.wav",
+            "s12_Home": "M12_Home_15401.wav",
+            "s14_ThroughTheNight": "Grum - Through The Night_15401.wav"}[tag]),
+        hd_dir=TESTRUN1),
 }
 G = GAMES["EBA"]
 CUSTOMS = G["customs"]
@@ -242,8 +263,19 @@ def hd_audio(tag, vals, files, custom_preview):
     gain = float(np.sqrt(np.mean(ds ** 2)) / (np.sqrt(np.mean(hs ** 2)) + 1e-9))
     vals["hd_gain"] = "%.3f" % min(gain, 1.0)   # the run's hits raise its level: never above unity
     k, c = np.array(pts).T
-    rate, clock0 = np.polyfit(k, c, 1)
+    # a window matched at the wrong place (a repeated phrase) would pull a least-squares line:
+    # the median of the pairwise slopes and intercepts first (Theil-Sen), the points more
+    # than 3 frames off it dropped, then the line through the rest
+    slopes = [(c[j] - c[i]) / (k[j] - k[i]) for i in range(len(k)) for j in range(i + 1, len(k))]
+    rate = float(np.median(slopes))
+    clock0 = float(np.median(c - rate * k))
+    keep = np.abs(c - (clock0 + rate * k)) <= 3
+    if keep.sum() >= 3:
+        k, c = k[keep], c[keep]
+        rate, clock0 = np.polyfit(k, c, 1)
     resid = float(np.abs(c - (clock0 + rate * k)).max())
+    if not 59.5 < rate < 60.5:
+        raise SystemExit("%s: the song's clock runs at %.2f frames a second (points %s): not measured" % (tag, rate, pts))
     vals.update(art="art.bmp", stage_card="stage_card.bmp", preview_original="preview_original.wav",
                 preview_custom="preview_custom.wav", hd="hd.wav", hd_offset="%.4f" % hd_offset,
                 clock0="%.2f" % clock0, clock_rate="%.4f" % rate)

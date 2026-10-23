@@ -27,7 +27,7 @@ change hands as the game goes (6 then 1 at boot, 0 for the stage, 5 for
 gameplay, 6 again at the fail screen), each found by the runtime. Known
 runtime gap seen: 3D edge marking is not drawn (the EBA and OE2 stage maps).
 
-## The options bar (EBA)
+## The options bar (all three games)
 
 EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
 `third_party/imgui`, v1.92.9b):
@@ -52,7 +52,7 @@ while the mouse is near the top; F1 hides or shows it. While the mouse is on
 the bar or a menu, it is not the stylus, and Esc closes the menu, not the
 game.
 
-## Timing offset (EBA)
+## Timing offset (all three games)
 
 The judge (`0x020681D8`, every tap and slider head; spinners are not timed)
 is recompiled with a hook (`--hook 020681D8`); `src/eba_timing.cpp` gives it
@@ -109,7 +109,7 @@ balls and spinners between frames, which is what makes 120/240/uncapped
 smoother. If a driver keeps the vertical sync on against the runtime's
 request (NVIDIA Control Panel's "Vertical sync: On" did), the log says so.
 
-## Button mode (EBA)
+## Button mode (all three games)
 
 For players without a touchscreen: any face button of an Xbox, PlayStation
 or Switch controller, or Space on the keyboard, in place of the stylus during
@@ -173,7 +173,7 @@ what the judge (`Note::Judge`) reads of the session besides the touch:
   widened by 5 or 11 px. Off, they are left alone. `--port approach=PCT`,
   `--port hit-extra=PX`.
 
-## Customs (EBA, Ouendan 2)
+## Customs (all three games)
 
 A mode of its own, apart from the campaign: songs charted over story stages,
 each with its own scores and HD audio. An orange **CUSTOMS** button sits at
@@ -219,6 +219,20 @@ Ouendan 2's four, in `customs_oe2/` (`--game OE2` for both tools): Hohoemi no
 Bakudan (over Real Life Real Heart, OS02), I Want You (VISTA, OSB02), Madder
 (Kibun Jojo, OS03), Takedown (Music Hour, OS05). Its facts (clock, notes,
 judge, scenes, session) are in `src/games.cpp`.
+
+Ouendan 1's five, in `customs_oe1/` (`--game OE1`): Danger Zone (over Guts Da
+Ze, s03), I Just Can't Wait to Be King (Thrill, s08), I Think I'm OKAY (One
+Night Carnival, s11), Home (Over the Distance, s12), Through the Night
+(Shanghai Honey, s14), all with HD audio. Ouendan 1's engine is older: its
+notes are EBA's objects with the fields from +0x14 on 4 bytes later (the
+profile's `shift`), its manager's Array at +0x6C; its judge (`0x0202EE30`,
+`--hook 0202EE30`) is `judge(note, now)` as EBA's, with autoplay at session
+`+0x1F8` and no replays. Its stage is the session's `+4` (its name built as
+`"%c%02d"`: index 0 is s01), and its card shows the map's man tapped
+whatever the session says, so the Customs screen shows the replaced stage's
+opening comic, and the original preview is its song's start. The bake's
+clock fit is now a median-based line (a window matched at the wrong place no
+longer pulls it).
 
 ## Local ndskit patches
 
