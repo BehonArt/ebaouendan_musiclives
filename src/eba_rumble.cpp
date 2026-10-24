@@ -1,15 +1,16 @@
 // Rumble: the gamepads' motors in a song, in button mode (SDL's rumble: a
 // DualSense's haptics, a Switch Pro Controller's or Joy-Con's HD rumble, Xbox
-// motors), after rhythm games like Fortnite Festival:
-// - a strong pulse for the note that ends a combo (a tap, a slider's tail, a
-//   spinner's end): the game's next note is number 1;
-// - a medium pulse for every other note hit and each slider tick;
-// - a slight hum while a slider is followed or a spinner spun, rising with
-//   the spinner's speed.
-// Misses are felt as nothing. Taps and slider heads come from the judge's hook
-// (eba_timing.cpp); slider ticks and tails are the combo going up without one
-// (the game's combo counts them); the song as button mode sees it each frame
-// (eba_buttons.cpp's SongView).
+// motors), after rhythm games like Fortnite Festival. Three strengths:
+// - high: the note that ends a combo (a tap, a slider's tail: the game's next
+//   note is number 1) and every spinner's end;
+// - medium: every other note hit, a slider's head, and a miss (with its X);
+// - low: a slider's ticks.
+// Nothing while a spinner turns (a DualSense's triggers push back instead:
+// eba_buttons.cpp). Taps, slider heads and misses come from the judge's hook
+// (eba_timing.cpp); slider ticks are the combo going up without one (the
+// game's combo counts them); a tail is felt as the ball reaches its end while
+// held (Ouendan 1 leaves some tails out of its combo); the song as button mode
+// sees it each frame (eba_buttons.cpp's SongView).
 //
 // Options (the options bar, saved; or ndsrun --port): rumble=off;
 // rumble-strength=N (10-100 percent); rumble-log (each pulse; a headless run
@@ -22,23 +23,24 @@
 namespace eba {
 namespace {
 
-constexpr int kStrongFrames = 9, kMediumFrames = 5;   // a pulse's length (it fades over it)
-constexpr double kStrong = 1.0, kMedium = 0.6, kSlight = 0.2;
+enum Level { kLow, kMedium, kHigh };
+constexpr int kFrames[3] = {4, 6, 9};               // a pulse's length (it fades over it)
+constexpr double kAmp[3] = {0.3, 0.6, 1.0};
+constexpr const char* kName[3] = {"low", "medium", "high"};
 
 bool g_log;
-int g_strong, g_medium;                 // frames left of each pulse
+int g_left[3];                          // frames left of each pulse
 int g_hits;                             // taps the judge counted since the last frame
 int g_combo;
 // the slider being played: held at its last frame seen; its tail felt
 struct { uint32_t note = 0; int end = 0; bool last = false, held = false, tail = false; } g_slider;
-struct { uint32_t note = 0; int end = 0; bool last = false, spun = false; } g_spinner;
+struct { uint32_t note = 0; int end = 0; bool spun = false; } g_spinner;
 uint16_t g_sent_lo, g_sent_hi;
 uint64_t g_sent_at;
 
-void pulse(bool strong, const char* what, int now) {
-    if (strong) g_strong = kStrongFrames;
-    else g_medium = kMediumFrames;
-    if (g_log) nds_note("eba rumble: %s %s at song frame %d", strong ? "strong" : "medium", what, now);
+void pulse(Level l, const char* what, int now) {
+    g_left[l] = kFrames[l];
+    if (g_log) nds_note("eba rumble: %s %s at song frame %d", kName[l], what, now);
 }
 
 void send(uint16_t lo, uint16_t hi, uint64_t vbl) {
@@ -53,6 +55,18 @@ void send(uint16_t lo, uint16_t hi, uint64_t vbl) {
     for (int i = 0; i < n; ++i)
         if (SDL_Gamepad* gp = SDL_GetGamepadFromID(ids[i])) SDL_RumbleGamepad(gp, lo, hi, 120);
     SDL_free(ids);
+}
+
+// the motors from the pulses left: the low (heavy) motor for the high pulses, the high (light) one for all
+void motors(uint64_t vbl) {
+    double a[3];
+    for (int l = 0; l < 3; ++l) {
+        a[l] = kAmp[l] * g_left[l] / kFrames[l];
+        if (g_left[l]) --g_left[l];
+    }
+    double k = rumble().on ? rumble().strength / 100.0 : 0;
+    double lo = std::max(a[kHigh], a[kMedium] * 0.5) * k, hi = std::max({a[kHigh] * 0.8, a[kMedium], a[kLow]}) * k;
+    send((uint16_t)std::lround(std::min(1.0, lo) * 0xFFFF), (uint16_t)std::lround(std::min(1.0, hi) * 0xFFFF), vbl);
 }
 
 }  // namespace
@@ -70,25 +84,24 @@ void rumble_options() {
 }
 
 void rumble_judged(uint32_t note, int grade) {
-    if (grade > 2) return;                          // a miss: nothing
+    int now = (int)rd(game().clock);
+    if (grade > 2) { pulse(kMedium, "miss", now); return; }
     ++g_hits;
     int kind = rd(note + 4) & 0xFF;
-    if (kind == 1) pulse(false, "slider head", (int)rd(game().clock));   // its tail ends a combo, if any
-    else pulse(note_ends_combo(note), "hit", (int)rd(game().clock));
+    if (kind == 1) pulse(kMedium, "slider head", now);   // its tail ends a combo, if any
+    else if (note_ends_combo(note)) pulse(kHigh, "combo end", now);
+    else pulse(kMedium, "hit", now);
 }
 
 void rumble_frame(const SongView& v, uint64_t vbl) {
     int c = combo();
-    if (!v.live) {                                  // no note left (a song's finale spinner just ended), or none
-        if (g_spinner.spun) pulse(g_spinner.last, "spinner end", g_spinner.end);
+    if (!v.live) {                                  // no song: a last spinner's end, then the motors run down
+        if (g_spinner.spun) pulse(kHigh, "spinner end", g_spinner.end);
         g_hits = 0;
         g_slider = {};
         g_spinner = {};
         g_combo = c;
-        double s = kStrong * g_strong / kStrongFrames, k = rumble().on ? rumble().strength / 100.0 : 0;
-        if (g_strong) --g_strong;
-        g_medium = 0;
-        send((uint16_t)std::lround(s * k * 0xFFFF), (uint16_t)std::lround(s * 0.8 * k * 0xFFFF), vbl);
+        motors(vbl);
         return;
     }
     // the combo up by more than the judge's taps: slider ticks (a tail, too, mostly: Ouendan 1
@@ -108,35 +121,23 @@ void rumble_frame(const SongView& v, uint64_t vbl) {
     }
     if (g_slider.note && !g_slider.tail && v.now > g_slider.end) {   // the ball at its end
         g_slider.tail = true;
-        if (g_slider.held) pulse(g_slider.last, "slider tail", v.now);
+        if (g_slider.held) pulse(g_slider.last ? kHigh : kMedium, g_slider.last ? "combo end (slider tail)" : "slider tail", v.now);
     } else if (g_slider.note && ticks > 0 && v.now < g_slider.end - 1) {
-        pulse(false, "slider tick", v.now);
+        pulse(kLow, "slider tick", v.now);
     }
     if (g_slider.note && v.now > g_slider.end + 4) g_slider = {};
 
-    double body = 0;
-    if (v.kind == 1 && v.pen && v.now >= v.start && v.now <= v.end) body = kSlight;
-    if (v.kind == 2) {
+    if (v.kind == 2) {                              // a spinner: nothing while it turns, high at its end
         if (g_spinner.note != v.note) g_spinner = {};
         g_spinner.note = v.note;
         g_spinner.end = v.end;
-        g_spinner.last = v.last;
-        if (v.pen && v.spin > 0.02 && v.now >= v.start && v.now <= v.end) {
-            g_spinner.spun = true;
-            body = kSlight * (0.75 + std::min(1.0, v.spin / 0.12));   // 0.15 .. 0.35 with its speed
-        }
+        if (v.pen && v.spin > 0.02 && v.now >= v.start && v.now <= v.end) g_spinner.spun = true;
     }
     if (g_spinner.note && (v.note != g_spinner.note || v.now > g_spinner.end)) {
-        if (g_spinner.spun) pulse(g_spinner.last, "spinner end", v.now);
+        if (g_spinner.spun) pulse(kHigh, "spinner end", v.now);
         g_spinner = {};
     }
-
-    double s = kStrong * g_strong / kStrongFrames, m = kMedium * g_medium / kMediumFrames;
-    if (g_strong) --g_strong;
-    if (g_medium) --g_medium;
-    double k = rumble().on ? rumble().strength / 100.0 : 0;
-    double lo = std::max(s, m * 0.5) * k, hi = std::max({s * 0.8, m, body}) * k;
-    send((uint16_t)std::lround(std::min(1.0, lo) * 0xFFFF), (uint16_t)std::lround(std::min(1.0, hi) * 0xFFFF), vbl);
+    motors(vbl);
 }
 
 }  // namespace eba

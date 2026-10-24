@@ -137,6 +137,14 @@ by `cmake/eba.cmake`).
   a second): The Anthem with the stick at 5 a second scores 3,349,920, the
   same as mashing; held still, 3,322,660 (the spinner's bonus lost). Ouendan
   2's first stage: 2,947,250 by stick, 2,949,450 by mashing.
+  Or mash the **triggers** (L2, R2: a press past 60% of the pull, released
+  under 35%), counted as presses on a spinner only. A DualSense's adaptive
+  triggers push back while a spinner turns (Input > DualSense trigger
+  resistance, on by default): continuous resistance (SDL's DualSense effect
+  report, mode 1) of 200 at the start, easing with the spinner's speed
+  (smoothed over about a second) to none near full speed; off after it.
+  Headless (`buttons-log`): at 7.5 presses a second it eases 180 to 0 over
+  80 frames.
 - The mouse still works and wins while it is down. Outside a song the face
   buttons are the DS's (south B, east A, west Y, north X), for the menus.
 
@@ -161,23 +169,29 @@ through SDL's rumble (a DualSense's haptics, a Switch Pro Controller's or
 Joy-Con's HD rumble, Switch 2 controllers where SDL 3.4 drives them, Xbox
 motors):
 
-- strong (both motors, 150 ms fading) for the note that ends a combo (the
-  next note is number 1): a tap, a slider's tail, a spinner's end;
-- medium (60%, 80 ms) for every other note hit, slider head and slider tick;
-- a slight hum (20%) while a slider is followed, and while a spinner turns
-  (15-35% with its speed). Misses are felt as nothing.
+- high (both motors, 150 ms fading) for the note that ends a combo (the
+  next note is number 1: a tap, a slider's tail) and every spinner's end;
+- medium (60%, 100 ms) for every other note hit, a slider's head or tail, and
+  a miss (its X);
+- low (30%, 65 ms) for slider ticks;
+- nothing while a spinner turns (a DualSense's triggers push back instead).
 
-Taps and slider heads come from the judge's hook; ticks are the combo going
-up without a judged tap; a tail is felt as the ball reaches its end while
-held (Ouendan 1 leaves some tails out of its combo, before a break). Checked
-headless with `rumble-log` on all three games' first stages, every note
-accounted for: The Anthem 230 medium hits and heads, 27 strong hits, 122
-ticks, 28 tails (13 ending a combo), the finale spinner strong; Ouendan 2
-268 / 30 / 19 / 8 (5) / spinner; Ouendan 1 174 / 53 / 14 / 6 (6) (its first
-stage has no spinner: the stick on an Ouendan 1 spinner is not yet seen).
+Taps, slider heads and misses come from the judge's hook; ticks are the
+combo going up without a judged tap; a tail is felt as the ball reaches its
+end while held (Ouendan 1 leaves some tails out of its combo, before a
+break). Checked headless with `rumble-log` on all three games' first
+stages, every note accounted for. The Anthem: high 40 combo ends (13 of
+them slider tails) and the finale spinner; medium 202 hits, 28 heads, 15
+tails; low 122 ticks. Ouendan 2: high 35 and its spinner; medium 252, 16,
+3; low 19. Ouendan 1: high 59; medium 168, 6; low 14 (its first stage has
+no spinner). Pressing 10 frames late (`buttons-auto=10`): a medium pulse
+for each of the 8 misses.
 
-In the stage's opening and ending comics, a face button (or a hit key) also
-taps SKIP at the lower right (EBA and Ouendan 2).
+A face button (or a hit key) also taps SKIP at the lower right in a stage's
+opening and ending comics, and in a song's intro after GO! (the Agents'
+arrival, the episode's card, ...) up to its first note: while every note of
+the song is still in state 0. EBA: a press 5400 jumps to Are You Ready?;
+Ouendan 2: to GO! 800 frames sooner. Ouendan 1's song intro has no SKIP.
 
 The d-pad hits like the face buttons (in songs and comics), so a stream can
 alternate between the two sets; keyboard hit keys have bits of their own.
@@ -290,12 +304,14 @@ until the next 30x. The combo is the game's own counter (session `+0xE0` EBA,
 score; slider ticks counted, as shown). EBA's combo bursts (the Agent
 portrait) come at 30, 60, 100 and 150, not 90.
 
-- **EBA:** spotlights rising from below the stage behind the Agents: 2 from
-  30x, 3 from 60x, 4 from 100x; each judged hit swings them a step (so they
-  move on the song's beats); a gold flash when a group ends all 300 (Elite
-  Beat flashes, a toggle).
-- **Ouendan 1 and 2:** fire rising behind the squad, taller as the combo
-  grows (full by 150x), a burst on an all-300 group: over the games' own fire.
+- **Fire** (all three; EBA's default style): fire rising behind the squad or
+  the Agents, taller as the combo grows (full by 150x), a burst on an
+  all-300 group: over the Ouendan games' own fire.
+- **EBA's other style, spotlights** (Effects > Spotlights, `--port
+  fx-style=spotlights`): rising from below the stage behind the Agents: 2
+  from 30x, 3 from 60x, 4 from 100x; each judged hit swings them a step (so
+  they move on the song's beats); a gold flash when a group ends all 300
+  (Elite Beat flashes, a toggle).
 - **Where:** in the 3D frame, a pass after the polygons at a depth just in
   front of the farthest opaque one (the stage's background), so the Agents,
   the notes (both 3D) and the HUD are not lit; and under the 3D where a 2D

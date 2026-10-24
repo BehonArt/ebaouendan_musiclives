@@ -1,19 +1,21 @@
 // Optional light behind the 3D in a song (display.h's DisplayFx), off by default.
 // Nothing shows before a 30x combo (the first combo burst); a broken combo fades
 // it out until the next 30x.
-// - EBA: spotlights rising from below the stage behind the Agents, swung a step by
-//   each note hit (so on the song's beats): 2 from 30x, 3 from 60x, 4 from 100x
-//   (EBA's combo bursts: 30, 60, 100, 150); a gold flash when a group of notes
-//   ends all 300 (an Elite Beat).
-// - Ouendan 1 and 2: fire rising behind the squad, taller as the combo grows,
-//   a burst on an all-300 group (the games' own fire, heightened).
+// - Fire rising behind the squad (Ouendan 1 and 2) or the Agents (EBA's default
+//   style), taller as the combo grows, a burst on an all-300 group (the
+//   Ouendan games' own fire, heightened).
+// - EBA's other style: spotlights rising from below the stage behind the Agents,
+//   swung a step by each note hit (so on the song's beats): 2 from 30x, 3 from
+//   60x, 4 from 100x (EBA's combo bursts: 30, 60, 100, 150); a gold flash when a
+//   group of notes ends all 300 (an Elite Beat).
 // It is drawn in the 3D frame just in front of its farthest opaque polygon
 // (render_gl.cpp), and under the 3D where a 2D background shows through, so the
 // Agents, the notes and the HUD stay as they are. The combo is the game's own
 // (Game::combo, slider ticks counted, as shown); each judged tap comes from the
 // judge's hook (eba_timing.cpp).
 //
-// Options (ndsrun --port): fx[=off]; fx-intensity=N (10-100); combo-log.
+// Options (ndsrun --port): fx[=off]; fx-intensity=N (10-100); fx-style=fire|spotlights
+// (EBA); combo-log.
 #include "eba.h"
 #include "display.h"
 #include <algorithm>
@@ -70,7 +72,7 @@ void fx_frame(uint64_t vbl) {
     g_heat += (heat - g_heat) * 0.03f;
     if (lit) g_beams = c >= 100 ? 4.0f : c >= 60 ? 3.0f : 2.0f;
     if (g_fade <= 0) { display_set_fx(fx); return; }
-    fx.kind = game().id == std::string("EBA") ? 1 : 2;
+    fx.kind = game().id == std::string("EBA") && e.spotlights ? 1 : 2;   // EBA: spotlights, or the Ouendan games' fire
     fx.time = (float)(vbl / 60.0);
     fx.level = g_fade * e.intensity / 100.0f;
     fx.pulse = g_pulse;
@@ -88,6 +90,7 @@ void fx_options() {
     const auto& o = g_cfg.port;
     if (o.count("fx")) effects().on = o.at("fx") != "off";
     if (o.count("fx-intensity")) effects().intensity = std::clamp(std::atoi(o.at("fx-intensity").c_str()), 10, 100);
+    if (o.count("fx-style")) effects().spotlights = o.at("fx-style") == "spotlights";
 }
 
 }  // namespace eba

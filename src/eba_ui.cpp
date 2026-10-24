@@ -122,18 +122,23 @@ void input_menu() {
     if (ImGui::MenuItem("Button mode", nullptr, b.on)) { b.on = !b.on; settings_save(); }
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("In a song, a gamepad's face buttons, its d-pad or the keys below hit the notes:\n"
-                          "tap on the beat, hold through sliders, mash or turn the left stick round for spinners.");
+                          "tap on the beat, hold through sliders; for spinners mash, pull the triggers\n"
+                          "or turn the left stick round. In a song's intro and the comics they press SKIP.");
     Rumble& r = rumble();
     ImGui::BeginDisabled(!b.on);
     if (ImGui::MenuItem("Rumble", nullptr, r.on)) { r.on = !r.on; settings_save(); }
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("In button mode, the gamepad's motors (a DualSense's haptics, a Switch controller's HD rumble):\n"
-                          "strong for the note that ends a combo, medium for each hit and slider tick,\n"
-                          "a slight hum through sliders and spinners.");
+                          "high for the note that ends a combo and a spinner's end, medium for each hit and miss,\n"
+                          "low for slider ticks; nothing while a spinner turns.");
     ImGui::BeginDisabled(!r.on);
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
     if (ImGui::SliderInt("Rumble strength", &r.strength, 10, 100, "%d%%")) settings_save();
     ImGui::EndDisabled();
+    if (ImGui::MenuItem("DualSense trigger resistance", nullptr, b.trigger_feel)) { b.trigger_feel = !b.trigger_feel; settings_save(); }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("On a spinner, L2 and R2 mash it, and a DualSense's triggers push back:\n"
+                          "hard at first, easing as the spinner speeds up.");
     ImGui::EndDisabled();
     ImGui::Separator();
     ImGui::TextDisabled("Hit keys (keyboard)");
@@ -189,14 +194,21 @@ void timing_menu() {
 void effects_menu() {
     Effects& e = effects();
     bool eba = game().id == std::string("EBA");
-    if (ImGui::MenuItem(eba ? "Spotlights behind the Agents" : "Fire behind the squad", nullptr, e.on)) {
+    if (ImGui::MenuItem(eba ? "Light behind the Agents" : "Fire behind the squad", nullptr, e.on)) {
         e.on = !e.on;
         settings_save();
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip(eba ? "Spotlights rise behind the Agents in a song, swinging with each hit,\n"
-                                "brighter as the combo grows."
-                              : "Fire rises behind the squad in a song, taller as the combo grows.");
+        ImGui::SetTooltip("From a 30x combo (the first combo burst), stronger as the combo grows.");
+    if (eba) {
+        ImGui::BeginDisabled(!e.on);
+        if (ImGui::MenuItem("   Fire (the Ouendan games')", nullptr, !e.spotlights)) { e.spotlights = false; settings_save(); }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fire rises behind the Agents, taller as the combo grows, flaring with each hit.");
+        if (ImGui::MenuItem("   Spotlights", nullptr, e.spotlights)) { e.spotlights = true; settings_save(); }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Spotlights rise behind the Agents, swinging with each hit: 2 from 30x, 3 from 60x, 4 from 100x.");
+        ImGui::EndDisabled();
+    }
     if (ImGui::MenuItem(eba ? "Elite Beat flashes" : "Bursts on perfect groups", nullptr, e.flashes)) {
         e.flashes = !e.flashes;
         settings_save();

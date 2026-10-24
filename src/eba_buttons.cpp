@@ -5,9 +5,10 @@
 // along the path, a point a frame. On a spinner, each press spins the stylus
 // faster around its centre; it slows down when the presses stop. Or the left
 // stick, turned round: the stylus turns with it (1.5 times as far, either way), on
-// top of the presses. The mouse,
-// when it is down, wins. In a stage's opening or ending comic a hit button
-// presses its SKIP. Elsewhere the buttons are the DS's as before (south B,
+// top of the presses; or a gamepad's triggers, mashed (a DualSense's push back,
+// hard at first, easing as the spinner speeds up). The mouse, when it is down,
+// wins. In a stage's opening or ending comic, and in a song's intro after GO!
+// (up to its first note), a hit button presses SKIP. Elsewhere the buttons are the DS's as before (south B,
 // east A, west Y, north X); in a song and a comic, the face buttons and the
 // d-pad are hits only (both sets: alternating them makes fast streams easier).
 //
@@ -203,6 +204,60 @@ bool stick_angle(double& turns) {
     return ok;
 }
 
+// The triggers (L2, R2) of every gamepad, two hit bits for spinners: down past 60% of the pull, up under 35%.
+uint32_t trigger_bits() {
+    static uint32_t state;
+    if (!g_cfg.window) return 0;
+    int n = 0;
+    SDL_JoystickID* ids = SDL_GetGamepads(&n);
+    double l = 0, r = 0;
+    for (int i = 0; i < n; ++i)
+        if (SDL_Gamepad* gp = SDL_GetGamepadFromID(ids[i])) {
+            l = std::max(l, SDL_GetGamepadAxis(gp, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) / 32767.0);
+            r = std::max(r, SDL_GetGamepadAxis(gp, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) / 32767.0);
+        }
+    SDL_free(ids);
+    auto set = [](double v, uint32_t bit) { if (v > 0.6) state |= bit; else if (v < 0.35) state &= ~bit; };
+    set(l, 1u << 20);
+    set(r, 1u << 21);
+    return state;
+}
+
+// A DualSense's adaptive triggers on a spinner: resistance from the start of the pull, hard
+// at first and easing as the spinner speeds up, none near full speed; off elsewhere. SDL's
+// DualSense effect report (its DS5EffectsState_t, 47 bytes): both triggers' effects enabled,
+// mode 1 (continuous resistance: start, force) or 5 (off).
+void trigger_feel(bool spinning, double speed) {
+    static int sent = -1;                           // the force last sent (0: off)
+    static double pace;                             // the spinner's speed, smoothed over about a second
+    pace = spinning ? pace + (speed - pace) * 0.06 : 0;
+    int force = 0;
+    if (spinning && eba::buttons().trigger_feel)
+        force = (int)std::lround(200 * std::clamp(1.0 - pace / (0.8 * kSpinMax), 0.0, 1.0)) / 20 * 20;
+    if (force == sent) return;
+    sent = force;
+    if (m.log) nds_note("eba buttons: trigger resistance %d", force);
+    if (!g_cfg.window) return;
+    struct {
+        uint8_t enable1, enable2, rumble_right, rumble_left, headphones, speaker, mic, audio, mic_light, mute;
+        uint8_t right[11], left[11];
+        uint8_t rest[15];
+    } e{};
+    static_assert(sizeof e == 47, "DS5EffectsState_t");
+    e.enable1 = 0x04 | 0x08;                        // the right and the left trigger's effect
+    uint8_t fx[11] = {};
+    if (force) { fx[0] = 0x01; fx[1] = 0; fx[2] = (uint8_t)force; }
+    else fx[0] = 0x05;
+    std::memcpy(e.right, fx, 11);
+    std::memcpy(e.left, fx, 11);
+    int n = 0;
+    SDL_JoystickID* ids = SDL_GetGamepads(&n);
+    for (int i = 0; i < n; ++i)
+        if (SDL_Gamepad* gp = SDL_GetGamepadFromID(ids[i]); gp && SDL_GetGamepadType(gp) == SDL_GAMEPAD_TYPE_PS5)
+            SDL_SendGamepadEffect(gp, &e, sizeof e);
+    SDL_free(ids);
+}
+
 // A stage's opening or ending comic: a hit button presses its SKIP, at the lower right.
 void skip_comic(NdsInput& in) {
     static uint32_t prev;
@@ -229,6 +284,13 @@ void play_input(NdsInput& in, uint64_t vbl) {
     if (!eba::buttons().on) return;
     if (eba::scene_has_skip()) { skip_comic(in); return; }
     uint32_t mgr = manager(vbl);
+    // a song's intro, after GO! (the Agents' arrival, the episode's card, ...) up to its first
+    // note: SKIP at the lower right too, while no note has appeared (they appear in order)
+    if (eba::scene_is_song() && (!mgr || note_at(rd(rd(mgr + eba::game().notes))).state == 0)) {
+        skip_comic(in);
+        m.held_prev = 0;
+        return;
+    }
     uint32_t clock = mgr ? rd(eba::game().clock) : 0;
     if (clock != m.clock) { m.clock = clock; m.clock_seen = vbl; }
     bool live = mgr && vbl - m.clock_seen < 30;     // a song running: its clock moved in the last half second
@@ -265,6 +327,8 @@ void play_input(NdsInput& in, uint64_t vbl) {
         if (!m.stick_auto && have && cur.kind == 2 && now >= cur.time - (int)rd(eba::note_field(cur.at, 0x40)) && now <= cur.time)
             held |= (++m.auto_mash % 8 < 4) ? 4 : 0;    // 4 frames down, 4 up: 7.5 presses a second
     }
+    uint32_t triggers = trigger_bits();             // on a spinner the triggers mash too
+    if (have && cur.kind == 2) held |= triggers;
     if (m.log && g_cfg.port.count("buttons-trace") && vbl % 15 == 0)
         nds_note("eba buttons: song frame %d: current #%d kind %d state %d time %d at %08X; slider %08X held %X",
                  now, have ? cur.number : -1, cur.kind, cur.state, cur.time, cur.at, m.slider.at, held);
@@ -347,6 +411,7 @@ void hook(NdsInput& in, uint64_t vbl) {
     m.view.pen = in.pen;
     if (!eba::buttons().on || !m.view.live) m.view = eba::SongView();
     eba::rumble_frame(m.view, vbl);
+    trigger_feel(m.view.kind == 2 && m.view.now >= m.view.start && m.view.now <= m.view.end, m.view.spin);
     eba::ra_frame(vbl);                             // the achievements, on the frame's RAM as it is
 }
 

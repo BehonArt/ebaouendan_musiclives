@@ -76,6 +76,7 @@ int difficulty_index(char d);                       // e n h x: 0 .. 3, the sess
 struct Buttons {
     bool on = true;                     // the face buttons and keys hit notes in a song
     int keys[4] = {44, 0, 0, 0};        // SDL scancodes that hit too (44: Space), 0: none
+    bool trigger_feel = true;           // a DualSense's triggers push back on spinners
 };
 Buttons& buttons();
 void buttons_options();                 // --port's buttons options
@@ -113,9 +114,10 @@ bool replay_playing();                              // a recorded run is being p
 std::string last_replay();                          // the file the last song's run was saved to
 
 // ---- light behind the 3D (eba_fx.cpp) ---------------------------------------------------
-struct Effects { bool on = false; int intensity = 70; bool flashes = true; };   // off by default
+// off by default; EBA's style: fire (the Ouendan games' own, heightened) or spotlights
+struct Effects { bool on = false; int intensity = 70; bool flashes = true; bool spotlights = false; };
 Effects& effects();
-void fx_options();                                  // --port fx[=off] fx-intensity=N
+void fx_options();                                  // --port fx[=off] fx-intensity=N fx-style=fire|spotlights
 void fx_frame(uint64_t vblank);
 void fx_judged(int grade, int number);             // each tap the judge judges (eba_timing.cpp)
 int combo();                                       // the game's combo, as it shows it (slider ticks counted)

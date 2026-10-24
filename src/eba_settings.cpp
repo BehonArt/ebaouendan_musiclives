@@ -55,6 +55,7 @@ void settings_load() {
     if (g_cfg.audio_latency == 3) audio_set_latency(num("audio_latency", 3));
     Buttons& b = buttons();
     b.on = num("buttons", 1) != 0;
+    b.trigger_feel = num("trigger_feel", 1) != 0;
     for (int i = 0; i < 4; ++i) {
         std::string k = "button_key" + std::to_string(i + 1);
         if (v.count(k)) b.keys[i] = v[k].empty() ? 0 : SDL_GetScancodeFromName(v[k].c_str());
@@ -65,6 +66,7 @@ void settings_load() {
     effects().on = num("fx", 0) != 0;
     effects().intensity = std::clamp((int)num("fx_intensity", 70), 10, 100);
     effects().flashes = num("fx_flashes", 1) != 0;
+    effects().spotlights = v.count("fx_style") && v["fx_style"] == "spotlights";
     assists().no_fail = num("no_fail", 0) != 0;
     rumble().on = num("rumble", 1) != 0;
     rumble().strength = std::clamp((int)num("rumble_strength", 100), 10, 100);
@@ -85,13 +87,14 @@ void settings_save() {
     std::fprintf(f, "scale=%d\nlayout=%s\nfps=%d\nfullscreen=%d\nlow_latency=%d\naudio_latency=%g\n", s.scale,
                  kLayouts[(int)s.layout], s.fps, s.fullscreen ? 1 : 0, s.low_latency ? 1 : 0, audio_latency());
     const Buttons& b = buttons();
-    std::fprintf(f, "buttons=%d\n", b.on ? 1 : 0);
+    std::fprintf(f, "buttons=%d\ntrigger_feel=%d\n", b.on ? 1 : 0, b.trigger_feel ? 1 : 0);
     for (int i = 0; i < 4; ++i)
         std::fprintf(f, "button_key%d=%s\n", i + 1, b.keys[i] ? SDL_GetScancodeName((SDL_Scancode)b.keys[i]) : "");
     std::fprintf(f, "offset=%d\n", offset());
     std::fprintf(f, "filter=%d\n", s.filter);
     std::fprintf(f, "fx=%d\nfx_intensity=%d\nfx_flashes=%d\n", effects().on ? 1 : 0, effects().intensity,
                  effects().flashes ? 1 : 0);
+    std::fprintf(f, "fx_style=%s\n", effects().spotlights ? "spotlights" : "fire");
     std::fprintf(f, "approach_pct=%d\nhit_extra=%d\n", assists().approach_pct, assists().hit_extra);
     std::fprintf(f, "rumble=%d\nrumble_strength=%d\n", rumble().on ? 1 : 0, rumble().strength);
     std::fprintf(f, "no_fail=%d\nhide_life=%d\n", assists().no_fail ? 1 : 0, assists().hide_life ? 1 : 0);
