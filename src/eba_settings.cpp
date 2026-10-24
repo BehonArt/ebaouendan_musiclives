@@ -66,6 +66,8 @@ void settings_load() {
     effects().intensity = std::clamp((int)num("fx_intensity", 70), 10, 100);
     effects().flashes = num("fx_flashes", 1) != 0;
     assists().no_fail = num("no_fail", 0) != 0;
+    rumble().on = num("rumble", 1) != 0;
+    rumble().strength = std::clamp((int)num("rumble_strength", 100), 10, 100);
     assists().hide_life = num("hide_life", 1) != 0;
     skin().name = v.count("skin") ? v["skin"] : "";
     skin().hd_rings = std::clamp((int)num("hd_rings", 0), 0, 3);
@@ -90,6 +92,7 @@ void settings_save() {
     std::fprintf(f, "fx=%d\nfx_intensity=%d\nfx_flashes=%d\n", effects().on ? 1 : 0, effects().intensity,
                  effects().flashes ? 1 : 0);
     std::fprintf(f, "approach_pct=%d\nhit_extra=%d\n", assists().approach_pct, assists().hit_extra);
+    std::fprintf(f, "rumble=%d\nrumble_strength=%d\n", rumble().on ? 1 : 0, rumble().strength);
     std::fprintf(f, "no_fail=%d\nhide_life=%d\n", assists().no_fail ? 1 : 0, assists().hide_life ? 1 : 0);
     std::fprintf(f, "skin=%s\nhd_rings=%d\n", skin().name.c_str(), skin().hd_rings);
     std::fclose(f);
@@ -102,6 +105,7 @@ void init() {
     play_options();
     fx_options();
     skins_options();
+    rumble_options();
     customs_init();
 }
 

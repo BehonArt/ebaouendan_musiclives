@@ -3,7 +3,9 @@
 // now, for two frames, and the game judges that tap as its own: the same
 // windows, the same score. On a slider, held, the stylus follows its ball
 // along the path, a point a frame. On a spinner, each press spins the stylus
-// faster around its centre; it slows down when the presses stop. The mouse,
+// faster around its centre; it slows down when the presses stop. Or the left
+// stick, turned round: the stylus turns with it (1.5 times as far, either way), on
+// top of the presses. The mouse,
 // when it is down, wins. In a stage's opening or ending comic a hit button
 // presses its SKIP. Elsewhere the buttons are the DS's as before (south B,
 // east A, west Y, north X); in a song and a comic, the face buttons and the
@@ -32,7 +34,9 @@
 // buttons-log (each press and what it hit; buttons-trace adds the note judged
 // every 15 frames); buttons-auto[=N] (a test: presses on every note's frame,
 // or N frames after it, holds the sliders, mashes the spinners at 7.5 a
-// second: The Anthem on Hard Rock, rank S, 258 of 258 at 300).
+// second: The Anthem on Hard Rock, rank S, 258 of 258 at 300); stick-auto (with
+// buttons-auto: the spinners spun by a left stick turning N times a second, 5
+// by default).
 #include "eba.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -57,6 +61,9 @@ constexpr double kSpinBoost = 2.0 / 60;             // a press adds 2 turns a se
 constexpr double kSpinDecay = 0.9715;               // ... which halve in 0.4 s without presses
 constexpr double kSpinMax = 10.0 / 60;              // at most 10 turns a second
 constexpr double kSpinRadius = 40;
+constexpr double kStickDead = 0.6;                  // a stick pushed past this turns a spinner
+constexpr double kStickGain = 1.5;                  // the stylus turns this much for a turn of the stick
+constexpr double kStickMax = 0.3;                   // at most this of a turn a frame (18 a second)
 
 struct Note {
     uint32_t at = 0;
@@ -99,6 +106,11 @@ struct Mode {
     double angle = 0, speed = 0;        // turns, turns a frame
     uint32_t auto_last = 0;             // buttons-auto: the last note pressed
     int auto_mash = 0;
+    bool stick_auto = false;            // stick-auto[=N]: buttons-auto turns the stick N times a second on spinners (5)
+    double stick_rate = 5;
+    bool stick_on = false;              // the left stick past its dead zone at the last frame
+    double stick_prev = 0, stick_turn = 0;   // its angle then (turns); this frame's turn of it
+    eba::SongView view;                 // for the rumble
 } m;
 
 bool manager_ok(uint32_t a) {
@@ -172,6 +184,25 @@ uint32_t hit_buttons(const NdsInput& in) {
     return held;
 }
 
+// The left sticks: the angle (turns: 0 right, a quarter down) of the one pushed furthest past the dead zone.
+bool stick_angle(double& turns) {
+    if (!g_cfg.window) return false;
+    int n = 0;
+    SDL_JoystickID* ids = SDL_GetGamepads(&n);
+    double best = kStickDead;
+    bool ok = false;
+    for (int i = 0; i < n; ++i) {
+        SDL_Gamepad* gp = SDL_GetGamepadFromID(ids[i]);
+        if (!gp) continue;
+        double x = SDL_GetGamepadAxis(gp, SDL_GAMEPAD_AXIS_LEFTX) / 32767.0;
+        double y = SDL_GetGamepadAxis(gp, SDL_GAMEPAD_AXIS_LEFTY) / 32767.0;
+        double r = std::hypot(x, y);
+        if (r > best) { best = r; turns = std::atan2(y, x) / (2 * M_PI); ok = true; }
+    }
+    SDL_free(ids);
+    return ok;
+}
+
 // A stage's opening or ending comic: a hit button presses its SKIP, at the lower right.
 void skip_comic(NdsInput& in) {
     static uint32_t prev;
@@ -188,7 +219,7 @@ void skip_comic(NdsInput& in) {
     }
 }
 
-void hook(NdsInput& in, uint64_t vbl) {
+void play_input(NdsInput& in, uint64_t vbl) {
     if (!m.init) { m.init = true; eba::init(); }
     eba::debug_pokes(vbl);
     eba::play_frame(vbl);                           // autoplay, replays, assists
@@ -212,6 +243,18 @@ void hook(NdsInput& in, uint64_t vbl) {
     Note cur;
     bool have = current(mgr, cur);
     int now = (int)clock + 1;                       // the frame this input is read in
+    // the left stick turned round: this frame's turn of it, for a spinner
+    double st = 0;
+    bool stick = stick_angle(st);
+    if (m.autoplay && m.stick_auto && have && cur.kind == 2) { st = m.stick_prev + m.stick_rate / 60; stick = true; }
+    m.stick_turn = 0;
+    if (stick && m.stick_on) {
+        double d = st - m.stick_prev;
+        m.stick_turn = std::clamp((d - std::round(d)) * kStickGain, -kStickMax, kStickMax);
+    }
+    m.stick_on = stick;
+    if (stick) m.stick_prev = st;
+    if (m.stick_turn != 0 && have && cur.kind == 2) m.spinner = cur.at;
     if (m.autoplay) {                               // the test: a perfect player
         held = 0;
         if (have && cur.kind != 2 && cur.at != m.auto_last && now >= cur.time + m.auto_late) {
@@ -219,13 +262,27 @@ void hook(NdsInput& in, uint64_t vbl) {
             held = 1;
         }
         if (m.slider.at) { int bx, by; if (ball(m.slider, now, bx, by)) held |= 1; }   // the same button, held on
-        if (have && cur.kind == 2 && now >= cur.time - (int)rd(eba::note_field(cur.at, 0x40)) && now <= cur.time)
+        if (!m.stick_auto && have && cur.kind == 2 && now >= cur.time - (int)rd(eba::note_field(cur.at, 0x40)) && now <= cur.time)
             held |= (++m.auto_mash % 8 < 4) ? 4 : 0;    // 4 frames down, 4 up: 7.5 presses a second
     }
     if (m.log && g_cfg.port.count("buttons-trace") && vbl % 15 == 0)
         nds_note("eba buttons: song frame %d: current #%d kind %d state %d time %d at %08X; slider %08X held %X",
                  now, have ? cur.number : -1, cur.kind, cur.state, cur.time, cur.at, m.slider.at, held);
     in.keys &= ~(in.pad_keys & kFaceKeys);          // in a song the face buttons and d-pad are hits, not the DS's
+    m.view.live = true;                             // what the rumble sees: the song, its note if any
+    m.view.now = now;
+    if (have) {
+        eba::SongView& v = m.view;
+        v.note = cur.at;
+        v.kind = cur.kind;
+        v.start = v.end = cur.time;
+        if (cur.kind == 1) {
+            Slider s = m.slider.at == cur.at ? m.slider : slider_at(cur.at);
+            if (s.at) v.end = s.time + s.n * s.passes;
+        }
+        if (cur.kind == 2) v.start = cur.time - (int)rd(eba::note_field(cur.at, 0x40));
+        v.last = eba::note_ends_combo(cur.at);
+    }
     int presses = __builtin_popcount(held & ~m.held_prev);
     m.held_prev = held;
     bool mouse = in.pen;
@@ -272,14 +329,24 @@ void hook(NdsInput& in, uint64_t vbl) {
     if (m.spinner) {
         Note s = note_at(m.spinner);
         if (now > s.time || s.kind != 2) { m.spinner = 0; m.speed = 0; return; }
-        m.angle += m.speed;
+        m.angle += m.speed + m.stick_turn;
         m.speed *= kSpinDecay;
-        if (m.speed < 0.2 / 60 && !held) return;    // stopped: the stylus up
+        m.view.spin = m.speed + std::abs(m.stick_turn);
+        if (m.speed < 0.2 / 60 && !held && !m.stick_on) return;   // stopped: the stylus up
         double r = m.angle * 2 * M_PI;
         in.pen = true;
         in.x = std::clamp((int)std::lround(s.x + kSpinRadius * std::cos(r)), 0, 255);
         in.y = std::clamp((int)std::lround(s.y + kSpinRadius * std::sin(r)), 0, 191);
     }
+}
+
+// each frame: the input, then the rumble from what it saw of the song
+void hook(NdsInput& in, uint64_t vbl) {
+    m.view = eba::SongView();
+    play_input(in, vbl);
+    m.view.pen = in.pen;
+    if (!eba::buttons().on || !m.view.live) m.view = eba::SongView();
+    eba::rumble_frame(m.view, vbl);
 }
 
 struct Register {
@@ -301,6 +368,8 @@ void buttons_options() {
     if (o.count("buttons")) b.on = o.at("buttons") != "off";
     m.log = o.count("buttons-log") > 0;
     m.autoplay = o.count("buttons-auto") > 0;
+    m.stick_auto = o.count("stick-auto") > 0;
+    if (m.stick_auto && !o.at("stick-auto").empty()) m.stick_rate = std::atof(o.at("stick-auto").c_str());
     if (m.autoplay) m.auto_late = std::atoi(o.at("buttons-auto").c_str());
     if (o.count("button-keys")) {
         std::fill(b.keys, b.keys + 4, 0);
@@ -313,6 +382,18 @@ void buttons_options() {
         }
     }
     if (b.on) nds_note("eba buttons: on%s", m.autoplay ? " (buttons-auto)" : "");
+}
+
+bool note_ends_combo(uint32_t note) {
+    if (!manager_ok(m.mgr)) return false;
+    uint32_t arr = rd(m.mgr + game().notes), n = rd(m.mgr + game().notes + 8);
+    for (uint32_t i = 0; i < n; ++i)
+        if (rd(arr + 4 * i) == note) {
+            if (i + 1 == n) return true;
+            uint32_t next = rd(arr + 4 * (i + 1));
+            return in_main(next) && g_main[(next + game().number) & 0x3FFFFF] == 1;
+        }
+    return false;
 }
 
 // --port poke=ADDR:VALUE@VBLANK,... (hex address, decimal byte): a test's writes to main RAM

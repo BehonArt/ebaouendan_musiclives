@@ -120,7 +120,19 @@ void input_menu() {
     if (ImGui::MenuItem("Button mode", nullptr, b.on)) { b.on = !b.on; settings_save(); }
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("In a song, a gamepad's face buttons, its d-pad or the keys below hit the notes:\n"
-                          "tap on the beat, hold through sliders, mash for spinners.");
+                          "tap on the beat, hold through sliders, mash or turn the left stick round for spinners.");
+    Rumble& r = rumble();
+    ImGui::BeginDisabled(!b.on);
+    if (ImGui::MenuItem("Rumble", nullptr, r.on)) { r.on = !r.on; settings_save(); }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("In button mode, the gamepad's motors (a DualSense's haptics, a Switch controller's HD rumble):\n"
+                          "strong for the note that ends a combo, medium for each hit and slider tick,\n"
+                          "a slight hum through sliders and spinners.");
+    ImGui::BeginDisabled(!r.on);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
+    if (ImGui::SliderInt("Rumble strength", &r.strength, 10, 100, "%d%%")) settings_save();
+    ImGui::EndDisabled();
+    ImGui::EndDisabled();
     ImGui::Separator();
     ImGui::TextDisabled("Hit keys (keyboard)");
     for (int i = 0; i < 4; ++i) {

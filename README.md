@@ -41,7 +41,7 @@ EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
 
 No menu has submenus (in a small window ImGui puts one over its menu): each
 choice is a list under a grey heading.
-- **Input:** button mode on or off, up to four hit keys (click one, then
+- **Input:** button mode on or off, rumble and its strength, up to four hit keys (click one, then
   press a key; right-click clears), the connected gamepads, the key map.
 - **Timing:** the offset (-8 to +8 frames), the sound's latency (1 to 6
   frames), and **Calibrate...**, a window that counts every tap the game
@@ -131,13 +131,20 @@ by `cmake/eba.cmake`).
 - **Spinner:** mash. Each press spins the stylus faster around the spinner
   (2 turns a second per press, halving in 0.4 s without presses, at most 10
   a second); about 6 presses a second keeps up with the hardest spinners.
+  Or turn the **left stick** round (past 60% of its throw): the stylus turns
+  with it, 1.5 times as far, either way, on top of any presses (at most 18
+  turns a second). Checked headless (`stick-auto=N`, a stick turning N times
+  a second): The Anthem with the stick at 5 a second scores 3,349,920, the
+  same as mashing; held still, 3,322,660 (the spinner's bonus lost). Ouendan
+  2's first stage: 2,947,250 by stick, 2,949,450 by mashing.
 - The mouse still works and wins while it is down. Outside a song the face
   buttons are the DS's (south B, east A, west Y, north X), for the menus.
 
 Options, each as `--port ...`: `buttons=off`; `button-keys=Space,F,J` (SDL
 key names); `buttons-log` (every press, the note it hit and how many frames
 off); `buttons-auto` (a test player: presses on every note's frame, holds
-the sliders, mashes the spinners).
+the sliders, mashes the spinners; with `stick-auto[=N]` it spins them with a
+left stick turning N times a second instead).
 
     build/recomp/b/ndsrun roms/EBA.nds --save build/play/EBA.sav --window --scale 3 --fps 60 --port buttons-log
 
@@ -147,6 +154,27 @@ Rock, everything through button mode: rank S, 258 of 258 at 300, max combo
 before. What it reads of the game (the song clock, the notes' manager and
 each note's fields) is at the top of `src/eba_buttons.cpp`;
 `tools/eba_notes.py` inspects a RAM dump.
+
+**Rumble** (Input menu, on by default, with a strength; `--port rumble=off`,
+`rumble-strength=N`, `rumble-log`; `src/eba_rumble.cpp`), in button mode,
+through SDL's rumble (a DualSense's haptics, a Switch Pro Controller's or
+Joy-Con's HD rumble, Switch 2 controllers where SDL 3.4 drives them, Xbox
+motors):
+
+- strong (both motors, 150 ms fading) for the note that ends a combo (the
+  next note is number 1): a tap, a slider's tail, a spinner's end;
+- medium (60%, 80 ms) for every other note hit, slider head and slider tick;
+- a slight hum (20%) while a slider is followed, and while a spinner turns
+  (15-35% with its speed). Misses are felt as nothing.
+
+Taps and slider heads come from the judge's hook; ticks are the combo going
+up without a judged tap; a tail is felt as the ball reaches its end while
+held (Ouendan 1 leaves some tails out of its combo, before a break). Checked
+headless with `rumble-log` on all three games' first stages, every note
+accounted for: The Anthem 230 medium hits and heads, 27 strong hits, 122
+ticks, 28 tails (13 ending a combo), the finale spinner strong; Ouendan 2
+268 / 30 / 19 / 8 (5) / spinner; Ouendan 1 174 / 53 / 14 / 6 (6) (its first
+stage has no spinner: the stick on an Ouendan 1 spinner is not yet seen).
 
 In the stage's opening and ending comics, a face button (or a hit key) also
 taps SKIP at the lower right (EBA and Ouendan 2).

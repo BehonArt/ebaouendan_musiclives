@@ -78,6 +78,7 @@ struct Buttons {
 Buttons& buttons();
 void buttons_options();                 // --port's buttons options
 void debug_pokes(uint64_t vblank);      // --port poke=ADDR:VALUE@VBLANK (tests)
+bool note_ends_combo(uint32_t note);    // the next note starts a new combo (its number 1), or none follows
 
 // ---- timing (eba_timing.cpp) -------------------------------------------------------------
 // The judge (0x020681D8, taps and slider heads) is given the song's clock minus
@@ -115,6 +116,21 @@ Effects& effects();
 void fx_options();                                  // --port fx[=off] fx-intensity=N
 void fx_frame(uint64_t vblank);
 void fx_judged(int grade, int number);             // each tap the judge judges (eba_timing.cpp)
+int combo();                                       // the game's combo, as it shows it (slider ticks counted)
+
+// ---- rumble (eba_rumble.cpp): the gamepads' motors in a song, in button mode -------------
+struct Rumble { bool on = true; int strength = 100; };   // strength: percent
+Rumble& rumble();
+struct SongView {                                  // what button mode sees of the song each frame
+    bool live = false;                             // a song running
+    uint32_t note = 0;                             // the note judged now (else the next)
+    int kind = -1, now = 0, start = 0, end = 0;    // its kind (0 tap 1 slider 2 spinner, -1 none); its body's frames
+    bool last = false, pen = false;                // it ends its combo; the stylus is down
+    double spin = 0;                               // a spinner's speed, turns a frame
+};
+void rumble_frame(const SongView& v, uint64_t vblank);
+void rumble_judged(uint32_t note, int grade);      // each tap the judge judges (eba_timing.cpp)
+void rumble_options();                             // --port rumble[=off] rumble-strength=N rumble-log
 
 // ---- skins (eba_skins.cpp): texture packs for the notes' pictures ----------------------
 // <skins_dir>/<name>/ (beside the ROM, else here), a pack of pictures by texture hash

@@ -28,15 +28,14 @@ float g_pulse, g_flash, g_heat, g_phase, g_target, g_fade, g_beams;
 bool g_hit;
 int g_last_combo = -1;
 
-// the game's combo, as it shows it
+}  // namespace
+
 int combo() {
     const Game& g = game();
     if (!g.session || !g.combo) return 0;
     uint32_t s = rd(g.session);
     return in_main(s) ? std::max(0, (int)rh(s + g.combo)) : 0;
 }
-
-}  // namespace
 
 Effects& effects() {
     static Effects e;
