@@ -10,7 +10,9 @@
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
+#include "rc_client.h"
 #include <SDL3/SDL.h>
+#include <cfloat>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -280,6 +282,95 @@ void help_windows() {
     }
 }
 
+// RetroAchievements (eba_achievements.cpp): the sign-in, the game's set, why it is paused
+bool g_ra;
+char g_ra_user[64], g_ra_pass[128];
+
+void ra_window() {
+    if (!g_ra) return;
+    ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 30, ImGui::GetFontSize() * 26), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("RetroAchievements", &g_ra)) { ImGui::End(); return; }
+    Achievements& a = achievements();
+    ImGui::TextWrapped("%s", ra_status().c_str());
+    if (const char* why = ra_paused_by(); why && ra_signed_in() && a.on)
+        ImGui::TextColored(ImVec4(1, 0.75f, 0.3f, 1), "Paused: %s.", why);
+    ImGui::TextDisabled("Casual mode. Achievements count only for the game as made: not in Customs,");
+    ImGui::TextDisabled("button mode, with an assist (approach, hit circle, No-Fail), autoplay or a replay.");
+    ImGui::Separator();
+    if (!ra_signed_in()) {
+        if (a.user[0] && !g_ra_user[0]) std::snprintf(g_ra_user, sizeof g_ra_user, "%s", a.user.c_str());
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 14);
+        ImGui::InputText("Username", g_ra_user, sizeof g_ra_user);
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 14);
+        bool go = ImGui::InputText("Password", g_ra_pass, sizeof g_ra_pass,
+                                   ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
+        if ((ImGui::Button("Sign in") || go) && g_ra_user[0] && g_ra_pass[0]) {
+            if (!a.on) ra_set_on(true);
+            std::string pass = g_ra_pass;
+            std::fill(std::begin(g_ra_pass), std::end(g_ra_pass), '\0');
+            ra_login(g_ra_user, pass);
+        }
+        ImGui::TextDisabled("Your retroachievements.org account. Only RA's sign-in token is kept,");
+        ImGui::TextDisabled("shared by the three games; never the password.");
+        ImGui::End();
+        return;
+    }
+    bool on = a.on;
+    if (ImGui::Checkbox("Achievements", &on)) ra_set_on(on);
+    ImGui::SameLine();
+    if (ImGui::Button("Sign out")) ra_logout();
+    ImGui::Separator();
+    rc_client_t* c = ra_client();
+    if (c && a.on && rc_client_get_game_info(c)) {
+        rc_client_achievement_list_t* list =
+            rc_client_create_achievement_list(c, RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE, RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_PROGRESS);
+        if (list) {
+            for (uint32_t b = 0; b < list->num_buckets; ++b) {
+                const rc_client_achievement_bucket_t& bk = list->buckets[b];
+                ImGui::SeparatorText(bk.label);
+                for (uint32_t i = 0; i < bk.num_achievements; ++i) {
+                    const rc_client_achievement_t* x = bk.achievements[i];
+                    bool got = x->unlocked != RC_CLIENT_ACHIEVEMENT_UNLOCKED_NONE;
+                    ImGui::TextColored(got ? ImVec4(1, 0.85f, 0.35f, 1) : ImVec4(0.85f, 0.85f, 0.85f, 1), "%s  (%u)", x->title,
+                                       x->points);
+                    ImGui::Indent();
+                    ImGui::TextWrapped("%s", x->description);
+                    if (x->measured_progress[0]) ImGui::TextDisabled("%s", x->measured_progress);
+                    ImGui::Unindent();
+                }
+            }
+            rc_client_destroy_achievement_list(list);
+        }
+    }
+    ImGui::End();
+}
+
+// the pop-ups, stacked at the lower right
+void ra_toasts_draw() {
+    auto toasts = ra_toasts();
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    float y = vp->WorkPos.y + vp->WorkSize.y - ImGui::GetFontSize();
+    for (size_t i = toasts.size(); i-- > 0;) {
+        char id[32];
+        std::snprintf(id, sizeof id, "##ra_toast%zu", i);
+        ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x - ImGui::GetFontSize(), y), ImGuiCond_Always, ImVec2(1, 1));
+        ImGui::SetNextWindowBgAlpha(0.85f);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(ImGui::GetFontSize() * 26, FLT_MAX));
+        ImGuiWindowFlags f = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs |
+                             ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoSavedSettings;
+        if (ImGui::Begin(id, nullptr, f)) {
+            ImGui::TextColored(ImVec4(1, 0.85f, 0.35f, 1), "%s", toasts[i].title.c_str());
+            if (!toasts[i].text.empty()) {
+                ImGui::PushTextWrapPos(ImGui::GetFontSize() * 25);
+                ImGui::TextUnformatted(toasts[i].text.c_str());
+                ImGui::PopTextWrapPos();
+            }
+            y -= ImGui::GetWindowHeight() + ImGui::GetStyle().ItemSpacing.y;
+        }
+        ImGui::End();
+    }
+}
+
 void setup() {
     SDL_Window* win = display_window();
     IMGUI_CHECKVERSION();
@@ -313,6 +404,7 @@ void draw(int, int) {
         if (ImGui::BeginMenu("Game")) {
             if (ImGui::MenuItem("Customs...")) customs_ui_open();
             if (custom_playing() && ImGui::MenuItem("Back to campaign")) customs_back_to_campaign();
+            if (ImGui::MenuItem("RetroAchievements...")) g_ra = true;
             ImGui::Separator();
             if (ImGui::MenuItem("Screenshot", "F12")) push_key(SDL_SCANCODE_F12);
             if (ImGui::MenuItem("Quit", "Esc")) { SDL_Event e{}; e.type = SDL_EVENT_QUIT; SDL_PushEvent(&e); }
@@ -336,6 +428,8 @@ void draw(int, int) {
     if (g_calibration) calibration_window();
     help_windows();
     customs_ui_draw();
+    ra_window();
+    ra_toasts_draw();
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

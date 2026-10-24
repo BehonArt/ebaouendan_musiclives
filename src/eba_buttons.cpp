@@ -347,6 +347,7 @@ void hook(NdsInput& in, uint64_t vbl) {
     m.view.pen = in.pen;
     if (!eba::buttons().on || !m.view.live) m.view = eba::SongView();
     eba::rumble_frame(m.view, vbl);
+    eba::ra_frame(vbl);                             // the achievements, on the frame's RAM as it is
 }
 
 struct Register {

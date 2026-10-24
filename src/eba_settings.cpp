@@ -71,6 +71,7 @@ void settings_load() {
     assists().hide_life = num("hide_life", 1) != 0;
     skin().name = v.count("skin") ? v["skin"] : "";
     skin().hd_rings = std::clamp((int)num("hd_rings", 0), 0, 3);
+    achievements().on = num("achievements", 1) != 0;
     nds_note("eba: settings from %s", p.c_str());
 }
 
@@ -94,6 +95,7 @@ void settings_save() {
     std::fprintf(f, "approach_pct=%d\nhit_extra=%d\n", assists().approach_pct, assists().hit_extra);
     std::fprintf(f, "rumble=%d\nrumble_strength=%d\n", rumble().on ? 1 : 0, rumble().strength);
     std::fprintf(f, "no_fail=%d\nhide_life=%d\n", assists().no_fail ? 1 : 0, assists().hide_life ? 1 : 0);
+    std::fprintf(f, "achievements=%d\n", achievements().on ? 1 : 0);
     std::fprintf(f, "skin=%s\nhd_rings=%d\n", skin().name.c_str(), skin().hd_rings);
     std::fclose(f);
 }
@@ -107,6 +109,7 @@ void init() {
     skins_options();
     rumble_options();
     customs_init();
+    ra_init();
 }
 
 }  // namespace eba

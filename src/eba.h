@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+struct rc_client_t;
+
 namespace eba {
 
 // The first frame (after ndsrun's options are read): the saved settings, then --port's over them.
@@ -169,6 +171,24 @@ uint32_t scene();                       // the scene's vtable (eba_customs.cpp's
 bool scene_is_main_menu();
 bool scene_is_song();
 bool scene_has_skip();                  // a stage's opening or ending comic: SKIP at the lower right
+
+// ---- RetroAchievements (eba_achievements.cpp) ---------------------------------------------
+// The game's own set, casual only, paused in Customs, button mode, with an assist, autoplay,
+// a replay or a test's options: the game as it was made.
+// The sign-in is shared by the three games (%APPDATA%/eba-recomp/RetroAchievements/login.ini).
+struct Achievements { bool on = true; std::string user, token; };   // token: RA's, from a sign-in
+Achievements& achievements();
+void ra_init();                                     // after the settings: signs in with the saved token
+void ra_frame(uint64_t vblank);                     // each frame: the network's answers, the achievements
+void ra_login(const std::string& user, std::string& password);   // the password is wiped
+void ra_logout();
+void ra_set_on(bool on);
+bool ra_signed_in();
+std::string ra_status();                            // signed in, the game's set and its progress
+const char* ra_paused_by();                         // why they are paused now (nullptr: they count)
+struct RaToast { std::string title, text; };
+std::vector<RaToast> ra_toasts();                   // the pop-ups to show now
+rc_client_t* ra_client();                           // for the list (rc_client.h)
 
 // ---- the options bar (eba_ui.cpp) --------------------------------------------------------
 bool ui_wants_mouse();                  // the mouse is over the bar or a menu: not the stylus

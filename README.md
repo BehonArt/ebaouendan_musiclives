@@ -182,6 +182,35 @@ taps SKIP at the lower right (EBA and Ouendan 2).
 The d-pad hits like the face buttons (in songs and comics), so a stream can
 alternate between the two sets; keyboard hit keys have bits of their own.
 
+## RetroAchievements (all three games, `src/eba_achievements.cpp`)
+
+**Game > RetroAchievements...**: sign in with a retroachievements.org account
+(only RA's token is kept, in `%APPDATA%\eba-recomp\RetroAchievements\login.ini`,
+shared by the three games; never the password), then each game's own set
+loads, with its list and progress, and unlocks pop up at the lower right.
+
+- **rcheevos** v12.5.0 (`third_party/rcheevos`, a submodule, MIT), its
+  rc_client, built as a static library by `cmake/eba.cmake`. The network is
+  WinHTTP (Windows' own, on a thread of its own): no DLL to ship.
+- **Memory:** RA's DS addresses are the recomp's own buffers: 0 to 0x3FFFFF
+  main RAM (0x02000000), 0x1000000 to 0x1003FFF the ARM9's DTCM. Checked once
+  a game frame, on the RAM the game left.
+- **The game:** RA's hash of the ROM (header, ARM9, ARM7, icon). All three
+  stock ROMs are in RA's Nintendo DS hash list: EBA `bbf10cada0dcc72068179c600fe79267`
+  (game 9232), Ouendan 2 `899b9c8dd0128097aebb009b49b2a2d5` (17353), Ouendan 1
+  `999654092d72821ef56a7c8de260cc64` (1226).
+- **Casual only.** RA counts hardcore from emulators it has approved (six
+  months public, its compliance list); this one is not.
+- **The game as made.** Achievements are paused (not checked; when the
+  pause ends they start over from their own start conditions, `rc_client_reset`)
+  in Customs, in button mode, with the approach or hit circle assist or
+  No-Fail, the game's autoplay, a replay played back, or a test's `--port`
+  options. A pop-up says so. The timing offset, the sound's latency, the
+  picture's options, skins, effects and rumble change nothing the game judges.
+- User agent: `eba-recomp/0.1.0 (Windows NT 10.0) eba/0.1.0` plus rcheevos's.
+- `--port ra-log` logs rc_client; `--port ra-spectator` checks achievements and
+  sends nothing (tests; a headless run then signs in with the saved token).
+
 ## The game's own play (`src/eba_play.cpp`, from the decomp)
 
 The matching decompilation (`eba-decomp`, `docs/DECOMP_FINDINGS.md`) showed
