@@ -2,7 +2,7 @@
 
 Source: the matching decomp at `F:\dxvk_remix\Claude\eba-decomp` (sections 1–10 at
 commit `64179bc`, 188 functions byte-matched; sections 11–17 added at `04b4a78`, 276
-functions). Sections 1–10 are read from code that compiles to the exact original
+functions; section 18 at `3f2fa9b`, 618 functions). Sections 1–10 are read from code that compiles to the exact original
 bytes, unless marked *unverified*. Sections 11–17 are mostly traced from the
 disassembly (and, for the scene table, by running the game's own factory under
 unicorn); each says which. Addresses are EBA USA ARM9.
@@ -234,7 +234,11 @@ Every transition in the game uses all four flags, so scene ids appear as
 | 0x202 | multiplayer (0x020b4dac) | main menu `M_SELECT` |
 | 0x205 | Download Play host (0x020b4bdc) | sends `data/rom/btlnchild.srl` + `data/mbicon.nbfc/nbfp`; `BTN_SEND` / `BTN_BACK`; goes to 0x88 if the wireless worker `*0x020c2e44` is NULL |
 | 0x88 | wireless error/child scene | one of two scenes, picked by boot type |
-| others | 0x08–0x15, 0x81–0x8a, 0x106–0x108, 0x201–0x208 | not identified yet |
+| 0x0B / 0x0E / 0x0F | records / gallery / ghosts | byte-matched; see section 18 |
+| 0x14 / 0x15 | wireless difficulty / host song select | byte-matched (near-misses) |
+| 0x81 / 0x84 | host waiting for players / joiner waiting | byte-matched (near-misses) |
+| 0x204 | picking a ghost to play against | byte-matched (one near-miss) |
+| others | 0x08–0x13, 0x82–0x8a, 0x106–0x108, 0x201–0x208 | many now decompiled in eba-decomp; not summarised here |
 
 **The attract demo** (`SceneTitle_v04` 0x02053d78; the main menu has the same code):
 after 2400 idle frames (40 s) it sets session +0xB4 = 1, +0x234 = 4 (random
@@ -332,3 +336,68 @@ lead to that scene; hiding or redirecting them is a recomp-side choice.
 - It swaps between three circle textures: the smallest whose limit (`circle +0x08`)
   covers the current scale (`func_0206f5b8`).
 - An HD layer can draw one high-res ring at that scale and ignore the texture swaps.
+
+## 18. The song scene (0x100) and the menus around it
+
+*Byte-matched unless marked: SceneSong (`eba-decomp/src/game/tu_020b6530.cpp`, 14 of 19
+functions exact, the rest register/scheduling near-misses), gallery 0x0E, ghost
+picker 0x204, the multiplayer lobby scenes 0x14/0x15/0x81.*
+
+**SceneSong layout** (0x144 bytes, vtable 0x020b65a0, an 11th virtual `v10(reset, a)` =
+(re)start the song, also called by the Training subclass at 0x020b9b50):
+
+| Off | Field |
+|---|---|
+| +0x38 | overlays: the 3 pause-menu buttons, then [3] the skip button |
+| +0x44 | the song player (0x84 bytes): +0 current frame, +0x0C timeline (`order`/`items` arrays, cursor +0x18), +0x28 the movie (`UnkClass_0205a198`, its picture at +0x20) |
+| +0xF0 | score number |
+| +0x128 | pause backdrop sprite; its alpha eases toward +0x13C (31 while `*0x020cd250` is 1, 2 or 10) |
+| +0x12C / +0x134 | replay/demo/review banners and the demo's "touch" hint (blink 50 on / 30 off) |
+| +0x138 | each screen's brightness saved while paused |
+| +0x140 | skip limit = movie length - 120 frames |
+
+**Per frame (`v04`):** the scene's frame counter (+0x10) is set from the player's
+frame each tick, and the delta goes to `*0x020b3b24` (frames advanced this tick).
+Start (`trigger & 8`) pauses unless `*0x020cd250 == 10`; the skip button stops
+working after +0x140. While replaying, the recorded stylus position
+(`func_02055f00`) is written straight into `gInput` +0x0C/+0x0E, so the touch
+test sees the replay's stylus. The song player's per-frame call
+(`func_0205d0e4(player, 1, comboCount)`) returns an event: 2 = failed, 3 = over.
+
+**Where a song goes next** (`func_02082e70`):
+
+| Event | Condition | Next scene |
+|---|---|---|
+| 3 (over) | attract demo (+0xB4) | 0x01 (music fades over 30 frames) |
+| 3 | Training (+0 == 4) | 0x04 |
+| 3 | stage == `func_02054680(0)` (the stage just unlocked?) | 0x0F if session +0x13C else 0x105 (results) |
+| 3 | otherwise | 0x103 (ending comic) |
+| 2 (failed) | `func_02055c94(session, frame)` true | 0x104 (regroup), or 0x01 in the demo; plays sound `*0x020b4330` id 0x28 |
+
+`v06` then fades the screen to white over 120 frames (to black over 15 in the
+demo) and releases the result once brightness reaches ±16.
+
+**Replay review:** with session +0x138 (replaying) and **+0xB0 = a frame**, the song
+restarts 600 frames (10 s) before that frame, stepping back past slider/spinner
+bodies, and restores the gauge from the replay. The pause menu's middle button
+then goes to 0x105 instead of 0x06 (0x0F when session +0x13C is set).
+
+**Resources:** +0x1BC = paused flag, +0x2A0 = !paused (both written by the song's
+`v09`); +0x234 / +0x2A8 take the two screens' full-screen rects on exit.
+
+**Gallery (0x0E):** buttons by difficulty (`data/menu/gallery_lvbtn_n/h/x.gui`),
+movies per difficulty (`gallery_movbtn_<e,n,h,x>.gui`; button i shown only if
+`i <= func_02054ab0(save, difficulty)`, button 8 needs a stage-clear check). Special
+buttons: "4" = ending (`misc/endroll1` + `data/bgm/ending`, removed unless
+`func_0209eae4()`), "5" = rankings (`rnk/LV_10`, needs `func_02054d3c(save) >= 11`).
+Other movies use `func_0209de04(movie, difficulty, name)`.
+
+**Multiplayer lobby (for whoever wires wireless):** the host broadcasts a
+0x1C-byte message from scene +0x70 every frame: every 10th frame a player slot
+(type 2: slot, joined, name from the peer's beacon), otherwise the setup (type 4:
+roles by AID, ranks, AIDs, stage, difficulty, AID count - 1). Joining players get
+the first free AID in their team's range (`data_020b258c` / `data_020b2594`). The
+host's beacon game info (`*(connection +0x14)`) carries mode at +0x53,
+difficulty +0x54, stage +0x55, status +0x56. In co-op the host gives up after
+1800 frames if everyone left.
+
