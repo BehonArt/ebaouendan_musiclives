@@ -1,0 +1,90 @@
+diff --git a/runtime/display.cpp b/runtime/display.cpp
+index f4b4e68..a2b8a9c 100644
+--- a/runtime/display.cpp
++++ b/runtime/display.cpp
+@@ -433,6 +433,8 @@ void set_pace(float hz) {
+             sync = hz > fps;
+         }
+     }
++    if (cur.vsync == 1) sync = true;                    // asked for: always, or never
++    else if (cur.vsync == 2) sync = false;
+     vsync = sync && SDL_GL_SetSwapInterval(1);
+     if (!vsync) {
+         SDL_GL_SetSwapInterval(0);
+@@ -454,7 +456,8 @@ void set_pace(float hz) {
+     else
+         std::snprintf(how, sizeof how, "the game at 60 frames a second, %d pictures a second by the clock, %s", fps,
+                       vsync ? "with the vertical sync" : "without the vertical sync");
+-    nds_note("display: %s, %.2f Hz, %s%s", (const char*)glGetString(GL_RENDERER), hz, how,
++    nds_note("display: %s, %.2f Hz, %s%s%s", (const char*)glGetString(GL_RENDERER), hz, how,
++             cur.vsync == 1 ? ", the vertical sync always" : cur.vsync == 2 ? ", the vertical sync never" : "",
+              cur.low_latency ? ", low latency" : "");
+     next_ns = locked_last_ns = SDL_GetTicksNS();
+     locked_avg_ns = frame_ns;
+@@ -474,7 +477,7 @@ void apply_changes() {
+         if (cur.layout != old.layout) nds_note("display: %s", display_layout_name(cur.layout));
+     }
+     if (cur.filter != old.filter) nds_note("display: the %s filter", display_filter_name(cur.filter));
+-    if (cur.fps != old.fps || cur.low_latency != old.low_latency) {
++    if (cur.fps != old.fps || cur.low_latency != old.low_latency || cur.vsync != old.vsync) {
+         float hz = 0;
+         if (const SDL_DisplayMode* dm = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(win))) hz = dm->refresh_rate;
+         refresh_hz = hz;
+@@ -632,6 +635,7 @@ bool display_open(bool vis) {
+             start.layout = (NdsLayout)std::clamp(g_cfg.layout, 0, 3);
+             start.low_latency = g_cfg.low_latency;
+             start.filter = std::clamp(g_cfg.filter, 0, 3);
++            start.vsync = std::clamp(g_cfg.vsync, 0, 2);
+         }
+         changed = false;
+         cur = want = start;
+diff --git a/runtime/display.h b/runtime/display.h
+index ee0eafa..1ee7266 100644
+--- a/runtime/display.h
++++ b/runtime/display.h
+@@ -27,6 +27,8 @@ struct DisplaySettings {
+     bool low_latency = false;           // wait for each picture to be drawn before the next (no frames queued)
+     int filter = 0;                     // the picture's filter on the DS's pixels: 0 sharp, 1 bilinear,
+                                         // 2 bicubic (Catmull-Rom), 3 soft (B-spline)
++    int vsync = 0;                      // the vertical sync: 0 auto (on when the display's rate suits
++                                        // the pace), 1 always (no tearing), 2 never (the least latency)
+ };
+ const char* display_filter_name(int f);
+ const DisplaySettings& display_settings();
+diff --git a/runtime/main.cpp b/runtime/main.cpp
+index 4b97d3b..4f0ee26 100644
+--- a/runtime/main.cpp
++++ b/runtime/main.cpp
+@@ -1,7 +1,7 @@
+ // ndskit runtime — ndsrun: a cartridge's recompiled programs on the runtime.
+ //
+ //     ndsrun GAME.nds [--window] [--scale N] [--fullscreen] [--fps ds|60|120|240|uncapped]
+-//                     [--layout stacked|side|top|bottom] [--filter sharp|bilinear|bicubic|soft] [--low-latency] [--audio-latency FRAMES]
++//                     [--layout stacked|side|top|bottom] [--filter sharp|bilinear|bicubic|soft] [--vsync auto|on|off] [--low-latency] [--audio-latency FRAMES]
+ //                     [--mute] [--wav FILE] [--out DIR] [--vblanks N] [--port KEY[=VALUE] ...]
+ //                     [--replace-file NAME=PATH ...]
+ //                     [--save FILE] [--save-size BYTES] [--shots V,V,...] [--shot-every N] [--input SCRIPT] [--trace]
+@@ -63,6 +63,11 @@ int main(int argc, char** argv) {
+             if (cfg.layout < 0) { std::fprintf(stderr, "--layout is stacked, side, top or bottom\n"); return 2; }
+         }
+         else if (a == "--low-latency") cfg.low_latency = true;
++        else if (a == "--vsync") {
++            std::string v = next();
++            cfg.vsync = v == "auto" ? 0 : v == "on" ? 1 : v == "off" ? 2 : -1;
++            if (cfg.vsync < 0) { std::fprintf(stderr, "--vsync is auto, on or off\n"); return 2; }
++        }
+         else if (a == "--filter") {
+             std::string v = next();
+             const char* names[] = {"sharp", "bilinear", "bicubic", "soft"};
+diff --git a/runtime/nds.h b/runtime/nds.h
+index 8d4f7c3..59d5bfa 100644
+--- a/runtime/nds.h
++++ b/runtime/nds.h
+@@ -36,6 +36,7 @@ struct NdsConfig {
+                                         // 3 the lower alone (display.h's NdsLayout)
+     bool low_latency = false;           // no picture queued ahead of the display (display.cpp)
+     int filter = 0;                     // --filter: the picture's filter (display.h)
++    int vsync = 0;                      // --vsync auto|on|off: 0, 1, 2 (display.h)
+     double audio_latency = 3;           // the sound queued ahead of the device, in frames (audio.cpp)
+     std::vector<uint64_t> shots;        // headless: both screens as PNGs at these VBlanks
+     uint64_t shot_every = 0;            // ... and every N VBlanks

@@ -184,10 +184,10 @@ index a3ccccf..e4e1773 100644
  target_link_libraries(ndskit_machine PUBLIC SDL3::SDL3)
 diff --git a/runtime/texpack.cpp b/runtime/texpack.cpp
 new file mode 100644
-index 0000000..e726db6
+index 0000000..1f5f697
 --- /dev/null
 +++ b/runtime/texpack.cpp
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,278 @@
 +// Texture packs: the 3D's textures replaced by pictures of any resolution, and
 +// dumped to make them.
 +//
@@ -199,7 +199,8 @@ index 0000000..e726db6
 +// palette: one picture for every palette it is drawn with, a white ring the
 +// game tints, say), or t<hash>.png, a shape's picture multiplied by the colour
 +// the texture shows most (its palette's: a glow that cycles colours keeps
-+// cycling); a polygon using a texture the pack has samples that picture instead
++// cycling); any of them may start with a label and two underscores
++// (approach_ring__s<hash>.png); a polygon using a texture the pack has samples that picture instead
 +// (filtered, mipmapped), its colour and alpha combined as the DS's texel's. The
 +// first pack listed that has a hash wins. --port tex-dump=DIR writes each
 +// texture a run draws, decoded, as DIR/<hash>.png (the way to find one), with
@@ -323,6 +324,7 @@ index 0000000..e726db6
 +        std::error_code ec;
 +        for (const auto& e : fs::directory_iterator(*it, ec)) {
 +            std::string n = e.path().filename().string();
++            if (size_t l = n.rfind("__"); l != std::string::npos) n = n.substr(l + 2);   // label__<hash>.png
 +            bool shape = n.size() == 21 && (n[0] == 's' || n[0] == 't');
 +            if ((n.size() != 20 && !shape) || n.substr(n.size() - 4) != ".png") continue;
 +            char* end = nullptr;

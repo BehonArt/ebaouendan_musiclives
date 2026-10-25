@@ -75,6 +75,16 @@ void display_menu() {
             ImGui::SetTooltip("Runs the game at 60 (0.29%% fast): smooth on a display at this rate.");
     }
     ImGui::Separator();
+    heading("Vsync");
+    struct { const char* name; const char* tip; } v[] = {
+        {"Auto", "On when the display's refresh rate suits the frame rate (the default)."},
+        {"On", "Always: no tearing; the frame rate is held to the display's."},
+        {"Off", "Never: the least latency; the picture may tear."}};
+    for (int i = 0; i < 3; ++i) {
+        if (ImGui::MenuItem(v[i].name, nullptr, s.vsync == i)) { s.vsync = i; change(s); }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", v[i].tip);
+    }
+    ImGui::Separator();
     if (ImGui::MenuItem("Fullscreen", "F11 / Alt+Enter", s.fullscreen)) { s.fullscreen = !s.fullscreen; change(s); }
     if (ImGui::MenuItem("Low latency", nullptr, s.low_latency)) { s.low_latency = !s.low_latency; change(s); }
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Wait for each picture to be drawn: no frames queued in the driver.");

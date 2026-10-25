@@ -48,6 +48,7 @@ void settings_load() {
     if (!g_cfg.fullscreen) s.fullscreen = num("fullscreen", s.fullscreen) != 0;
     if (!g_cfg.low_latency) s.low_latency = num("low_latency", s.low_latency) != 0;
     if (!g_cfg.filter) s.filter = std::clamp((int)num("filter", s.filter), 0, 3);
+    if (!g_cfg.vsync) s.vsync = std::clamp((int)num("vsync", s.vsync), 0, 2);
     if (!g_cfg.layout && v.count("layout"))
         for (int l = 0; l < 4; ++l)
             if (v["layout"] == kLayouts[l]) s.layout = (NdsLayout)l;
@@ -90,7 +91,7 @@ void settings_save() {
     for (int i = 0; i < 4; ++i)
         std::fprintf(f, "button_key%d=%s\n", i + 1, b.keys[i] ? SDL_GetScancodeName((SDL_Scancode)b.keys[i]) : "");
     std::fprintf(f, "offset=%d\n", offset());
-    std::fprintf(f, "filter=%d\n", s.filter);
+    std::fprintf(f, "filter=%d\nvsync=%d\n", s.filter, s.vsync);
     std::fprintf(f, "fx=%d\nfx_intensity=%d\nfx_flashes=%d\n", effects().on ? 1 : 0, effects().intensity,
                  effects().flashes ? 1 : 0);
     std::fprintf(f, "approach_pct=%d\nhit_extra=%d\n", assists().approach_pct, assists().hit_extra);

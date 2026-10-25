@@ -83,6 +83,11 @@ Game make_oe2() {
     g.card_from = 4364; g.card_to = 4364; g.hand_over = 4760;  // the card sets its stage by 4362
     g.again = {160, 88, 440, 450, 238, 183};    // the stage last played: its character, in the middle
     g.autoplay = 0x27C; g.replaying = 0x15C; g.replay = 0xA0;   // from its judge (EBA's +0x234, +0x138)
+    // matched to EBA's code: the approach in 0x020BB294 (EBA's 0x020681B8), the hit test's
+    // radius in the judge; the gauge's switch in 0x020BAAD0 (EBA's 0x02067AD8), its table 0x02091FBC
+    g.approach = 0x02092644; g.hit_radius = 0x0209003C;
+    g.gauge_on = 0x02092200;
+    g.life_bar = {0x73f4aaee0adfe356ull, 0x60b16bb1e7e60f12ull, 0x13b4c2330acd0315ull, 0xf59404e8a94ac33eull};
     g.difficulties = {"Kigaru (easy)", "Kakan (normal)", "Gekiretsu (hard)", "Karei (insane)"};
     g.stages = {"OS01", "OS02", "OS04", "OS06", "OS08", "OS10", "OSB02", "OS11", "OS03", "OS07", "OS14", "OS12",
                 "OS13", "OS05", "OS15A", "OS15B", "OSB03", "OSB01", "OS09"};   // the table at 0x02092020
@@ -115,6 +120,9 @@ Game make_oe1() {
     g.again = {160, 76, 390, 400, 236, 183};    // the map comes back as first seen: the same man
     g.autoplay = 0x1F8;                 // (no replays in the first game)
     g.approach = 0x020891B0; g.hit_radius = 0x02086184;
+    // the gauge's switch in 0x0202F340 (EBA's 0x02067AD8) and the miss's 0x0202F184, its table 0x0208952C
+    g.gauge_on = 0x02088A7C;
+    g.life_bar = {0x9a8db07c59582e78ull, 0x8bce0dcc20ec79c8ull, 0x13b4c2330acd0315ull, 0xf59404e8a94ac33eull};
     g.difficulties = {"Kigaru (easy)", "Kakan (normal)", "Gekiretsu (hard)", "Karei (insane)"};
     g.stages = {"s01", "s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "s13",
                 "s14", "s15"};                // its name is "%c%02d" of the index + 1

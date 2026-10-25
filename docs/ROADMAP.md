@@ -20,7 +20,8 @@ GitHub or GitLab repository's release assets, a zip or an MSI).
 The games themselves, plus the enhancements that matter most:
 
 - **Display:** resolution (to 4K), layout, frame rate (DS, 60, 120, 240,
-  uncapped), the smoothing filters, fullscreen, low latency.
+  uncapped), the smoothing filters, Vsync (auto, on, off), fullscreen, low
+  latency.
 - **Look:** HD approach circles (normal, thin, thinner).
 - **Effects:** the fire behind the squad (all three games).
 - **Controllers:** button mode, hit keys, rumble (high, medium, low) and its
@@ -29,7 +30,7 @@ The games themselves, plus the enhancements that matter most:
 - **Timing:** the offset and its calibration (a PC's sound and picture lag).
 - **Assists:** a slower or faster approach, a more lenient hit circle, and
   No-Fail (the life gauge held, its bar hidden). Today: the approach and hit
-  circle in EBA and Ouendan 1, No-Fail in EBA only.
+  circle and No-Fail in all three games.
 
 Not in v1 (kept in the code, left out of the release build):
 
@@ -42,9 +43,8 @@ Not in v1 (kept in the code, left out of the release build):
 
 1. A release build that leaves the later features out (a CMake option, not
    deleted code).
-2. The assists for all three games: Ouendan 2's approach and hit-circle
-   values, and the life gauge's switch in both Ouendan games for No-Fail
-   (EBA's is 0x020B40C8), each with its life-bar textures to hide.
+2. ~~The assists for all three games~~: done 2026-10-25 (Ouendan 2's approach,
+   hit radius and gauge switch; Ouendan 1's gauge switch; both life bars).
 3. First run: point each game at its ROM, checked by hash; a clear message
    for a wrong or modified dump.
 4. Saves and settings in `%APPDATA%`, not beside the executable (an install

@@ -35,7 +35,9 @@ EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
 - **Game:** screenshot (F12), quit (Esc).
 - **Display:** resolution (Auto, or 1x to 6x), layout (vertical, side by
   side, top screen only, bottom screen only; F9 cycles), frame rate (DS,
-  60, 120, 240, uncapped), fullscreen (F11, Alt+Enter), low latency.
+  60, 120, 240, uncapped), Vsync (Auto: on when the display's refresh rate
+  suits the frame rate; On: always, no tearing; Off: never, the least
+  latency; `--vsync auto|on|off`), fullscreen (F11, Alt+Enter), low latency.
 - **Look:** the filter; EBA's skin and HD approach circles (off, normal,
   thin, thinner).
 
@@ -243,21 +245,34 @@ what the judge (`Note::Judge`) reads of the session besides the touch:
   `+0x15C`). Checked: a run pressing 4 frames late, recorded and played back
   with no input, gives the same 241 judgements. The game's replay mode
   does not drain the life gauge: a recorded fail plays back to a clear.
-- **Assists (EBA, the Assist menu):** the frames a note shows (`0x020B4704`)
-  and the hit test's extra radius (`0x020B22E0`) are .data the game sets for
-  each stage (75 frames for The Anthem, 99 for Makes No Difference): the
-  approach is scaled from the game's value (+30%, +65%, -20%), the radius
-  widened by 5 or 11 px. Off, they are left alone. `--port approach=PCT`,
-  `--port hit-extra=PX`.
-- **No-Fail (EBA, the Assist menu):** in a song, the life gauge's switch
-  (s32 `0x020B40C8`, which the song's setup sets to 1 and Training turns
-  off) is held at 0, so no judgement fills or drains it; off mid-song, it is
-  set back to 1. **Hide the life bar** (on by default) leaves out its four
-  textures (texture-pack hashes `0ec7e029992bd7fb`, `a0a30d9776046f10`,
-  `13b4c2330acd0315`, `f59404e8a94ac33e`) meanwhile. Customs keep their
-  score with it. Checked headless, The Anthem with no input: Regroup? by frame
-  8,000 without it; still playing at 13,000 with it (no other drain kills).
-  `--port no-fail`, `--port hide-life=off`.
+- **Assists (all three, the Assist menu):** the frames a note shows and the
+  hit test's extra radius are .data the game sets for each stage (EBA 75
+  frames for The Anthem, 99 for Makes No Difference; Ouendan 2's first stage
+  72, Ouendan 1's 90; the radius +3 in all three): the approach is scaled
+  from the game's value (+30%, +65%, -20%), the radius widened by 5 or 11 px.
+  Off, they are left alone. `--port approach=PCT`, `--port hit-extra=PX`.
+- **No-Fail (all three, the Assist menu):** in a song, the life gauge's
+  switch (an s32 the song's setup sets to 1; EBA's Training turns it off) is
+  held at 0, so no judgement fills or drains it; off mid-song, it is set
+  back to 1. **Hide the life bar** (on by default) leaves out its four
+  textures meanwhile: the 気/Yes markers, the bar, and the red and yellow
+  fills (the fills are the same textures in all three games).
+  Customs keep their score with it. Checked headless with no input: The
+  Anthem fails (Regroup?) by frame 8,000 without it, plays on at 13,000
+  with it; Ouendan 2 fails (応援失敗) by 8,000, plays to the stage's end with
+  it; Ouendan 1 fails by 7,000, plays on at 11,500. `--port no-fail`,
+  `--port hide-life=off`.
+
+  | | approach | hit radius | gauge switch | its function (EBA's) |
+  |---|---|---|---|---|
+  | EBA | `0x020B4704` | `0x020B22E0` | `0x020B40C8` | `0x02067AD8` |
+  | Ouendan 2 | `0x02092644` | `0x0209003C` | `0x02092200` | `0x020BAAD0` |
+  | Ouendan 1 | `0x020891B0` | `0x02086184` | `0x02088A7C` | `0x0202F340` |
+
+  Ouendan 2's were found by matching its code to EBA's: the function before
+  each judge sets a note's appear frame from the approach (EBA `0x020681B8`,
+  Ouendan 2 `0x020BB294`); the judges load the radius at the same place; the
+  gauge function loads the gauge table by judgement, then tests the switch.
 
 ## Skins and texture packs (EBA, `src/eba_skins.cpp`, ndskit `texpack.cpp`)
 
@@ -269,6 +284,10 @@ palette entries it uses); a pack is a folder of pictures:
 - `s<shape>.png`: its texels under any palette (the shape hash, without it);
 - `t<shape>.png`: likewise, multiplied by the colour the texture shows most
   (a glow whose palette cycles keeps cycling).
+
+Any of them may start with a label and two underscores
+(`notes_approach_ring_small__sbb1d0471b237cda1.png`), so a redraw keeps
+readable names.
 
 Any size: the picture is sampled (mipmapped, smooth) over the texture's
 coordinates and wrap. `--port tex-dump=DIR` writes every texture drawn, as
@@ -426,7 +445,10 @@ they reproduce the submodule's working tree exactly:
   screenshots).
 - `ndskit-texpacks.patch`: texture packs and dumps (`runtime/texpack.cpp`,
   the fragment shader's `u_hdtex`), hidden textures
-  (`display_set_texture_hidden`), `display_set_texture_packs`.
+  (`display_set_texture_hidden`), `display_set_texture_packs`; a file may
+  carry a label (`label__<hash>.png`).
+- `ndskit-vsync.patch`: the vertical sync as a setting (`DisplaySettings::vsync`,
+  `--vsync auto|on|off`): auto as before, or always, or never.
 
 The discovery fixes, both to report upstream (drafts in `upstream/`):
 1. `Program.run()` gave up after 4 refuse passes and wiped everything, so
@@ -445,7 +467,7 @@ The discovery fixes, both to report upstream (drafts in `upstream/`):
 Re-apply after updating the submodule:
 
     cd ndskit
-    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch ../patches/ndskit-texpacks.patch
+    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch ../patches/ndskit-texpacks.patch ../patches/ndskit-vsync.patch
 
 ## Toolchain
 
