@@ -194,21 +194,13 @@ void timing_menu() {
 void effects_menu() {
     Effects& e = effects();
     bool eba = game().id == std::string("EBA");
-    if (ImGui::MenuItem(eba ? "Light behind the Agents" : "Fire behind the squad", nullptr, e.on)) {
+    if (ImGui::MenuItem(eba ? "Fire behind the Agents" : "Fire behind the squad", nullptr, e.on)) {
         e.on = !e.on;
         settings_save();
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("From a 30x combo (the first combo burst), stronger as the combo grows.");
-    if (eba) {
-        ImGui::BeginDisabled(!e.on);
-        if (ImGui::MenuItem("   Fire (the Ouendan games')", nullptr, !e.spotlights)) { e.spotlights = false; settings_save(); }
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fire rises behind the Agents, taller as the combo grows, flaring with each hit.");
-        if (ImGui::MenuItem("   Spotlights", nullptr, e.spotlights)) { e.spotlights = true; settings_save(); }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Spotlights rise behind the Agents, swinging with each hit: 2 from 30x, 3 from 60x, 4 from 100x.");
-        ImGui::EndDisabled();
-    }
+        ImGui::SetTooltip("From a 30x combo (the first combo burst): the Ouendan games' fire, taller as the\n"
+                          "combo grows, flaring with each hit.");
     if (ImGui::MenuItem(eba ? "Elite Beat flashes" : "Bursts on perfect groups", nullptr, e.flashes)) {
         e.flashes = !e.flashes;
         settings_save();

@@ -304,14 +304,11 @@ until the next 30x. The combo is the game's own counter (session `+0xE0` EBA,
 score; slider ticks counted, as shown). EBA's combo bursts (the Agent
 portrait) come at 30, 60, 100 and 150, not 90.
 
-- **Fire** (all three; EBA's default style): fire rising behind the squad or
-  the Agents, taller as the combo grows (full by 150x), a burst on an
-  all-300 group: over the Ouendan games' own fire.
-- **EBA's other style, spotlights** (Effects > Spotlights, `--port
-  fx-style=spotlights`): rising from below the stage behind the Agents: 2
-  from 30x, 3 from 60x, 4 from 100x; each judged hit swings them a step (so
-  they move on the song's beats); a gold flash when a group ends all 300
-  (Elite Beat flashes, a toggle).
+- **Fire** (all three): fire rising behind the squad or the Agents, taller
+  as the combo grows (full by 150x), flaring with each hit, a burst on an
+  all-300 group (a toggle): the Ouendan games' own fire, heightened. EBA had
+  spotlights for a while; they were removed (2026-10-25): new graphics made
+  from scratch do not suit the games.
 - **Where:** in the 3D frame, a pass after the polygons at a depth just in
   front of the farthest opaque one (the stage's background), so the Agents,
   the notes (both 3D) and the HUD are not lit; and under the 3D where a 2D

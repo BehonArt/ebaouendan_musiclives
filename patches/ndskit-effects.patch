@@ -1,5 +1,5 @@
 diff --git a/runtime/display.cpp b/runtime/display.cpp
-index 5358979..39c3034 100644
+index 5358979..f4b4e68 100644
 --- a/runtime/display.cpp
 +++ b/runtime/display.cpp
 @@ -76,7 +76,8 @@ bool turbo;                                             // display_set_turbo
@@ -34,16 +34,16 @@ index 5358979..39c3034 100644
      if (mode == 1u) {
          if (a3 != 0u) {
              if ((w.x & (1u << 26)) != 0u) {
-@@ -172,6 +181,53 @@ void main() {
+@@ -172,6 +181,35 @@ void main() {
  }
  )";
  
 +// A port's light (DisplayFx), in GLSL for the compose pass and the 3D's own pass:
 +// fx_light(q) at a pixel of the 3D's screen (x 0-256, y 0-192 down), RGB 0-1.
 +const char* kFxLightGLSL = R"(
-+uniform int u_fx_kind;                            // 0 none, 1 spotlights, 2 fire
++uniform int u_fx_kind;                            // 0 none, 2 fire
 +uniform vec4 u_fx;                                // time (s), level, pulse, flash
-+uniform vec4 u_fx2;                               // heat, phase, beams
++uniform vec4 u_fx2;                               // heat, phase
 +float fx_hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 +float fx_noise(vec2 p) {
 +    vec2 i = floor(p), f = fract(p);
@@ -53,26 +53,8 @@ index 5358979..39c3034 100644
 +float fx_fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 4; ++i) { v += a * fx_noise(p); p *= 2.03; a *= 0.5; } return v; }
 +vec3 fx_light(vec2 q) {
 +    float t = u_fx.x, level = u_fx.y, pulse = u_fx.z, flash = u_fx.w, heat = u_fx2.x, phase = u_fx2.y;
-+    int beams = int(u_fx2.z + 0.5);
 +    vec3 l = vec3(0.0);
-+    if (u_fx_kind == 1) {
-+        // spotlights from below the stage, spread across it, swung by the beat (phase)
-+        const vec3 col[4] = vec3[4](vec3(1.0, 0.92, 0.75), vec3(1.0, 0.75, 0.35), vec3(0.7, 0.85, 1.0), vec3(1.0, 0.6, 0.8));
-+        for (int i = 0; i < 4; ++i) {
-+            if (i >= beams) break;
-+            float u = beams == 1 ? 0.5 : float(i) / float(beams - 1);   // 0 .. 1 across
-+            vec2 o = vec2(36.0 + 184.0 * u, 205.0);      // their feet just below the screen
-+            // leaning in towards the middle, each swung about its own lean by the beat
-+            float a = (0.5 - u) * 0.55 + 0.28 * sin(phase * 1.5708 + float(i) * 2.1) + 0.05 * sin(t * 0.7 + float(i));
-+            vec2 d = q - o;
-+            float ang = atan(d.x, -d.y) - a;      // from straight up
-+            float w = 0.11 + 0.04 * pulse + 0.06 * flash;
-+            float beam = smoothstep(w, w * 0.3, abs(ang)) * smoothstep(240.0, 20.0, length(d));
-+            l += col[i] * beam * (0.8 + 0.4 * smoothstep(60.0, 0.0, length(d)));   // brightest at the foot
-+        }
-+        l *= level * (0.7 + 0.5 * pulse);
-+        l += vec3(1.0, 0.8, 0.3) * flash * level * 0.6 * smoothstep(210.0, 0.0, distance(q, vec2(128.0, 140.0)));
-+    } else if (u_fx_kind == 2) {
++    if (u_fx_kind == 2) {
 +        // fire rising from the bottom, taller with the combo (heat), brighter on hits
 +        float h = 40.0 + 130.0 * heat + 25.0 * flash;
 +        float y = (192.0 - q.y) / h;
@@ -88,7 +70,7 @@ index 5358979..39c3034 100644
  // the composed picture to the window, in the layout
  const char* kOutFS = R"(#version 450
  layout(binding = 0) uniform sampler2D u_pic;      // both screens at the scale, upper above lower, rows bottom first
-@@ -473,6 +529,10 @@ const char* display_layout_name(NdsLayout l) {
+@@ -473,6 +511,10 @@ const char* display_layout_name(NdsLayout l) {
  
  void display_set_hooks(const DisplayHooks& h) { hooks = h; }
  
@@ -99,7 +81,7 @@ index 5358979..39c3034 100644
  void display_set_turbo(bool on) {
      if (on == turbo) return;
      turbo = on;
-@@ -560,10 +620,15 @@ bool display_open(bool vis) {
+@@ -560,10 +602,15 @@ bool display_open(bool vis) {
      if (!ctx) { nds_note("display: no OpenGL 4.5 context: %s", SDL_GetError()); return false; }
      if (!gl_load()) return false;
      if (!render_init()) return false;
@@ -116,31 +98,30 @@ index 5358979..39c3034 100644
      out_prog = gl_program(kCompVS, kOutFS);
      if (!out_prog) return false;
      loc_out_view = glGetUniformLocation(out_prog, "u_view");
-@@ -660,6 +725,9 @@ bool display_frame() {
+@@ -660,6 +707,9 @@ bool display_frame() {
      glUseProgram(comp_prog);
      glProgramUniform4f(comp_prog, loc_view, 0, 0, (float)pw, (float)ph);
      glProgramUniform1i(comp_prog, loc_atop, gpu2d_top_is_a() ? 1 : 0);
 +    glProgramUniform1i(comp_prog, loc_fx_kind, fx.kind);
 +    glProgramUniform4f(comp_prog, loc_fx, fx.time, fx.level, fx.pulse, fx.flash);
-+    glProgramUniform4f(comp_prog, loc_fx2, fx.heat, fx.phase, (float)fx.beams, 0);
++    glProgramUniform4f(comp_prog, loc_fx2, fx.heat, fx.phase, 0, 0);
      glBindTextureUnit(0, words_tex);
      glBindTextureUnit(1, pic);
      glBindVertexArray(empty_vao);
 diff --git a/runtime/display.h b/runtime/display.h
-index bc321ba..f1aa497 100644
+index bc321ba..7651905 100644
 --- a/runtime/display.h
 +++ b/runtime/display.h
-@@ -45,6 +45,18 @@ SDL_Window* display_window();           // the window, for a port's UI (nullptr
+@@ -45,6 +45,17 @@ SDL_Window* display_window();           // the window, for a port's UI (nullptr
  // Turbo: the game as fast as it runs, a picture every 20 frames, no sound (a
  // port's own way through menus, behind its loading screen).
  void display_set_turbo(bool on);
 +
 +// A port's light behind engine A's 3D (its pixels where the 3D is the top layer, under the
-+// 3D): kind 0 none, 1 spotlights, 2 fire; times in seconds, the rest 0 to 1.
++// 3D): kind 0 none, 2 fire; times in seconds, the rest 0 to 1.
 +struct DisplayFx {
 +    int kind = 0;
 +    float time = 0, level = 0, pulse = 0, flash = 0, heat = 0, phase = 0;
-+    int beams = 3;                      // spotlights
 +    bool debug = false;                 // drawn in front of everything (to see it)
 +};
 +void display_set_fx(const DisplayFx& fx);
@@ -150,7 +131,7 @@ index bc321ba..f1aa497 100644
  // Where a screen (0 upper, 1 lower) is in the window now, in pixels; false if the layout hides it.
  bool display_screen_rect(int screen, float* x, float* y, float* w, float* h);
 diff --git a/runtime/render_gl.cpp b/runtime/render_gl.cpp
-index 54efcda..cdaab76 100644
+index 54efcda..c5482e7 100644
 --- a/runtime/render_gl.cpp
 +++ b/runtime/render_gl.cpp
 @@ -33,6 +33,7 @@
@@ -237,7 +218,7 @@ index 54efcda..cdaab76 100644
 +        glProgramUniform4f(fx_prog, fx_z, z, (float)T.scale, 0, 0);
 +        glProgramUniform1i(fx_prog, fx_kind, fx.kind);
 +        glProgramUniform4f(fx_prog, fx_u, fx.time, fx.level, fx.pulse, fx.flash);
-+        glProgramUniform4f(fx_prog, fx_u2, fx.heat, fx.phase, (float)fx.beams, 0);
++        glProgramUniform4f(fx_prog, fx_u2, fx.heat, fx.phase, 0, 0);
 +        glEnable(GL_DEPTH_TEST);
 +        glDepthFunc(GL_LESS);
 +        glDepthMask(GL_FALSE);

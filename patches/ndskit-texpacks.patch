@@ -1,5 +1,5 @@
 diff --git a/runtime/display.h b/runtime/display.h
-index f1aa497..ea4cbc1 100644
+index 7651905..ee0eafa 100644
 --- a/runtime/display.h
 +++ b/runtime/display.h
 @@ -1,5 +1,7 @@
@@ -10,7 +10,7 @@ index f1aa497..ea4cbc1 100644
  #include "nds.h"
  #include <string>
  
-@@ -56,7 +58,13 @@ struct DisplayFx {
+@@ -55,7 +57,13 @@ struct DisplayFx {
  };
  void display_set_fx(const DisplayFx& fx);
  const DisplayFx& display_fx();
@@ -48,7 +48,7 @@ index 0a42f63..d0ad173 100644
 +bool texpack_active();
 +constexpr GLuint kTexHidden = 0xFFFFFFFFu;            // texpack_lookup: the texture's polygons are not drawn
 diff --git a/runtime/render_gl.cpp b/runtime/render_gl.cpp
-index cdaab76..3e1c18c 100644
+index c5482e7..aee7bd7 100644
 --- a/runtime/render_gl.cpp
 +++ b/runtime/render_gl.cpp
 @@ -43,6 +43,7 @@
