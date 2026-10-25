@@ -27,6 +27,9 @@ The games themselves, plus the enhancements that matter most:
   strength, spinners by the left stick or the triggers, DualSense trigger
   resistance, SKIP by button in the comics and song intros.
 - **Timing:** the offset and its calibration (a PC's sound and picture lag).
+- **Assists:** a slower or faster approach, a more lenient hit circle, and
+  No-Fail (the life gauge held, its bar hidden). Today: the approach and hit
+  circle in EBA and Ouendan 1, No-Fail in EBA only.
 
 Not in v1 (kept in the code, left out of the release build):
 
@@ -34,34 +37,35 @@ Not in v1 (kept in the code, left out of the release build):
 - RetroAchievements
 - Skins (osu! skins; only the player's own could be used anyway)
 - Replays saved to disk
-- Assists and No-Fail (to be decided)
 
 ## Before v1 ships
 
 1. A release build that leaves the later features out (a CMake option, not
    deleted code).
-2. First run: point each game at its ROM, checked by hash; a clear message
+2. The assists for all three games: Ouendan 2's approach and hit-circle
+   values, and the life gauge's switch in both Ouendan games for No-Fail
+   (EBA's is 0x020B40C8), each with its life-bar textures to hide.
+3. First run: point each game at its ROM, checked by hash; a clear message
    for a wrong or modified dump.
-3. Saves and settings in `%APPDATA%`, not beside the executable (an install
+4. Saves and settings in `%APPDATA%`, not beside the executable (an install
    folder may not be writable); a portable mode keeping them beside it.
-4. One package for the three games (one launcher with a game picker, or three
+5. One package for the three games (one launcher with a game picker, or three
    executables in one folder: to be decided).
-5. A clean Windows machine: no MSYS2, other GPUs (AMD, Intel; OpenGL 4.5),
+6. A clean Windows machine: no MSYS2, other GPUs (AMD, Intel; OpenGL 4.5),
    high DPI. Every DLL the package needs is in it.
-6. Real controllers: DualSense, Switch Pro or Joy-Con, Xbox.
-7. A crash leaves a log the player can attach to an issue.
-8. Version numbers (the executables, About), a CHANGELOG.
-9. Third-party licences: SDL3 (zlib), Dear ImGui (MIT), the MinGW runtime,
+7. Real controllers: DualSense, Switch Pro or Joy-Con, Xbox.
+8. A crash leaves a log the player can attach to an issue.
+9. Version numbers (the executables, About), a CHANGELOG.
+10. Third-party licences: SDL3 (zlib), Dear ImGui (MIT), the MinGW runtime,
    ndskit (check its licence before release).
-10. A player's README: setup, controls, the options bar, known issues.
-11. A public repository with GitHub Releases (zip; an installer later), then
+11. A player's README: setup, controls, the options bar, known issues.
+12. A public repository with GitHub Releases (zip; an installer later), then
     the Quiver submission (the user's account).
 
 ## Later releases
 
 - Customs (and Customs Studio)
 - RetroAchievements (casual; paused for Customs, button mode, assists)
-- Assists and No-Fail, if not in v1
 - An installer and code signing (Windows SmartScreen)
 - Linux and Steam Deck builds
 - The ndskit patches offered upstream (drafts in `upstream/`)
