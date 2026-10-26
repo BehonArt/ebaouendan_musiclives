@@ -223,17 +223,18 @@ uint32_t trigger_bits() {
     return state;
 }
 
-// A DualSense's adaptive triggers on a spinner: resistance from the start of the pull, hard
-// at first and easing as the spinner speeds up, none near full speed; off elsewhere. SDL's
-// DualSense effect report (its DS5EffectsState_t, 47 bytes): both triggers' effects enabled,
-// mode 1 (continuous resistance: start, force) or 5 (off).
+// A DualSense's adaptive triggers on a spinner: a moderate resistance from the start of the
+// pull (120 of 255), easing slowly as the spinner speeds up (over about 4 seconds of keeping
+// up), none at full speed; off elsewhere. SDL's DualSense effect report (its
+// DS5EffectsState_t, 47 bytes): both triggers' effects enabled, mode 1 (continuous
+// resistance: start, force) or 5 (off).
 void trigger_feel(bool spinning, double speed) {
     static int sent = -1;                           // the force last sent (0: off)
-    static double pace;                             // the spinner's speed, smoothed over about a second
-    pace = spinning ? pace + (speed - pace) * 0.06 : 0;
+    static double pace;                             // the spinner's speed, smoothed over about 2 seconds
+    pace = spinning ? pace + (speed - pace) * 0.02 : 0;
     int force = 0;
     if (spinning && eba::buttons().trigger_feel)
-        force = (int)std::lround(200 * std::clamp(1.0 - pace / (0.8 * kSpinMax), 0.0, 1.0)) / 20 * 20;
+        force = (int)std::lround(120 * std::pow(std::clamp(1.0 - pace / kSpinMax, 0.0, 1.0), 0.8)) / 10 * 10;
     if (force == sent) return;
     sent = force;
     if (m.log) nds_note("eba buttons: trigger resistance %d", force);

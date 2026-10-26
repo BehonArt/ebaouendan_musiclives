@@ -143,10 +143,11 @@ by `cmake/eba.cmake`).
   under 35%), counted as presses on a spinner only. A DualSense's adaptive
   triggers push back while a spinner turns (Input > DualSense trigger
   resistance, on by default): continuous resistance (SDL's DualSense effect
-  report, mode 1) of 200 at the start, easing with the spinner's speed
-  (smoothed over about a second) to none near full speed; off after it.
-  Headless (`buttons-log`): at 7.5 presses a second it eases 180 to 0 over
-  80 frames.
+  report, mode 1) of 120 (of 255) at the start, easing slowly with the
+  spinner's speed (smoothed over about 2 seconds) to none at full speed;
+  off after it. Headless (`buttons-log`): at 7.5 presses a second it eases
+  120 to 40 over 115 frames and is still easing when the finale spinner
+  ends (it was 200 to 0 over 80 frames).
 - The mouse still works and wins while it is down. Outside a song the face
   buttons are the DS's (south B, east A, west Y, north X), for the menus.
 
