@@ -401,3 +401,35 @@ host's beacon game info (`*(connection +0x14)`) carries mode at +0x53,
 difficulty +0x54, stage +0x55, status +0x56. In co-op the host gives up after
 1800 frames if everyone left.
 
+
+## 19. How a song ends, and the song clock follows the music
+
+*From the recompiled ARM9 (`f_0205D0E4`, the song player's per-frame call) and
+a headless Customs run (All Star, 2026-10-26).*
+
+- **The over test** is `func_0205d0e4`'s last step (0x0205D218): the
+  timeline's cursor (player +0x24) equal to its item count (+0x14) sets the
+  player's state (+4) to 3, "over". The cursor is advanced by
+  `Scheduler_Tick` (0x02059C20) from the song frame; the last item a chart
+  carries is its `(frame, None)` end sentinel, or the last stream's end
+  (`song_tail.py` in the ROM toolkit). With one audio segment the song ends
+  at the chart's STAGE_LENGTH field (`stage_length.py`). Headless, All Star
+  (stream 3:09.72, STAGE_LENGTH the same, last note 2:46.9): the song scene
+  ended at its 11,530th frame, all 120 notes judged, then the ending comic
+  (0x020B6448) and results (0x020B62C0). So a custom whose "song ends too
+  early" is one whose **notes** end early: the converter's default
+  section-fit packs the beatmap into the stock stage's gameplay windows, and
+  the song's remainder plays with nothing to hit (16 to 40 s on the five
+  EBA customs). `osu_import.py --no-breaks` keeps the song's own time.
+- **The song clock is slaved to the music.** When `*(0x020B4158 + 0x1C)` is
+  set, each frame the player reads the current stream's position
+  (`func_0205A034`: the timeline's current item's stream, then
+  `func_020585A4`; 0 when the cursor is past the end) and converts it to
+  frames (ms × 60 / 1000, the 0x10624DD3 multiply). The song frame counter
+  (player +0) is then held to it: more than 1 frame ahead, it steps back 1;
+  1 to 9 frames behind, it snaps to the stream; 10 to 119 behind, it jumps
+  +10 a frame; further behind, it free-runs. So the chart's time is the
+  stream's playback time, and a stream whose header (rate, sample count) is
+  wrong moves the notes with it. This is also why a custom's HD audio needs
+  a measured `clock0` offset: the clock starts with the stream, not with the
+  scene.
