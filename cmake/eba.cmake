@@ -30,6 +30,9 @@ set(EBA_PORT_SOURCES
 set(EBA_DEFS EBA_VERSION="${EBA_VERSION}")
 if(EBA_RELEASE)
     list(APPEND EBA_DEFS EBA_RELEASE=1)
+    if(WIN32)
+        target_link_options(ndsrun PRIVATE -mwindows)   # no console window (the launcher keeps the log)
+    endif()
 endif()
 set_source_files_properties(${EBA_PORT_SOURCES} PROPERTIES COMPILE_DEFINITIONS "${EBA_DEFS}")
 target_sources(ndsrun PRIVATE

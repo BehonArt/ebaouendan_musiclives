@@ -473,6 +473,29 @@ Re-apply after updating the submodule:
     cd ndskit
     git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch ../patches/ndskit-texpacks.patch ../patches/ndskit-vsync.patch ../patches/ndskit-config-hook.patch
 
+## The launcher (`launcher/`, `tools/build_launcher.sh`)
+
+`eba-recomp.exe`: the three games in one window. Each shows whether its
+executable (`EBA.exe`, `OE1.exe`, `OE2.exe` beside it) is in the package,
+the player's dump (Choose dump..., or drop a `.nds` on the window: the
+launcher tells which game it is), Play, and Save folder. A dump is checked
+by RetroAchievements' hash of the ROM (header, ARM9, ARM7, icon: the same for
+every good dump of a game, trimmed or not): EBA's USA cartridge (AOSE),
+Ouendan 1's (AOSJ) and Ouendan 2's (AO2J); anything else is refused with
+the reason. The paths are kept in `launcher.ini` in the launcher's data
+folder (`%APPDATA%\eba-recomp\Launcher\`, or `userdata\Launcher\` when
+portable). Play starts the game with `--window`, its output in
+`<its folder>\<game>.log`; a game that stops with an error says so, with
+Open log. It draws with SDL's 2D renderer, not OpenGL 4.5, so it opens on
+any PC. Test options: `--rom FILE`, `--play ID`, `--shot FILE.bmp`.
+
+Checked (a portable folder: the launcher, a release `EBA.exe`, the DLLs):
+first run asks for each dump; EBA's and Ouendan 2's dumps are recognised
+and kept, any other file is refused; Play starts EBA in its window, titled
+"Elite Beat Agents (eba-recomp 1.0.0)", its save and log in
+`userdata\EBA\`. Release game executables are Windows programs (no console
+window); the launcher keeps their output.
+
 ## Release builds and where the player's files go
 
 `EBA_RELEASE=ON tools/build.sh` (or `cmake -DEBA_RELEASE=ON`) builds the
