@@ -54,7 +54,7 @@ runs that launcher.
 
 | Day | Work | Done when |
 |---|---|---|
-| **Mon 26 Oct** ✓ (the decisions still open) | Decide: repo name, our licence, launcher name. Release build option that leaves Customs, RetroAchievements, skin packs and replays out. Version numbers (exe, About, RA user agent, window title). Saves and settings move to `%APPDATA%` (portable mode: beside the exe). | `ndsrun` builds in release mode for all three; no Customs/RA menus; saves in `%APPDATA%` |
+| **Mon 26 Oct** ✓ (the decisions still open) | Decide: repo name, launcher name (licence: MIT, decided). Release build option that leaves Customs, RetroAchievements, skin packs and replays out. Version numbers (exe, About, RA user agent, window title). Saves and settings move to `%APPDATA%` (portable mode: beside the exe). | `ndsrun` builds in release mode for all three; no Customs/RA menus; saves in `%APPDATA%` |
 | **Tue 27 Oct** | The launcher: pick each game's ROM, check its hash (a clear message for a wrong or modified dump), remember the path, start the game with it. | A fresh folder: launcher, pick ROM, Play, game runs |
 | **Wed 28 Oct** | Packaging script: the zip (launcher, three exes, SDL3 and the MinGW DLLs, the HD ring pack), `THIRD_PARTY.txt` (SDL3 zlib, Dear ImGui MIT, rcheevos MIT if linked, ndskit MIT, MinGW runtime), `LICENSE`. Test on a clean Windows user (no MSYS2 on the PATH). | The zip runs on a PC that never had the toolchain |
 | **Thu 29 Oct** | Crash log (a file the player can attach to an issue), a "copy diagnostics" button (GPU, driver, settings). Controller pass: DualSense (yours), Xbox; Switch Pro or Joy-Con if one is at hand. | A forced crash leaves a readable log |
