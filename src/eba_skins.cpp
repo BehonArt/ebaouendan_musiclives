@@ -3,7 +3,7 @@
 // (tools/make_texture_pack.py makes one from an osu! skin: the circles, their
 // numbers, the approach circles, the slider ball, the judgements, the spinner;
 // pictures only, the game's sounds stay). The skins' folder is the game's
-// skins_dir beside the ROM (a play folder's), else here; its _hd-rings folder
+// skins_dir beside the executable, else beside the ROM, else here; its _hd-rings folder
 // holds the approach circles redrawn smooth, the HD approach circles option
 // (_hd-rings-thin, _hd-rings-thinner: the same, thinner).
 //
@@ -20,10 +20,13 @@ namespace fs = std::filesystem;
 
 const char* const kHdRings[] = {"", "_hd-rings", "_hd-rings-thin", "_hd-rings-thinner"};
 
+// beside the executable (a release's), else beside the ROM (a play folder's), else here
 fs::path root() {
     if (!*game().skins_dir) return {};
-    fs::path beside = fs::path(g_cfg.rom).parent_path() / game().skins_dir;
-    return fs::exists(beside) ? beside : fs::current_path() / game().skins_dir;
+    std::error_code ec;
+    for (fs::path p : {fs::path(exe_dir()) / game().skins_dir, fs::path(g_cfg.rom).parent_path() / game().skins_dir})
+        if (fs::exists(p, ec)) return p;
+    return fs::current_path() / game().skins_dir;
 }
 
 }  // namespace

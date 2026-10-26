@@ -450,6 +450,9 @@ they reproduce the submodule's working tree exactly:
   carry a label (`label__<hash>.png`).
 - `ndskit-vsync.patch`: the vertical sync as a setting (`DisplaySettings::vsync`,
   `--vsync auto|on|off`): auto as before, or always, or never.
+- `ndskit-config-hook.patch`: a port's look at the options once they are
+  read, before the cartridge boots (`nds_set_config_hook`: where the save
+  and the run's files go), and a window title of its own (`NdsConfig::title`).
 
 The discovery fixes, both to report upstream (drafts in `upstream/`):
 1. `Program.run()` gave up after 4 refuse passes and wiped everything, so
@@ -468,7 +471,26 @@ The discovery fixes, both to report upstream (drafts in `upstream/`):
 Re-apply after updating the submodule:
 
     cd ndskit
-    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch ../patches/ndskit-texpacks.patch ../patches/ndskit-vsync.patch
+    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch ../patches/ndskit-texpacks.patch ../patches/ndskit-vsync.patch ../patches/ndskit-config-hook.patch
+
+## Release builds and where the player's files go
+
+`EBA_RELEASE=ON tools/build.sh` (or `cmake -DEBA_RELEASE=ON`) builds the
+release: Customs, RetroAchievements and saved replays stay in the code with
+their menus and calls off (`kRelease`, `src/eba.h`), the window is titled with
+the game and the version, and a window's run writes no memory dumps. The
+version is `-DEBA_VERSION` (1.0.0): the About box, the title, RetroAchievements'
+user agent, and the executable's version resource (`cmake/version.rc.in`).
+Both apply to the port's sources only: switching rebuilds those, not the
+recompiled game. Unset, `build.sh` builds the development build.
+
+A window's run given no `--save` (`src/eba_paths.cpp`) keeps its save, its
+settings, screenshots and log in `%APPDATA%\eba-recomp\<game>\` (EBA, OE2,
+OE1); with a file `portable.txt` beside the executable, in
+`userdata\<game>\` beside it. **Game > Open the save folder** opens it. A run
+given `--save` (the play folders, tests) keeps the paths it was given, and
+headless runs are unchanged. Skins are found beside the executable first,
+then beside the ROM.
 
 ## Toolchain
 

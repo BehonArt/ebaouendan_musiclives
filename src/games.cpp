@@ -130,8 +130,8 @@ Game make_oe1() {
     return g;
 }
 
-std::string game_code() {
-    std::ifstream f(g_cfg.rom, std::ios::binary);
+std::string game_code(const std::string& rom) {
+    std::ifstream f(rom, std::ios::binary);
     char c[4] = {};
     f.seekg(0xC);
     f.read(c, 4);
@@ -140,13 +140,15 @@ std::string game_code() {
 
 }  // namespace
 
+Game game_of(const std::string& rom) {
+    std::string code = game_code(rom);
+    Game r = code == "AO2J" ? make_oe2() : code == "AOSJ" ? make_oe1() : make_eba();
+    r.code = code;
+    return r;
+}
+
 const Game& game() {
-    static const Game g = [] {
-        std::string code = game_code();
-        Game r = code == "AO2J" ? make_oe2() : code == "AOSJ" ? make_oe1() : make_eba();
-        r.code = code;
-        return r;
-    }();
+    static const Game g = game_of(g_cfg.rom);
     return g;
 }
 

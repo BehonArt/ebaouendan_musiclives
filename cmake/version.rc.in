@@ -1,0 +1,26 @@
+// The executable's version resource (cmake/eba.cmake fills it in).
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION @EBA_VERSION_COMMAS@,0
+PRODUCTVERSION @EBA_VERSION_COMMAS@,0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "eba-recomp"
+            VALUE "FileDescription", "eba-recomp: a Nintendo DS rhythm game, recompiled (needs your own cartridge dump)"
+            VALUE "FileVersion", "@EBA_VERSION@"
+            VALUE "ProductName", "eba-recomp"
+            VALUE "ProductVersion", "@EBA_VERSION@"
+            VALUE "LegalCopyright", "eba-recomp's own code; ndskit (MIT), SDL3 (zlib), Dear ImGui (MIT)"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

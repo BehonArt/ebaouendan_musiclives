@@ -76,7 +76,7 @@ void save_replay(uint32_t s) {
     std::string path;
     const auto& o = g_cfg.port;
     if (o.count("replay-save")) path = o.at("replay-save");
-    else if (g_cfg.window) {                        // a window's run: <out>/replays/GAME_stage_difficulty_time.rep
+    else if (g_cfg.window && !kRelease) {                      // a window's run: <out>/replays/GAME_stage_difficulty_time.rep
         namespace fs = std::filesystem;
         fs::path dir = fs::path(g_cfg.out) / "replays";
         std::error_code ec;

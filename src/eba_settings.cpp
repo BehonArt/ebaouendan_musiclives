@@ -1,7 +1,8 @@
 // The settings: the window's (display.h), the sound's latency, button mode's,
-// the timing offset, the assists, the effects and the skin, in a file of KEY=VALUE lines in SDL's folder for the
-// user's settings, one a game (on Windows %APPDATA%\eba-recomp\EBA\settings.ini,
-// ...\OE2\, ...\OE1\). A window's
+// the timing offset, the assists, the effects and the skin, in a file of
+// KEY=VALUE lines in the game's data folder (eba_paths.cpp: on Windows
+// %APPDATA%\eba-recomp\EBA\settings.ini, ...\OE2\, ...\OE1\; portable, beside
+// the executable). A window's
 // run reads it at its first frame and the options bar writes it at each
 // change; what ndsrun's own options set (--scale 3, --port offset=2) wins over
 // it for that run. A headless run neither reads nor writes it: its results
@@ -20,11 +21,8 @@ namespace eba {
 namespace {
 
 std::string path() {
-    char* dir = SDL_GetPrefPath("eba-recomp", game().id);
-    if (!dir) return "";
-    std::string p = std::string(dir) + "settings.ini";
-    SDL_free(dir);
-    return p;
+    std::string dir = data_dir();
+    return dir.empty() ? "" : dir + "settings.ini";
 }
 
 const char* kLayouts[] = {"stacked", "side", "top", "bottom"};
@@ -110,8 +108,8 @@ void init() {
     fx_options();
     skins_options();
     rumble_options();
-    customs_init();
-    ra_init();
+    if (!kRelease) customs_init();          // (not in the release yet: docs/ROADMAP.md)
+    if (!kRelease) ra_init();
 }
 
 }  // namespace eba

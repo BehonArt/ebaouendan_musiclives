@@ -280,7 +280,7 @@ void play_input(NdsInput& in, uint64_t vbl) {
     eba::debug_pokes(vbl);
     eba::play_frame(vbl);                           // autoplay, replays, assists
     eba::fx_frame(vbl);                             // the light behind the 3D
-    if (eba::customs_frame(in, vbl)) return;        // Customs' autopilot drives the game to its stage
+    if (!eba::kRelease && eba::customs_frame(in, vbl)) return;        // Customs' autopilot drives the game to its stage
     if (eba::ui_wants_mouse()) in.pen = false;      // the mouse is on the options bar
     if (!eba::buttons().on) return;
     if (eba::scene_has_skip()) { skip_comic(in); return; }

@@ -16,6 +16,26 @@ namespace eba {
 // The first frame (after ndsrun's options are read): the saved settings, then --port's over them.
 void init();
 
+// ---- the release (cmake -DEBA_RELEASE=ON, -DEBA_VERSION=x.y.z) -------------------------
+// A release build leaves out what is not in it yet (Customs, RetroAchievements, replays
+// saved to disk; docs/ROADMAP.md): the code stays, its menus and calls do not run.
+#ifdef EBA_RELEASE
+constexpr bool kRelease = true;
+#else
+constexpr bool kRelease = false;
+#endif
+#ifndef EBA_VERSION
+#define EBA_VERSION "0.0.0-dev"
+#endif
+
+// ---- where the player's files go (eba_paths.cpp) ----------------------------------------
+// A window's run with no --save: the save, the settings, screenshots and the log in
+// %APPDATA%\eba-recomp\<game>\ (SDL's folder for the user's settings), or, with a file
+// portable.txt beside the executable, in userdata\<game>\ beside it.
+std::string data_dir();                 // that folder (ends with a separator)
+std::string exe_dir();                  // the executable's folder (ends with a separator)
+bool portable();
+
 inline uint32_t rd(uint32_t a) { uint32_t v; std::memcpy(&v, g_main + (a & 0x3FFFFFu), 4); return v; }
 inline int16_t rh(uint32_t a) { int16_t v; std::memcpy(&v, g_main + (a & 0x3FFFFFu), 2); return v; }
 inline bool in_main(uint32_t a) { return a >= 0x02000000u && a < 0x02400000u; }
@@ -66,6 +86,7 @@ struct Game {
     float menu_button_x = 0.5f;         // the CUSTOMS button across the main menu's lower screen (0 left .. 1 right)
 };
 const Game& game();
+Game game_of(const std::string& rom);               // the profile for a ROM file (before g_cfg is set)
 inline uint32_t note_field(uint32_t note, uint32_t eba_offset) {   // a note's field, given at EBA's offset
     return note + eba_offset + (eba_offset >= 0x14 ? game().shift : 0);
 }

@@ -1,0 +1,73 @@
+diff --git a/runtime/display.cpp b/runtime/display.cpp
+index a2b8a9c..989f30d 100644
+--- a/runtime/display.cpp
++++ b/runtime/display.cpp
+@@ -597,7 +597,7 @@ bool display_open(bool vis) {
+     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+     int wh = 768;
+     if (const SDL_DisplayMode* dm = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay())) wh = std::max(384, (int)(dm->h * 0.85f));
+-    std::string title = "ndskit - " + g_cfg.rom.substr(g_cfg.rom.find_last_of("/\\") + 1);
++    std::string title = !g_cfg.title.empty() ? g_cfg.title : "ndskit - " + g_cfg.rom.substr(g_cfg.rom.find_last_of("/\\") + 1);
+     win = SDL_CreateWindow(title.c_str(), wh / 2, wh,
+                            SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | (vis ? 0 : SDL_WINDOW_HIDDEN));
+     if (!win) { nds_note("display: no window: %s", SDL_GetError()); return false; }
+@@ -809,7 +809,7 @@ bool display_frame() {
+                      (now - left_ns) / 1e6, (entered - left_ns) / 1e6, (now - entered) / 1e6);
+     }
+     left_ns = now;
+-    if (now - title_ns >= 1000000000ull) {
++    if (g_cfg.title.empty() && now - title_ns >= 1000000000ull) {   // a port's own title stays as it is
+         double s = (now - title_ns) / 1e9;
+         std::string rom = g_cfg.rom.substr(g_cfg.rom.find_last_of("/\\") + 1);
+         char t[256];
+diff --git a/runtime/main.cpp b/runtime/main.cpp
+index 4f0ee26..b77da2b 100644
+--- a/runtime/main.cpp
++++ b/runtime/main.cpp
+@@ -26,6 +26,15 @@
+ #include <filesystem>
+ #include <sstream>
+ 
++namespace {
++NdsConfigHook& config_hook() {
++    static NdsConfigHook h = nullptr;
++    return h;
++}
++}  // namespace
++
++void nds_set_config_hook(NdsConfigHook hook) { config_hook() = hook; }
++
+ int main(int argc, char** argv) {
+     NdsConfig cfg;
+     bool mute = false;
+@@ -120,6 +129,7 @@ int main(int argc, char** argv) {
+         std::fprintf(stderr, "usage: ndsrun GAME.nds [--window] [--out DIR] [--vblanks N] [--shots V,...]\n");
+         return 2;
+     }
++    if (config_hook()) config_hook()(cfg);
+     std::error_code ec;
+     std::filesystem::create_directories(cfg.out, ec);
+     if (!nds_boot(cfg)) return 2;
+diff --git a/runtime/nds.h b/runtime/nds.h
+index 59d5bfa..dbf71c2 100644
+--- a/runtime/nds.h
++++ b/runtime/nds.h
+@@ -37,6 +37,7 @@ struct NdsConfig {
+     bool low_latency = false;           // no picture queued ahead of the display (display.cpp)
+     int filter = 0;                     // --filter: the picture's filter (display.h)
+     int vsync = 0;                      // --vsync auto|on|off: 0, 1, 2 (display.h)
++    std::string title;                  // the window's title (default: ndskit, the ROM, the pace)
+     double audio_latency = 3;           // the sound queued ahead of the device, in frames (audio.cpp)
+     std::vector<uint64_t> shots;        // headless: both screens as PNGs at these VBlanks
+     uint64_t shot_every = 0;            // ... and every N VBlanks
+@@ -228,6 +229,10 @@ struct NdsInput {
+ // A port's own code sees each input before the machine does, and may change it.
+ using NdsInputHook = void (*)(NdsInput& in, uint64_t vblank);
+ void nds_set_input_hook(NdsInputHook hook);
++// A port's own code sees the options once they are read, before the cartridge boots, and
++// may change them (where the save and the run's files go, the window's title).
++using NdsConfigHook = void (*)(NdsConfig& cfg);
++void nds_set_config_hook(NdsConfigHook hook);
+ void nds_apply_input(NdsInput& in, uint64_t vblank);   // the pad's DS buttons, the hook, then the machine
+ void input_parse(const std::string& script);
+ void input_vblank(uint64_t vblank);     // a script: sets the input held at this VBlank

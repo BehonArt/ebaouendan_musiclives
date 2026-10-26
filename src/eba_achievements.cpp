@@ -44,7 +44,7 @@ extern uint32_t g_dtcm_size;
 namespace eba {
 namespace {
 
-constexpr const char* kVersion = "0.1.0";
+constexpr const char* kVersion = EBA_VERSION;
 
 rc_client_t* g_client;
 bool g_spectator, g_paused = true;

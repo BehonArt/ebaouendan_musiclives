@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 
 namespace eba {
@@ -231,7 +232,7 @@ void assist_menu() {
         if (ImGui::MenuItem(x.name, nullptr, a.approach_pct == x.pct)) { a.approach_pct = x.pct; settings_save(); }
     ImGui::TextDisabled("(from the next song)");
     ImGui::Separator();
-    ImGui::TextDisabled("Hit circle leniency (Customs keep no score above Normal)");
+    ImGui::TextDisabled(kRelease ? "Hit circle leniency" : "Hit circle leniency (Customs keep no score above Normal)");
     struct { const char* name; int px; } rad[] = {{"Normal", 0}, {"Generous  (+5 px)", 5}, {"Very generous  (+11 px)", 11}};
     for (auto& x : rad)
         if (ImGui::MenuItem(x.name, nullptr, a.hit_extra == x.px)) { a.hit_extra = x.px; settings_save(); }
@@ -288,8 +289,10 @@ void help_windows() {
     }
     if (g_about) {
         if (ImGui::Begin("About", &g_about, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("%s, recompiled to native code (eba-recomp)", game().title);
+            ImGui::Text("%s, recompiled to native code (eba-recomp %s%s)", game().title, EBA_VERSION,
+                        kRelease ? "" : ", development build");
             ImGui::Text("on ndskit, a static recompiler and runtime for the Nintendo DS.");
+            ImGui::TextDisabled("The game's code and data come from your own cartridge dump.");
             ImGui::TextDisabled("Dear ImGui %s", IMGUI_VERSION);
         }
         ImGui::End();
@@ -416,11 +419,15 @@ void draw(int, int) {
     bool bar = g_shown && (!full || near_top || menu_open);
     if (bar && ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("Game")) {
-            if (ImGui::MenuItem("Customs...")) customs_ui_open();
-            if (custom_playing() && ImGui::MenuItem("Back to campaign")) customs_back_to_campaign();
-            if (ImGui::MenuItem("RetroAchievements...")) g_ra = true;
-            ImGui::Separator();
+            if (!kRelease) {                        // (not in the release yet: docs/ROADMAP.md)
+                if (ImGui::MenuItem("Customs...")) customs_ui_open();
+                if (custom_playing() && ImGui::MenuItem("Back to campaign")) customs_back_to_campaign();
+                if (ImGui::MenuItem("RetroAchievements...")) g_ra = true;
+                ImGui::Separator();
+            }
             if (ImGui::MenuItem("Screenshot", "F12")) push_key(SDL_SCANCODE_F12);
+            if (ImGui::MenuItem("Open the save folder")) SDL_OpenURL(("file:///" + std::filesystem::absolute(g_cfg.out).string()).c_str());
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s\nThe save, the settings, screenshots and the log.", g_cfg.out.c_str());
             if (ImGui::MenuItem("Quit", "Esc")) { SDL_Event e{}; e.type = SDL_EVENT_QUIT; SDL_PushEvent(&e); }
             ImGui::EndMenu();
         }
@@ -441,7 +448,7 @@ void draw(int, int) {
     display_set_top_margin(g_shown && !full ? (int)std::ceil(g_bar_h) : 0);
     if (g_calibration) calibration_window();
     help_windows();
-    customs_ui_draw();
+    if (!kRelease) customs_ui_draw();
     ra_window();
     ra_toasts_draw();
     ImGui::Render();
