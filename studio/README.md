@@ -7,6 +7,14 @@ in both editors for the recomp's side of a custom:
 - **Test in recomp** (and **Build + test**): the custom just built, played at
   once in the recomp's Customs mode, straight into its stage, on any
   difficulty, with autoplay if wanted.
+- **✔ Validate**: the recomp plays the custom through headless with its
+  button-mode test player, every note on time (under a minute, no window;
+  `validate.py`), and reports: loaded, notes played, score and grades,
+  cleared or failed, and how many seconds of the song are left after the last
+  note (more than 25 s is flagged: stock stages leave 10 to 22). From a
+  shell: `py -3 tools\validate_custom.py customs\<tag>`. Checked on All Star
+  (120/120 at 300, cleared, 23 s after the last note) and Girls Just Want to
+  Have Fun (182/182, cleared, flagged: 40 s).
 - **Export custom folder** (or **...as .zip**): `customs\<stage>_<title>` in
   the recomp's play folder, where Customs lists it; the .zip is for sharing
   (Import custom folder on the other side).
