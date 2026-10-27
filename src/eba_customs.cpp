@@ -23,7 +23,7 @@
 //
 // Options (ndsrun --port): custom=TAG difficulty=e|n|h|x campaign-save=PATH
 // (Customs mode, set by the launch); hd=off (the game's own song, not the HD one);
-// customs-dir=PATH (where the customs are:
+// customs-quit (a test run ends 2 s after the song is over); customs-dir=PATH (where the customs are:
 // by default customs/ beside the cartridge, else the game's folder in the working
 // directory: customs/ for EBA, customs_oe2/ for Ouendan 2).
 #include "eba.h"
@@ -509,8 +509,18 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
     static CustomScore now;
     static const char* unranked;                        // why its score is not kept (autoplay, a replay, an assist)
     if (g_playing && song && !was_song) { timing_reset(); hd_start(); }
-    if (g_playing && song) hd_frame(rd(g.clock));
-    if (g_playing && !song && was_song) hd_stop();
+    static uint32_t last_clock;                         // the song's clock at its last frame
+    if (g_playing && song) { hd_frame(rd(g.clock)); last_clock = rd(g.clock); }
+    if (g_playing && !song && was_song) {
+        hd_stop();
+        nds_note("eba customs: song over at frame %u", last_clock);   // (tools: dead time = this - the last note)
+    }
+    // --port customs-quit: a test run (the Studio's validation) ends 2 s after the song is over
+    static bool quit_armed;
+    if (g_playing && g_cfg.port.count("customs-quit") && !quit_armed && sc && (sc == k.ending || sc == k.results || sc == k.regroup)) {
+        quit_armed = true;
+        g_cfg.stop_vblanks = vbl + 120;
+    }
     if (g_playing && was_song && !song) {
         uint32_t s = session();
         now = CustomScore();

@@ -40,7 +40,7 @@
   #studio input[type=text],#studio select{width:100%;box-sizing:border-box;background:#11141b;color:#eee;border:1px solid #444;border-radius:4px;padding:3px}
   #studio button{margin:4px 4px 0 0;background:#e07a1f;color:#111;border:0;border-radius:4px;padding:5px 8px;font-weight:600;cursor:pointer}
   #studio button.alt{background:#3a4152;color:#eee}
-  #studio .st{margin-top:6px;min-height:16px;color:#9ec}
+  #studio .st{margin-top:6px;min-height:16px;color:#9ec;white-space:pre-wrap}
   #studio .st.err{color:#f88}
   #studio.min .body{display:none}`;
   const box = document.createElement('div');
@@ -56,6 +56,7 @@
       <div>
         <button id="st-test" title="The custom just built, in the recomp's Customs mode, straight into its stage">▶ Test in recomp</button>
         <button id="st-build" class="alt" title="This editor's ROM build, then the test">Build + test</button>
+        <button id="st-check" class="alt" title="The recomp plays the custom through headless, every note on time (under a minute): loads, judged, cleared, and how much song is left after the last note">✔ Validate</button>
       </div>
       <div>
         <button id="st-custom" class="alt" title="customs\\<tag> in the recomp's play folder: it shows in Customs at once">Export custom folder</button>
@@ -93,6 +94,11 @@
     if (r) say(`the recomp is starting on ${r.stage} (${r.game}): its log ${r.log}`);
   }
   $s('st-test').onclick = test;
+  $s('st-check').onclick = async () => {
+    say('the recomp is playing the custom through, headless (under a minute)…');
+    const r = await call('validate', {difficulty: $s('st-diff').value});
+    if (r) say(r.text, r.problems.length > 0);
+  };
   $s('st-build').onclick = () => {
     const b = document.getElementById('saveRomBtn') || document.getElementById('btn-build');
     if (!b) { say('no Build ROM button on this page', true); return; }

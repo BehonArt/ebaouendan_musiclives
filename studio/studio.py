@@ -169,6 +169,15 @@ def main():
             r = B.launch_test(game, c, d.get("difficulty", "n"), bool(d.get("autoplay")), paths["recomp"],
                               os.path.join(work_dir(), "run_" + game.lower()))
             return dict(r, stage=c["stage"], game=game)
+        if name == "validate":                            # the recomp plays it through headless: a report
+            import validate as V
+            customs = os.path.join(work_dir(), "customs_" + game.lower())
+            os.makedirs(customs, exist_ok=True)
+            c = B.make_custom(rom, stock_rom(game), customs, d.get("title") or "Studio test", d.get("artist", ""),
+                              tag="studio_test")
+            r = V.validate_custom(game, c, d.get("difficulty", "n"), paths["recomp"],
+                                  os.path.join(work_dir(), "validate_" + game.lower()))
+            return dict(r, text=V.report_text(r))
         if name == "export_custom":
             out = d.get("out_dir") or B.recomp_folder(paths["recomp"], game)["customs"]
             c = B.make_custom(rom, stock_rom(game), out, d.get("title", ""), d.get("artist", ""))
