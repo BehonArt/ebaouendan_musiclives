@@ -82,7 +82,7 @@ def parse(game, text, returncode=0):
     m = re.search(r"eba customs: song over at frame (\d+)", text)
     if m:
         r["song_frames"] = int(m.group(1))
-        if r["last_note"]:
+        if r["last_note"] and r["cleared"]:            # (a failed stage ends where it failed)
             r["dead_s"] = (r["song_frames"] - r["last_note"]) / FPS
     if re.search(r"returned to|fatal|unhandled exception|undefined instruction", text):
         r["crashed"] = True
@@ -126,8 +126,9 @@ def report_text(r):
         out.append("  score %d (300 x%d, 100 x%d, 50 x%d, miss x%d), %s"
                    % (r["score"], g[0], g[1], g[2], g[3], "cleared" if r["cleared"] else "FAILED"))
     if r["song_frames"] is not None:
-        out.append("  the song ended at %s%s" % (
-            tc(r["song_frames"]), "" if r["dead_s"] is None else ", %.0f s after the last note" % r["dead_s"]))
+        out.append("  the %s at %s%s" % (
+            "song ended" if r["cleared"] else "stage failed", tc(r["song_frames"]),
+            "" if r["dead_s"] is None else ", %.0f s after the last note" % r["dead_s"]))
     out.append("  " + ("no problems found" if not r["problems"] else "problems:"))
     out += ["   - " + p for p in r["problems"]]
     return "\n".join(out)
