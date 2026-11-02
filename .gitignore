@@ -13,3 +13,4 @@ studio/studio.ini
 studio/toolkit_deps.py
 studio/*.log
 skins/
+dist/

@@ -1,0 +1,38 @@
+Elite Beat Ouendan: Music LIVES (eba-recomp): third-party software
+====================================================================
+
+eba-recomp's own code is under the MIT licence (LICENSE). The package also
+carries, or is built from, the following; their licence texts are in the
+licenses folder.
+
+ndskit (static recompiler and runtime for the Nintendo DS), MIT
+    https://github.com/vs-sr-dev/ndskit            licenses/ndskit.txt
+    The recompiled games are built with it, with eba-recomp's patches
+    (patches/ in the source repository).
+
+SDL 3 (SDL3.dll), zlib licence
+    https://libsdl.org                             licenses/SDL3.txt
+
+Dear ImGui (built in), MIT
+    https://github.com/ocornut/imgui               licenses/imgui.txt
+
+rcheevos (built in: the dump check), MIT
+    https://github.com/RetroAchievements/rcheevos  licenses/rcheevos.txt
+
+GNU libiconv (libiconv-2.dll, used by SDL3.dll), LGPL 2.1 or later
+    https://www.gnu.org/software/libiconv/         licenses/libiconv.txt
+    An unmodified build from MSYS2 (mingw-w64-ucrt-x86_64-libiconv), whose
+    source is at https://github.com/msys2/MINGW-packages. It may be replaced
+    by any compatible build of the same DLL.
+
+GCC runtime (libgcc_s_seh-1.dll, libstdc++-6.dll), GPL 3 with the GCC
+Runtime Library Exception
+    https://gcc.gnu.org                            licenses/gcc-runtime.txt
+
+mingw-w64 winpthreads (libwinpthread-1.dll), MIT and BSD-style
+    https://www.mingw-w64.org                      licenses/winpthreads.txt
+
+The games themselves are not included: each needs the player's own dump of
+its cartridge. Elite Beat Agents, Osu! Tatakae! Ouendan and Moero! Nekketsu
+Rhythm Damashii Osu! Tatakae! Ouendan 2 are Nintendo's and iNiS's; this is a
+fan project, not affiliated with either.

@@ -5,5 +5,5 @@ set -e
 export PATH=/ucrt64/bin:$PATH
 cd "$(dirname "$0")/.."
 cmake -S launcher -B build/launcher -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_BUILD_TYPE=Release > /dev/null
+    -DCMAKE_BUILD_TYPE=Release ${EBA_VERSION:+-DEBA_VERSION=$EBA_VERSION} > /dev/null
 ninja -C build/launcher "$@"

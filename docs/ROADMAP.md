@@ -53,7 +53,7 @@ the player README and the public repo did not happen. The plan from here:
 | Day | Work | Done when |
 |---|---|---|
 | **Mon 2 Nov** | **The launcher, finished**: the project's name (Elite Beat Ouendan: Music LIVES), each game's own icon and title read from the player's dump (nothing of the games ships), a clear line for a wrong file dropped, a controller can pick a game and press Play, Play greyed out until a dump checks out. | Screenshot of the launcher with 0, 1 and 3 dumps set |
-| **Tue 3 Nov** | **Packaging**: release builds of all three games (`EBA_RELEASE=ON`), a script that makes the zip (launcher, EBA.exe, OE1.exe, OE2.exe, SDL3 and the MinGW DLLs, the three HD approach-circle packs, `LICENSE`, `THIRD_PARTY.txt`), and a test in Windows Sandbox (a PC that never had MSYS2). | The zip, unpacked in the Sandbox, plays all three |
+| **Tue 3 Nov** ✓ (on Mon 2) | **Packaging**: release builds of all three games (`EBA_RELEASE=ON`), a script that makes the zip (launcher, EBA.exe, OE1.exe, OE2.exe, SDL3 and the MinGW DLLs, the three HD approach-circle packs, `LICENSE`, `THIRD_PARTY.txt`), and a test in Windows Sandbox (a PC that never had MSYS2). | The zip, unpacked in the Sandbox, plays all three |
 | **Wed 4 Nov** | **When it goes wrong**: a crash log the player can attach to an issue, and "Copy diagnostics" in the launcher (version, GPU and driver, OpenGL version, settings). A clear message when the PC has no OpenGL 4.5. **You**: the controller pass (DualSense: rumble tiers, trigger resistance; Xbox or Switch if at hand). | A forced crash leaves a readable log |
 | **Thu 5 Nov** | **Going public**: the player README (setup, controls, options, known issues), CHANGELOG, screenshots. The public GitHub repo (you create it, or I install the GitHub CLI and you sign in), push, publish **v1.0.0-rc1** as a pre-release. Testers on AMD and Intel graphics get the link. | rc1 on GitHub |
 | **Fri 6, Sat 7 Nov** | Tester feedback, fixes only. The Quiver listing ready (name, description, tags, screenshots, the release asset). | No blocking issue open |
@@ -71,6 +71,15 @@ the release day.
 Risks: a graphics driver that dislikes the OpenGL 4.5 renderer (why rc1 goes
 out Thursday); the SmartScreen warning on an unsigned exe (the README
 explains "More info > Run anyway"; signing can wait); Quiver's review time.
+
+Packaging notes (done Mon 2 Nov): `tools\make_release.ps1 -Version 1.0.0` builds the
+three games in release mode and the launcher, stages and zips them (24.6 MB), then
+puts the build trees back in development mode. This PC runs Windows 11 Home, which
+has no Windows Sandbox, so the zip was tested unpacked into a fresh portable folder
+with only Windows' own folders on the PATH: all three games boot to their titles
+and the launcher opens. A truly clean PC is the testers' job (rc1).
+Gap found: only EBA has HD approach-circle packs; Ouendan 1 and 2 have no
+`skins_dir`, so their Look menu has no rings yet.
 
 ## The first week (26 October to 2 November)
 
