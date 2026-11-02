@@ -1,9 +1,11 @@
-// eba-recomp's launcher: the three games in one window. For each: whether its
-// executable is in the package, the player's own cartridge dump (chosen or
-// dropped on the window, checked by RetroAchievements' hash of the ROM: its
-// header, ARM9 and ARM7 code and icon, which every good dump of that game
-// shares, trimmed or not), Play, and its save folder. The ROM paths are kept
-// in launcher.ini in the launcher's own data folder.
+// Elite Beat Ouendan: Music LIVES, the launcher (eba-recomp.exe): the three games
+// in one window. For each: whether its executable is in the package, the player's
+// own cartridge dump (chosen or dropped on the window, checked by
+// RetroAchievements' hash of the ROM: its header, ARM9 and ARM7 code and icon,
+// which every good dump of that game shares, trimmed or not), Play, and its save
+// folder. Once a dump checks out, the card shows the game's own icon and title
+// from the dump's banner: nothing of the games ships with the launcher. The ROM
+// paths are kept in launcher.ini in the launcher's own data folder.
 //
 // Where the games keep their files is decided by the games themselves
 // (src/eba_paths.cpp): %APPDATA%\eba-recomp\<game>\, or userdata\<game>\
@@ -12,11 +14,15 @@
 // each game's output to <its folder>\<game>.log.
 //
 // It draws with SDL's 2D renderer, not OpenGL 4.5, so it opens on any PC, and
-// says what went wrong when a game stops with an error.
+// says what went wrong when a game stops with an error. A gamepad moves between
+// the buttons (d-pad or stick) and presses them (south button); Windows' own
+// Segoe UI and a Japanese font (Yu Gothic, Meiryo or MS Gothic) are used when
+// present, for the Ouendan games' titles.
 //
 // Options (tests): --rom FILE (set a dump, as a drop does); --play ID (EBA, OE1,
 // OE2: start it at once); --shot FILE.bmp (the window's picture after a few
-// frames, then quit).
+// frames, then quit); --data DIR (the launcher's own folder instead: a test's
+// launcher.ini).
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -24,10 +30,12 @@
 #include "rc_hash.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <map>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -40,45 +48,68 @@ namespace fs = std::filesystem;
 
 namespace {
 
+constexpr const char* kName = "Elite Beat Ouendan: Music LIVES";
+
 struct GameInfo {
     const char* id;                     // the data folder's name, the executable's
     const char* title;
+    const char* code;                   // the cartridge's game code (its header)
     const char* dump;                   // which dump it needs
     const char* hash;                   // RetroAchievements' hash of that dump
 };
 
 const GameInfo kGames[] = {
-    {"EBA", "Elite Beat Agents", "the USA cartridge (AOSE)", "bbf10cada0dcc72068179c600fe79267"},
-    {"OE1", "Osu! Tatakae! Ouendan", "the Japanese cartridge (AOSJ)", "999654092d72821ef56a7c8de260cc64"},
-    {"OE2", "Moero! Nekketsu Rhythm Damashii Osu! Tatakae! Ouendan 2", "the Japanese cartridge (AO2J)",
+    {"EBA", "Elite Beat Agents", "AOSE", "the USA cartridge (AOSE)", "bbf10cada0dcc72068179c600fe79267"},
+    {"OE1", "Osu! Tatakae! Ouendan", "AOSJ", "the Japanese cartridge (AOSJ)", "999654092d72821ef56a7c8de260cc64"},
+    {"OE2", "Moero! Nekketsu Rhythm Damashii Osu! Tatakae! Ouendan 2", "AO2J", "the Japanese cartridge (AO2J)",
      "899b9c8dd0128097aebb009b49b2a2d5"},
 };
 constexpr int kCount = 3;
 
 enum class Rom { None, Missing, Wrong, Good };
 
+// What a file's header and banner say: its game code, the game's own icon and title.
+struct Banner {
+    bool ds = false;                    // a DS cartridge dump, by its header
+    std::string code;
+    uint32_t icon[32 * 32] = {};        // RGBA, index 0 clear
+    bool has_icon = false;
+    std::string title;                  // the banner's (English slot), lines joined, the publisher left out
+};
+
 struct Slot {
     std::string rom;                    // the chosen dump
     Rom state = Rom::None;
     std::string got;                    // its hash, when wrong
+    Banner banner;
+    SDL_Texture* icon = nullptr;
     int exit_code = 0;                  // the last run's, when it stopped with an error
     bool failed = false;
 };
 
-std::string g_exe_dir;
-bool g_portable;
+std::string g_exe_dir, g_data_override;
+bool g_portable, g_jp_font;
 Slot g_slots[kCount];
+SDL_Renderer* g_ren;
 SDL_Process* g_proc;                    // the game running, if any
 int g_running = -1;
 std::string g_note;                     // a message under the games (a dropped file, ...)
+bool g_note_bad;
 std::mutex g_pick_mu;
 std::vector<std::pair<int, std::string>> g_picked;   // file dialogs' answers, for the main thread
+ImFont* g_big;
+
+// paths as UTF-8 (what SDL hands over: drops, dialogs, the ini)
+fs::path upath(const std::string& s) { return fs::path((const char8_t*)s.c_str()); }
+std::string ustr(const fs::path& p) { auto u = p.u8string(); return std::string(u.begin(), u.end()); }
+
+const ImVec4 kOk(0.45f, 0.85f, 0.45f, 1), kWarn(1, 0.72f, 0.3f, 1), kDim(0.62f, 0.62f, 0.66f, 1);
 
 std::string data_dir(const char* id) {
     std::string d;
-    if (g_portable) {
-        d = (fs::path(g_exe_dir) / "userdata" / id).string() + "\\";
-    } else if (char* p = SDL_GetPrefPath("eba-recomp", id)) {
+    if (!g_data_override.empty() && !std::strcmp(id, "Launcher")) d = g_data_override + "\\";
+    else if (g_portable) d = (fs::path(g_exe_dir) / "userdata" / id).string() + "\\";
+    else if (char* p = SDL_GetPrefPath("eba-recomp", id)) {
         d = p;
         SDL_free(p);
     }
@@ -103,7 +134,7 @@ void load() {
 
 void save() {
     std::ofstream f(ini_path());
-    f << "# eba-recomp's launcher: the cartridge dumps chosen\n";
+    f << "# " << kName << ", the launcher: the cartridge dumps chosen\n";
     for (int i = 0; i < kCount; ++i) f << "rom_" << kGames[i].id << "=" << g_slots[i].rom << "\n";
 }
 
@@ -112,15 +143,81 @@ std::string hash_of(const std::string& path) {
     return rc_hash_generate_from_file(h, RC_CONSOLE_NINTENDO_DS, path.c_str()) ? std::string(h) : std::string();
 }
 
+std::string utf16(const uint8_t* p, int chars) {
+    std::string s;
+    for (int i = 0; i < chars; ++i) {
+        uint32_t c = p[2 * i] | p[2 * i + 1] << 8;
+        if (!c) break;
+        if (c < 0x80) s += (char)c;
+        else if (c < 0x800) { s += (char)(0xC0 | c >> 6); s += (char)(0x80 | (c & 63)); }
+        else { s += (char)(0xE0 | c >> 12); s += (char)(0x80 | (c >> 6 & 63)); s += (char)(0x80 | (c & 63)); }
+    }
+    return s;
+}
+
+// The header (its game code at 0x0C, the banner's offset at 0x68) and the banner: a
+// 32x32 icon in 8x8 tiles of 4 bits (+0x20), its 16 colours (+0x220, BGR555), the
+// titles in UTF-16 (+0x240 Japanese, +0x340 English, ...).
+Banner read_banner(const std::string& path) {
+    Banner b;
+    std::ifstream f(upath(path), std::ios::binary);
+    uint8_t h[0x200] = {};
+    if (!f.read((char*)h, sizeof h)) return b;
+    for (int i = 0; i < 4; ++i) {
+        char c = (char)h[0x0C + i];
+        if (c < '0' || c > 'Z') return b;          // not a DS game code: not a dump
+        b.code += c;
+    }
+    b.ds = true;
+    uint32_t off = h[0x68] | h[0x69] << 8 | h[0x6A] << 16 | (uint32_t)h[0x6B] << 24;
+    std::vector<uint8_t> bn(0x440);
+    if (!off || !f.seekg(off) || !f.read((char*)bn.data(), (std::streamsize)bn.size())) return b;
+    uint32_t pal[16];
+    for (int i = 0; i < 16; ++i) {
+        uint16_t c = bn[0x220 + 2 * i] | bn[0x221 + 2 * i] << 8;
+        uint32_t r = (c & 31) * 255 / 31, g = (c >> 5 & 31) * 255 / 31, bl = (c >> 10 & 31) * 255 / 31;
+        pal[i] = i ? (r | g << 8 | bl << 16 | 0xFFu << 24) : 0;
+    }
+    for (int t = 0; t < 16; ++t)
+        for (int y = 0; y < 8; ++y)
+            for (int x = 0; x < 8; ++x) {
+                uint8_t v = bn[0x20 + t * 32 + y * 4 + x / 2];
+                b.icon[((t / 4) * 8 + y) * 32 + (t % 4) * 8 + x] = pal[x & 1 ? v >> 4 : v & 15];
+            }
+    b.has_icon = true;
+    std::string t = utf16(&bn[0x340], 128), line, joined;
+    std::vector<std::string> lines;
+    for (char c : t + "\n")
+        if (c == '\n') { if (!line.empty()) lines.push_back(line); line.clear(); }
+        else line += c;
+    if (lines.size() > 1) lines.pop_back();         // the last line is the publisher
+    for (auto& l : lines) joined += (joined.empty() ? "" : " ") + l;
+    b.title = joined;
+    return b;
+}
+
+void set_icon(Slot& s) {
+    if (s.icon) { SDL_DestroyTexture(s.icon); s.icon = nullptr; }
+    if (!g_ren || s.state != Rom::Good || !s.banner.has_icon) return;
+    s.icon = SDL_CreateTexture(g_ren, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, 32, 32);
+    if (!s.icon) return;
+    SDL_UpdateTexture(s.icon, nullptr, s.banner.icon, 32 * 4);
+    SDL_SetTextureScaleMode(s.icon, SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureBlendMode(s.icon, SDL_BLENDMODE_BLEND);
+}
+
 void check(int i) {
     Slot& s = g_slots[i];
     std::error_code ec;
+    s.banner = Banner();
     if (s.rom.empty()) s.state = Rom::None;
-    else if (!fs::exists(s.rom, ec)) s.state = Rom::Missing;
+    else if (!fs::exists(upath(s.rom), ec)) s.state = Rom::Missing;
     else {
         s.got = hash_of(s.rom);
         s.state = s.got == kGames[i].hash ? Rom::Good : Rom::Wrong;
+        s.banner = read_banner(s.rom);
     }
+    set_icon(s);
 }
 
 bool exe_present(int i) {
@@ -130,19 +227,25 @@ bool exe_present(int i) {
 
 // a file given for game i (or for whichever game it is: i < 0)
 void take(int i, const std::string& path) {
+    std::string name = ustr(upath(path).filename());
     std::string h = hash_of(path);
+    Banner b = read_banner(path);
     if (i < 0) {
         for (int k = 0; k < kCount; ++k)
-            if (h == kGames[k].hash) i = k;
+            if (h == kGames[k].hash || (b.ds && b.code == kGames[k].code)) i = k;
         if (i < 0) {
-            g_note = fs::path(path).filename().string() + " is none of the three games' expected dumps.";
+            g_note_bad = true;
+            g_note = !b.ds ? name + " is not a Nintendo DS cartridge dump."
+                           : name + " is a DS dump (" + b.code + (b.title.empty() ? "" : ", " + b.title) +
+                                 "), but not one of these three games.";
             return;
         }
     }
     g_slots[i].rom = path;
     check(i);
     save();
-    g_note = g_slots[i].state == Rom::Good ? std::string(kGames[i].title) + ": dump set." : "";
+    g_note_bad = g_slots[i].state != Rom::Good;
+    g_note = g_slots[i].state == Rom::Good ? std::string(kGames[i].title) + ": ready to play." : "";
 }
 
 void SDLCALL picked(void* user, const char* const* files, int) {
@@ -171,6 +274,7 @@ void play(int i) {
     if (out) SDL_CloseIO(out);
     g_slots[i].failed = false;
     if (!g_proc) {
+        g_note_bad = true;
         g_note = std::string("Could not start ") + exe + ": " + SDL_GetError();
         return;
     }
@@ -191,31 +295,71 @@ void poll_game() {
     g_running = -1;
 }
 
-void card(int i, SDL_Window* win) {
+// a button in the games' accent colour (Play), grey while it cannot be pressed
+bool accent_button(const char* label, ImVec2 size, bool on) {
+    if (on) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.80f, 0.24f, 0.16f, 1));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.33f, 0.20f, 1));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.66f, 0.18f, 0.12f, 1));
+    }
+    ImGui::BeginDisabled(!on);
+    bool r = ImGui::Button(label, size);
+    ImGui::EndDisabled();
+    if (on) ImGui::PopStyleColor(3);
+    return r;
+}
+
+void card(int i, SDL_Window* win, bool& focused) {
     const GameInfo& g = kGames[i];
     Slot& s = g_slots[i];
+    float fs_ = ImGui::GetFontSize();
+    float side = 32 * std::max(2.0f, std::round(fs_ * 5.2f / 32));   // the icon at a whole multiple of its 32 pixels
     ImGui::PushID(i);
-    ImGui::BeginChild("card", ImVec2(0, ImGui::GetFrameHeightWithSpacing() * 4.2f), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("card", ImVec2(0, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoScrollbar);
+    // the icon (the game's own, from the dump), or a blank tile
+    ImVec2 at = ImGui::GetCursorScreenPos();
+    if (s.icon) {                                   // its pixels kept square: nearest sampling (the backend's own switch)
+        const ImGuiPlatformIO& pio = ImGui::GetPlatformIO();
+        ImDrawList* d = ImGui::GetWindowDrawList();
+        if (pio.DrawCallback_SetSamplerNearest) d->AddCallback(pio.DrawCallback_SetSamplerNearest, nullptr);
+        ImGui::Image((ImTextureID)(intptr_t)s.icon, ImVec2(side, side));
+        if (pio.DrawCallback_SetSamplerLinear) d->AddCallback(pio.DrawCallback_SetSamplerLinear, nullptr);
+    } else {
+        ImDrawList* d = ImGui::GetWindowDrawList();
+        d->AddRectFilled(at, ImVec2(at.x + side, at.y + side), IM_COL32(44, 44, 52, 255), fs_ * 0.4f);
+        const char* t = "DS";
+        ImGui::PushFont(g_big, 0);
+        ImVec2 ts = ImGui::CalcTextSize(t);
+        d->AddText(ImVec2(at.x + (side - ts.x) / 2, at.y + (side - ts.y) / 2), IM_COL32(90, 90, 104, 255), t);
+        ImGui::PopFont();
+        ImGui::Dummy(ImVec2(side, side));
+    }
+    ImGui::SameLine(0, fs_ * 1.2f);
+    ImGui::BeginGroup();
+    ImGui::PushFont(g_big, ImGui::GetStyle().FontSizeBase * 1.25f);
     ImGui::TextUnformatted(g.title);
+    ImGui::PopFont();
     bool exe = exe_present(i);
-    const ImVec4 ok(0.45f, 0.85f, 0.45f, 1), warn(1, 0.75f, 0.3f, 1), dim(0.6f, 0.6f, 0.6f, 1);
-    if (!exe) ImGui::TextColored(dim, "Not in this package.");
-    else if (s.state == Rom::None) ImGui::TextColored(warn, "Choose your dump of %s (.nds).", g.dump);
-    else if (s.state == Rom::Missing) ImGui::TextColored(warn, "The dump chosen is gone (%s): choose it again.", s.rom.c_str());
+    if (s.state == Rom::Good && !s.banner.title.empty() && (g_jp_font || i == 0)) ImGui::TextColored(kDim, "%s", s.banner.title.c_str());
+    else ImGui::TextColored(kDim, "Needs your dump of %s.", g.dump);
+    if (!exe) ImGui::TextColored(kDim, "Not in this package.");
+    else if (s.state == Rom::None) ImGui::TextColored(kWarn, "Choose your dump (.nds), or drop it on this window.");
+    else if (s.state == Rom::Missing) ImGui::TextColored(kWarn, "The dump chosen is gone: choose it again.");
     else if (s.state == Rom::Wrong)
-        ImGui::TextColored(warn, "Not the expected dump: it must be %s, unmodified (its hash is %s).", g.dump,
-                           s.got.empty() ? "unreadable" : s.got.c_str());
-    else if (g_running == i) ImGui::TextColored(ok, "Playing...");
-    else if (s.failed) ImGui::TextColored(warn, "The game stopped with an error (code %d): see its log.", s.exit_code);
-    else ImGui::TextColored(ok, "Ready.");
-    if (s.state != Rom::None) ImGui::TextDisabled("%s", s.rom.c_str());
-    else ImGui::NewLine();
+        ImGui::TextColored(kWarn, s.banner.code == g.code ? "This is the game, but not the dump it needs: an unmodified %s."
+                                                         : "That file is not %s: choose its dump.",
+                           g.dump);
+    else if (g_running == i) ImGui::TextColored(kOk, "Playing...");
+    else if (s.failed) ImGui::TextColored(kWarn, "The game stopped with an error (code %d): its log says why.", s.exit_code);
+    else ImGui::TextColored(kOk, "Ready.");
+    if (ImGui::IsItemHovered() && !s.rom.empty()) ImGui::SetTooltip("%s", s.rom.c_str());
+    ImGui::Spacing();
     ImGui::BeginDisabled(!exe);
-    ImGui::BeginDisabled(s.state != Rom::Good || g_proc);
-    if (ImGui::Button("  Play  ")) play(i);
-    ImGui::EndDisabled();
+    bool can = exe && s.state == Rom::Good && !g_proc;
+    if (accent_button("Play", ImVec2(fs_ * 7, 0), can)) play(i);
+    if (!focused && can) { ImGui::SetItemDefaultFocus(); focused = true; }
     ImGui::SameLine();
-    if (ImGui::Button("Choose dump...")) {
+    if (ImGui::Button(s.state == Rom::Good ? "Change dump..." : "Choose dump...")) {
         static const SDL_DialogFileFilter f[] = {{"Nintendo DS cartridge dump", "nds"}};
         SDL_ShowOpenFileDialog(picked, (void*)(intptr_t)i, win, f, 1, nullptr, false);
     }
@@ -226,48 +370,101 @@ void card(int i, SDL_Window* win) {
         if (ImGui::Button("Open log")) SDL_OpenURL(("file:///" + data_dir(g.id) + g.id + ".log").c_str());
     }
     ImGui::EndDisabled();
+    ImGui::EndGroup();
     ImGui::EndChild();
     ImGui::PopID();
+}
+
+// Windows' Segoe UI (and its bold for the titles) with a Japanese font merged in, else ImGui's own
+void fonts(float size) {
+    ImGuiIO& io = ImGui::GetIO();
+    std::string win = "C:\\Windows";
+    if (const char* w = SDL_getenv("WINDIR")) win = w;
+    auto font = [&](const char* name) { return win + "\\Fonts\\" + name; };
+    auto exists = [](const std::string& p) { std::error_code ec; return fs::exists(p, ec); };
+    const char* jp[] = {"YuGothM.ttc", "meiryo.ttc", "msgothic.ttc"};
+    auto add = [&](const char* latin) -> ImFont* {
+        if (!exists(font(latin))) return nullptr;
+        ImFont* f = io.Fonts->AddFontFromFileTTF(font(latin).c_str(), size);
+        for (const char* j : jp)
+            if (exists(font(j))) {
+                ImFontConfig c;
+                c.MergeMode = true;
+                io.Fonts->AddFontFromFileTTF(font(j).c_str(), size, &c);
+                g_jp_font = true;
+                break;
+            }
+        return f;
+    };
+    ImFont* body = add("segoeui.ttf");
+    if (!body) io.Fonts->AddFontDefault();
+    g_big = add("segoeuib.ttf");
+    if (!g_big) g_big = io.Fonts->Fonts[0];
+}
+
+void style() {
+    ImGuiStyle& s = ImGui::GetStyle();
+    ImGui::StyleColorsDark();
+    s.WindowRounding = 0;
+    s.ChildRounding = 8;
+    s.FrameRounding = 6;
+    s.FramePadding = ImVec2(12, 6);
+    s.ItemSpacing = ImVec2(10, 7);
+    s.WindowPadding = ImVec2(18, 16);
+    ImVec4* c = s.Colors;
+    c[ImGuiCol_WindowBg] = ImVec4(0.075f, 0.075f, 0.09f, 1);
+    c[ImGuiCol_ChildBg] = ImVec4(0.11f, 0.11f, 0.13f, 1);
+    c[ImGuiCol_Border] = ImVec4(0.22f, 0.22f, 0.26f, 1);
+    c[ImGuiCol_Button] = ImVec4(0.20f, 0.21f, 0.26f, 1);
+    c[ImGuiCol_ButtonHovered] = ImVec4(0.28f, 0.30f, 0.37f, 1);
+    c[ImGuiCol_ButtonActive] = ImVec4(0.16f, 0.17f, 0.21f, 1);
+    c[ImGuiCol_NavCursor] = ImVec4(1, 0.78f, 0.25f, 1);
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (!SDL_Init(SDL_INIT_VIDEO)) return 1;
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return 1;
     if (const char* b = SDL_GetBasePath()) g_exe_dir = b;
     std::error_code ec;
     g_portable = fs::exists(fs::path(g_exe_dir) / "portable.txt", ec);
-    load();
-    for (int i = 0; i < kCount; ++i) check(i);
     std::string shot, play_id;
+    std::vector<std::string> roms;
     for (int a = 1; a + 1 < argc; a += 2) {
         std::string k = argv[a], v = argv[a + 1];
-        if (k == "--rom") take(-1, v);
+        if (k == "--rom") roms.push_back(v);
         else if (k == "--play") play_id = v;
         else if (k == "--shot") shot = v;
+        else if (k == "--data") g_data_override = v;
     }
-    for (int i = 0; i < kCount; ++i)
-        if (play_id == kGames[i].id && g_slots[i].state == Rom::Good && exe_present(i)) play(i);
-    int frames = 0;
+    load();
 
     float dpi = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
     if (dpi <= 0) dpi = 1;
-    SDL_Window* win = SDL_CreateWindow("eba-recomp " EBA_VERSION, (int)(760 * dpi), (int)(560 * dpi),
-                                       SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
-    SDL_Renderer* ren = win ? SDL_CreateRenderer(win, nullptr) : nullptr;
-    if (!ren) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "eba-recomp", SDL_GetError(), nullptr);
+    SDL_Window* win = SDL_CreateWindow(kName, (int)(860 * dpi), (int)(720 * dpi), SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    g_ren = win ? SDL_CreateRenderer(win, nullptr) : nullptr;
+    if (!g_ren) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, kName, SDL_GetError(), nullptr);
         return 1;
     }
-    SDL_SetRenderVSync(ren, 1);
+    SDL_SetRenderVSync(g_ren, 1);
+    for (int i = 0; i < kCount; ++i) check(i);
+    for (auto& r : roms) take(-1, r);
+    for (int i = 0; i < kCount; ++i)
+        if (play_id == kGames[i].id && g_slots[i].state == Rom::Good && exe_present(i)) play(i);
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui::GetIO().IniFilename = nullptr;
-    ImGui::StyleColorsDark();
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = nullptr;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad | ImGuiConfigFlags_NavEnableKeyboard;
+    style();
     ImGui::GetStyle().ScaleAllSizes(dpi);
-    ImGui::GetStyle().FontScaleDpi = dpi * 1.15f;
-    ImGui_ImplSDL3_InitForSDLRenderer(win, ren);
-    ImGui_ImplSDLRenderer3_Init(ren);
+    ImGui::GetStyle().FontScaleDpi = dpi;
+    fonts(18);
+    ImGui_ImplSDL3_InitForSDLRenderer(win, g_ren);
+    ImGui_ImplSDLRenderer3_Init(g_ren);
+    int frames = 0;
 
     for (bool run = true; run;) {
         SDL_Event e;
@@ -289,35 +486,47 @@ int main(int argc, char** argv) {
         ImGui::SetNextWindowPos(vp->WorkPos);
         ImGui::SetNextWindowSize(vp->WorkSize);
         ImGui::Begin("##main", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
-        ImGui::Text("eba-recomp %s", EBA_VERSION);
-        ImGui::TextDisabled("The Nintendo DS rhythm games, recompiled. Each needs your own dump of its cartridge;");
-        ImGui::TextDisabled("nothing of the games is included. Drop a .nds file on this window to set it.");
+        ImGui::PushFont(g_big, ImGui::GetStyle().FontSizeBase * 1.6f);
+        ImGui::TextUnformatted(kName);
+        ImGui::PopFont();
+        ImGui::TextColored(kDim, "Elite Beat Agents and both Osu! Tatakae! Ouendan games, recompiled for PC.   v" EBA_VERSION);
+        ImGui::TextColored(kDim, "Each game needs your own dump of its cartridge: nothing of the games is included.");
         ImGui::Spacing();
-        for (int i = 0; i < kCount; ++i) card(i, win);
-        if (!g_note.empty()) ImGui::TextWrapped("%s", g_note.c_str());
         ImGui::Spacing();
-        ImGui::TextDisabled("Saves and settings: %s", g_portable ? "beside this program (portable)" : "%APPDATA%\\eba-recomp");
-        ImGui::TextDisabled("In a game: F1 shows or hides the options bar. Not affiliated with Nintendo or iNiS.");
+        bool focused = false;
+        for (int i = 0; i < kCount; ++i) card(i, win, focused);
+        if (!g_note.empty()) {
+            ImGui::Spacing();
+            ImGui::TextColored(g_note_bad ? kWarn : kOk, "%s", g_note.c_str());
+        }
+        // the footer, at the window's foot
+        float foot = ImGui::GetTextLineHeightWithSpacing() * 2 + ImGui::GetStyle().WindowPadding.y;
+        if (ImGui::GetCursorPosY() < ImGui::GetWindowHeight() - foot) ImGui::SetCursorPosY(ImGui::GetWindowHeight() - foot);
+        ImGui::TextColored(kDim, "Saves and settings: %s.   In a game, F1 shows or hides the options bar.",
+                           g_portable ? "beside this program (portable)" : "%APPDATA%\\eba-recomp");
+        ImGui::TextColored(kDim, "A fan project, not affiliated with Nintendo or iNiS.");
         ImGui::End();
         ImGui::Render();
-        SDL_SetRenderDrawColor(ren, 20, 20, 24, 255);
-        SDL_RenderClear(ren);
-        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), ren);
+        SDL_SetRenderDrawColor(g_ren, 19, 19, 23, 255);
+        SDL_RenderClear(g_ren);
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), g_ren);
         if (!shot.empty() && ++frames == 5) {
-            if (SDL_Surface* s = SDL_RenderReadPixels(ren, nullptr)) {
+            if (SDL_Surface* s = SDL_RenderReadPixels(g_ren, nullptr)) {
                 SDL_SaveBMP(s, shot.c_str());
                 SDL_DestroySurface(s);
             }
             if (!g_proc) run = false;           // (a game started: wait for it)
         }
         if (!shot.empty() && frames > 5 && !g_proc) run = false;
-        SDL_RenderPresent(ren);
+        SDL_RenderPresent(g_ren);
         if (g_proc) SDL_Delay(10);
     }
+    for (auto& s : g_slots)
+        if (s.icon) SDL_DestroyTexture(s.icon);
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
-    SDL_DestroyRenderer(ren);
+    SDL_DestroyRenderer(g_ren);
     SDL_DestroyWindow(win);
     SDL_Quit();
     return 0;
