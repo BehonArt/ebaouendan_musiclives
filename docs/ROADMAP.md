@@ -5,7 +5,7 @@ Rhythm Damashii) released together, on GitHub Releases and in the Quiver
 Launcher catalog (quiverlauncher.com: it installs and updates apps from a
 GitHub or GitLab repository's release assets, a zip or an MSI).
 
-**Target: published and submitted to Quiver by Monday 2 November 2026.**
+**Target: v1.0 published and submitted to Quiver by Sunday 8 November 2026** (first target, 2 November, missed: see the re-planned week).
 (What is in our hands is the submission; Quiver's review time is not.)
 
 ## Rules
@@ -44,7 +44,35 @@ Not in v1 (kept in the code, left out of the release build):
   still load from the `skins` folder beside the game, so the Skin menu stays)
 - Replays saved to disk
 
-## The week
+## The week (re-planned Monday 2 November)
+
+The first week got the release build, the version numbers, the save folders
+and a working launcher done (26 and 27 October); packaging, the crash log,
+the player README and the public repo did not happen. The plan from here:
+
+| Day | Work | Done when |
+|---|---|---|
+| **Mon 2 Nov** | **The launcher, finished**: the project's name (Elite Beat Ouendan: Music LIVES), each game's own icon and title read from the player's dump (nothing of the games ships), a clear line for a wrong file dropped, a controller can pick a game and press Play, Play greyed out until a dump checks out. | Screenshot of the launcher with 0, 1 and 3 dumps set |
+| **Tue 3 Nov** | **Packaging**: release builds of all three games (`EBA_RELEASE=ON`), a script that makes the zip (launcher, EBA.exe, OE1.exe, OE2.exe, SDL3 and the MinGW DLLs, the three HD approach-circle packs, `LICENSE`, `THIRD_PARTY.txt`), and a test in Windows Sandbox (a PC that never had MSYS2). | The zip, unpacked in the Sandbox, plays all three |
+| **Wed 4 Nov** | **When it goes wrong**: a crash log the player can attach to an issue, and "Copy diagnostics" in the launcher (version, GPU and driver, OpenGL version, settings). A clear message when the PC has no OpenGL 4.5. **You**: the controller pass (DualSense: rumble tiers, trigger resistance; Xbox or Switch if at hand). | A forced crash leaves a readable log |
+| **Thu 5 Nov** | **Going public**: the player README (setup, controls, options, known issues), CHANGELOG, screenshots. The public GitHub repo (you create it, or I install the GitHub CLI and you sign in), push, publish **v1.0.0-rc1** as a pre-release. Testers on AMD and Intel graphics get the link. | rc1 on GitHub |
+| **Fri 6, Sat 7 Nov** | Tester feedback, fixes only. The Quiver listing ready (name, description, tags, screenshots, the release asset). | No blocking issue open |
+| **Sun 8 Nov** | Publish **v1.0.0**; submit to Quiver (your sign-in). | Released; submission in |
+
+v1.0's scope stays as above: all three games, button (Tap) mode and its
+controller options, the display and look options, timing, the fire effect,
+the assists and No-Fail. Out: Customs and Customs Studio, RetroAchievements,
+saved replays, skins other than the HD approach circles.
+
+What needs you: the GitHub repo (or a sign-in for the CLI), the controller
+pass, two or three testers on other GPUs, the Quiver sign-in, and a yes on
+the release day.
+
+Risks: a graphics driver that dislikes the OpenGL 4.5 renderer (why rc1 goes
+out Thursday); the SmartScreen warning on an unsigned exe (the README
+explains "More info > Run anyway"; signing can wait); Quiver's review time.
+
+## The first week (26 October to 2 November)
 
 The three game executables cannot be merged into one (each is a different
 game's translated code, with the same function names), so "one package" is
