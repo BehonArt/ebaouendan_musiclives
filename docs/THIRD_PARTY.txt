@@ -19,6 +19,9 @@ Dear ImGui (built in), MIT
 rcheevos (built in: the dump check), MIT
     https://github.com/RetroAchievements/rcheevos  licenses/rcheevos.txt
 
+stb_image (built into the launcher: its header.png), public domain or MIT
+    https://github.com/nothings/stb                licenses/stb_image.txt
+
 GNU libiconv (libiconv-2.dll, used by SDL3.dll), LGPL 2.1 or later
     https://www.gnu.org/software/libiconv/         licenses/libiconv.txt
     An unmodified build from MSYS2 (mingw-w64-ucrt-x86_64-libiconv), whose

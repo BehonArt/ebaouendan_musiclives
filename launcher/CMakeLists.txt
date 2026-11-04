@@ -13,10 +13,10 @@ add_library(rcheevos STATIC ${RC_SOURCES})
 target_include_directories(rcheevos PUBLIC ${RC}/include)
 target_compile_definitions(rcheevos PUBLIC RC_CLIENT_SUPPORTS_HASH RC_STATIC)
 add_executable(eba-recomp WIN32
-    launcher.cpp
+    launcher.cpp rom_music.cpp stb.cpp
     ${IMGUI}/imgui.cpp ${IMGUI}/imgui_draw.cpp ${IMGUI}/imgui_tables.cpp ${IMGUI}/imgui_widgets.cpp
     ${IMGUI}/backends/imgui_impl_sdl3.cpp ${IMGUI}/backends/imgui_impl_sdlrenderer3.cpp)
-target_include_directories(eba-recomp PRIVATE ${IMGUI} ${IMGUI}/backends)
+target_include_directories(eba-recomp PRIVATE ${IMGUI} ${IMGUI}/backends ${CMAKE_CURRENT_LIST_DIR}/../third_party/stb)
 target_compile_definitions(eba-recomp PRIVATE EBA_VERSION="${EBA_VERSION}")
 target_link_libraries(eba-recomp PRIVATE SDL3::SDL3 rcheevos)
 if(WIN32)

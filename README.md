@@ -528,7 +528,21 @@ folder (`%APPDATA%\eba-recomp\Launcher\`, or `userdata\Launcher\` when
 portable). Play starts the game with `--window`, its output in
 `<its folder>\<game>.log`; a game that stops with an error says so, with
 Open log. It draws with SDL's 2D renderer, not OpenGL 4.5, so it opens on
-any PC. Test options: `--rom FILE`, `--play ID`, `--shot FILE.bmp`.
+any PC. Test options: `--rom FILE`, `--play ID`, `--shot FILE.bmp`
+(`--shot-frame N`), `--music-wav NAME FILE.wav` (the first `--rom`'s stream
+decoded: the decoder's check, sample-identical to the toolkit's Python).
+
+When a dump is added its icon springs in (ease-out back, 0.9 s) with a ring
+spreading from it and the card glowing, and the game's **difficulty-select
+music** plays through once, decoded from the dump itself (`rom_music.cpp`:
+the ROM's file table finds `data/sound_data.sdat`, its SYMB names the stream
+`STRM_MENU_B` in all three games, IMA ADPCM blocks per channel); it loops
+again while the mouse or a gamepad's focus is on the card, ramped over a
+quarter second, and never over a running game. The Music checkbox in the
+footer turns it off (`music=` in `launcher.ini`). A `header.png` beside the
+launcher is drawn across the window's top in place of the title text;
+`launcher/header_template.png` (1600x300, safe area marked) is the guide,
+and `make_release.ps1` ships `launcher/header.png` when it exists.
 
 Checked (a portable folder: the launcher, a release `EBA.exe`, the DLLs):
 first run asks for each dump; EBA's and Ouendan 2's dumps are recognised

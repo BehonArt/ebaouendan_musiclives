@@ -4,8 +4,13 @@
 // RetroAchievements' hash of the ROM: its header, ARM9 and ARM7 code and icon,
 // which every good dump of that game shares, trimmed or not), Play, and its save
 // folder. Once a dump checks out, the card shows the game's own icon and title
-// from the dump's banner: nothing of the games ships with the launcher. The ROM
-// paths are kept in launcher.ini in the launcher's own data folder.
+// from the dump's banner, the icon popping in, and the game's difficulty-select
+// music plays through once from the dump (rom_music.cpp), and again while the
+// mouse (or a gamepad's focus) is on the card: nothing of the games ships with
+// the launcher. The ROM paths and the music switch are kept in launcher.ini in
+// the launcher's own data folder. A header.png beside the launcher (any width;
+// launcher/header_template.png is the guide) is drawn across the top in place
+// of the title text.
 //
 // Where the games keep their files is decided by the games themselves
 // (src/eba_paths.cpp): %APPDATA%\eba-recomp\<game>\, or userdata\<game>\
@@ -21,13 +26,16 @@
 //
 // Options (tests): --rom FILE (set a dump, as a drop does); --play ID (EBA, OE1,
 // OE2: start it at once); --shot FILE.bmp (the window's picture after a few
-// frames, then quit); --data DIR (the launcher's own folder instead: a test's
-// launcher.ini).
+// frames, then quit; --shot-frame N picks the frame); --data DIR (the launcher's
+// own folder instead: a test's launcher.ini); --music-wav NAME FILE.wav (write the
+// first --rom's stream NAME decoded, for checking the decoder, then quit).
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 #include "rc_consoles.h"
 #include "rc_hash.h"
+#include "rom_music.h"
+#include "stb_image.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <algorithm>
@@ -56,13 +64,14 @@ struct GameInfo {
     const char* code;                   // the cartridge's game code (its header)
     const char* dump;                   // which dump it needs
     const char* hash;                   // RetroAchievements' hash of that dump
+    const char* menu_strm;              // its difficulty-select music, by the sound archive's name
 };
 
 const GameInfo kGames[] = {
-    {"EBA", "Elite Beat Agents", "AOSE", "the USA cartridge (AOSE)", "bbf10cada0dcc72068179c600fe79267"},
-    {"OE1", "Osu! Tatakae! Ouendan", "AOSJ", "the Japanese cartridge (AOSJ)", "999654092d72821ef56a7c8de260cc64"},
+    {"EBA", "Elite Beat Agents", "AOSE", "the USA cartridge (AOSE)", "bbf10cada0dcc72068179c600fe79267", "STRM_MENU_B"},
+    {"OE1", "Osu! Tatakae! Ouendan", "AOSJ", "the Japanese cartridge (AOSJ)", "999654092d72821ef56a7c8de260cc64", "STRM_MENU_B"},
     {"OE2", "Moero! Nekketsu Rhythm Damashii Osu! Tatakae! Ouendan 2", "AO2J", "the Japanese cartridge (AO2J)",
-     "899b9c8dd0128097aebb009b49b2a2d5"},
+     "899b9c8dd0128097aebb009b49b2a2d5", "STRM_MENU_B"},
 };
 constexpr int kCount = 3;
 
@@ -85,6 +94,9 @@ struct Slot {
     SDL_Texture* icon = nullptr;
     int exit_code = 0;                  // the last run's, when it stopped with an error
     bool failed = false;
+    RomMusic music;                     // its difficulty-select music, from the dump
+    bool has_music = false;
+    uint64_t added_at = 0;              // when its dump was added (ms): the icon's pop
 };
 
 std::string g_exe_dir, g_data_override;
@@ -98,6 +110,21 @@ bool g_note_bad;
 std::mutex g_pick_mu;
 std::vector<std::pair<int, std::string>> g_picked;   // file dialogs' answers, for the main thread
 ImFont* g_big;
+SDL_Texture* g_header;                  // header.png beside the launcher, if any
+int g_header_w, g_header_h;
+int g_shot_frame = 5;
+
+// the menu music: one game's at a time, ramped in and out (a quarter second), looping
+// under the mouse, once through when just added, quiet while a game runs
+struct Music {
+    SDL_AudioStream* stream = nullptr;
+    int playing = -1, want = -1;        // the slot sounding; the one asked for
+    bool once = false;                  // the added game's play-through (no loop)
+    size_t pos = 0;                     // the frame next
+    float gain = 0;
+    bool on = true;                     // the option (launcher.ini music=)
+} g_music;
+constexpr float kMusicVolume = 0.55f;
 
 // paths as UTF-8 (what SDL hands over: drops, dialogs, the ini)
 fs::path upath(const std::string& s) { return fs::path((const char8_t*)s.c_str()); }
@@ -129,6 +156,7 @@ void load() {
         std::string k = line.substr(0, e), v = line.substr(e + 1);
         for (int i = 0; i < kCount; ++i)
             if (k == std::string("rom_") + kGames[i].id) g_slots[i].rom = v;
+        if (k == "music") g_music.on = v != "0";
     }
 }
 
@@ -136,6 +164,7 @@ void save() {
     std::ofstream f(ini_path());
     f << "# " << kName << ", the launcher: the cartridge dumps chosen\n";
     for (int i = 0; i < kCount; ++i) f << "rom_" << kGames[i].id << "=" << g_slots[i].rom << "\n";
+    f << "music=" << (g_music.on ? 1 : 0) << "\n";
 }
 
 std::string hash_of(const std::string& path) {
@@ -218,6 +247,8 @@ void check(int i) {
         s.banner = read_banner(s.rom);
     }
     set_icon(s);
+    s.music = RomMusic();
+    s.has_music = s.state == Rom::Good && rom_music_load(s.rom, kGames[i].menu_strm, s.music);
 }
 
 bool exe_present(int i) {
@@ -244,6 +275,12 @@ void take(int i, const std::string& path) {
     g_slots[i].rom = path;
     check(i);
     save();
+    if (g_slots[i].state == Rom::Good) {        // the pop, and its music once through
+        g_slots[i].added_at = SDL_GetTicks();
+        g_music.want = i;
+        g_music.once = true;
+        if (g_music.playing == i) g_music.pos = 0;
+    }
     g_note_bad = g_slots[i].state != Rom::Good;
     g_note = g_slots[i].state == Rom::Good ? std::string(kGames[i].title) + ": ready to play." : "";
 }
@@ -282,6 +319,53 @@ void play(int i) {
     g_note.clear();
 }
 
+// each frame: what should sound (the card under the mouse, else a play-through),
+// then enough audio queued for the next 150 ms, ramping between games and to silence
+void music_frame(int hovered) {
+    if (hovered >= 0 && !g_slots[hovered].has_music) hovered = -1;
+    if (hovered >= 0 && hovered != g_music.want) g_music.once = false;
+    g_music.want = hovered >= 0 ? hovered : g_music.once ? g_music.want : -1;
+    if (g_music.want >= 0 && !g_slots[g_music.want].has_music) g_music.want = -1;
+    bool quiet = !g_music.on || g_proc;
+    if (g_music.playing < 0) {
+        if (g_music.want < 0 || quiet) return;
+        g_music.playing = g_music.want;
+        g_music.pos = 0;
+        g_music.gain = 0;
+    }
+    const RomMusic& m = g_slots[g_music.playing].music;
+    SDL_AudioSpec spec = {SDL_AUDIO_S16, 2, m.rate};
+    if (!g_music.stream) {
+        g_music.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
+        if (!g_music.stream) { g_music.playing = -1; g_music.want = -1; g_music.on = false; return; }
+        SDL_ResumeAudioStreamDevice(g_music.stream);
+    }
+    SDL_SetAudioStreamFormat(g_music.stream, &spec, nullptr);
+    bool to = g_music.want == g_music.playing && !quiet;
+    float step = 1.0f / (0.25f * m.rate);
+    int16_t buf[2 * 512];
+    while (SDL_GetAudioStreamQueued(g_music.stream) < (int)(m.rate * 4 * 0.15)) {
+        int n = 0;
+        for (; n < 512; ++n) {
+            g_music.gain = to ? std::min(1.0f, g_music.gain + step) : std::max(0.0f, g_music.gain - step);
+            float g = g_music.gain * kMusicVolume;
+            buf[2 * n] = (int16_t)(m.pcm[2 * g_music.pos] * g);
+            buf[2 * n + 1] = (int16_t)(m.pcm[2 * g_music.pos + 1] * g);
+            if (++g_music.pos >= m.frames()) {
+                if (m.looped && !g_music.once) g_music.pos = m.loop;
+                else { g_music.pos = m.frames() - 1; g_music.gain = 0; to = false; }
+            }
+            if (!to && g_music.gain <= 0) { ++n; break; }
+        }
+        SDL_PutAudioStreamData(g_music.stream, buf, n * 4);
+        if (!to && g_music.gain <= 0) {             // silent: this one is over
+            if (g_music.once && g_music.want == g_music.playing) { g_music.once = false; g_music.want = -1; }
+            g_music.playing = -1;
+            return;
+        }
+    }
+}
+
 void poll_game() {
     if (!g_proc) return;
     int code = 0;
@@ -309,11 +393,20 @@ bool accent_button(const char* label, ImVec2 size, bool on) {
     return r;
 }
 
-void card(int i, SDL_Window* win, bool& focused) {
+const ImU32 kAccent = IM_COL32(235, 84, 41, 255);
+
+// the card; true while the mouse (or a gamepad's focus) is on it
+bool card(int i, SDL_Window* win, bool& focused) {
     const GameInfo& g = kGames[i];
     Slot& s = g_slots[i];
     float fs_ = ImGui::GetFontSize();
     float side = 32 * std::max(2.0f, std::round(fs_ * 5.2f / 32));   // the icon at a whole multiple of its 32 pixels
+    // the pop: 0.9 s after the dump is added the icon springs in (overshooting) with a ring spreading from it
+    float pop = 0;
+    if (s.added_at) {
+        pop = (SDL_GetTicks() - s.added_at) / 900.0f;
+        if (pop >= 1) { pop = 0; s.added_at = 0; }
+    }
     ImGui::PushID(i);
     ImGui::BeginChild("card", ImVec2(0, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoScrollbar);
     // the icon (the game's own, from the dump), or a blank tile
@@ -322,7 +415,14 @@ void card(int i, SDL_Window* win, bool& focused) {
         const ImGuiPlatformIO& pio = ImGui::GetPlatformIO();
         ImDrawList* d = ImGui::GetWindowDrawList();
         if (pio.DrawCallback_SetSamplerNearest) d->AddCallback(pio.DrawCallback_SetSamplerNearest, nullptr);
-        ImGui::Image((ImTextureID)(intptr_t)s.icon, ImVec2(side, side));
+        if (s.added_at) {                           // springing in: ease-out back, from nothing past its size and settling
+            float t = pop - 1, sc = 1 + 2.70158f * t * t * t + 1.70158f * t * t;
+            ImVec2 c(at.x + side / 2, at.y + side / 2), h(side * sc / 2, side * sc / 2);
+            ImGui::Dummy(ImVec2(side, side));
+            d->AddImage((ImTextureID)(intptr_t)s.icon, ImVec2(c.x - h.x, c.y - h.y), ImVec2(c.x + h.x, c.y + h.y));
+        } else {
+            ImGui::Image((ImTextureID)(intptr_t)s.icon, ImVec2(side, side));
+        }
         if (pio.DrawCallback_SetSamplerLinear) d->AddCallback(pio.DrawCallback_SetSamplerLinear, nullptr);
     } else {
         ImDrawList* d = ImGui::GetWindowDrawList();
@@ -343,7 +443,10 @@ void card(int i, SDL_Window* win, bool& focused) {
     if (s.state == Rom::Good && !s.banner.title.empty() && (g_jp_font || i == 0)) ImGui::TextColored(kDim, "%s", s.banner.title.c_str());
     else ImGui::TextColored(kDim, "Needs your dump of %s.", g.dump);
     if (!exe) ImGui::TextColored(kDim, "Not in this package.");
-    else if (s.state == Rom::None) ImGui::TextColored(kWarn, "Choose your dump (.nds), or drop it on this window.");
+    else if (s.state == Rom::None) {
+        ImGui::TextColored(kWarn, "Choose your dump (.nds), or drop it on this window.");
+        ImGui::TextColored(kDim, "To make one from your cartridge: a 3DS with GodMode9, or a DS flashcart with a dumper.");
+    }
     else if (s.state == Rom::Missing) ImGui::TextColored(kWarn, "The dump chosen is gone: choose it again.");
     else if (s.state == Rom::Wrong)
         ImGui::TextColored(kWarn, s.banner.code == g.code ? "This is the game, but not the dump it needs: an unmodified %s."
@@ -357,6 +460,7 @@ void card(int i, SDL_Window* win, bool& focused) {
     ImGui::BeginDisabled(!exe);
     bool can = exe && s.state == Rom::Good && !g_proc;
     if (accent_button("Play", ImVec2(fs_ * 7, 0), can)) play(i);
+    bool nav = ImGui::IsItemFocused() && ImGui::GetIO().NavVisible;   // a gamepad's or the keyboard's focus
     if (!focused && can) { ImGui::SetItemDefaultFocus(); focused = true; }
     ImGui::SameLine();
     if (ImGui::Button(s.state == Rom::Good ? "Change dump..." : "Choose dump...")) {
@@ -372,7 +476,17 @@ void card(int i, SDL_Window* win, bool& focused) {
     ImGui::EndDisabled();
     ImGui::EndGroup();
     ImGui::EndChild();
+    ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+    if (s.added_at) {                               // over the card: its glow fading, the ring spreading from the icon
+        ImDrawList* d = ImGui::GetWindowDrawList();
+        float a = 1 - pop;
+        d->AddRectFilled(mn, mx, (kAccent & 0xFFFFFF) | (ImU32)(a * a * 70) << 24, ImGui::GetStyle().ChildRounding);
+        ImVec2 c(at.x + side / 2, at.y + side / 2);
+        d->AddCircle(c, side * (0.55f + pop * 1.1f), (kAccent & 0xFFFFFF) | (ImU32)(a * 220) << 24, 0, fs_ * 0.22f * a + 1);
+    }
+    bool hovered = ImGui::IsMouseHoveringRect(mn, mx, false) && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_RootWindow);
     ImGui::PopID();
+    return hovered || nav;
 }
 
 // Windows' Segoe UI (and its bold for the titles) with a Japanese font merged in, else ImGui's own
@@ -402,6 +516,25 @@ void fonts(float size) {
     if (!g_big) g_big = io.Fonts->Fonts[0];
 }
 
+// header.png beside the launcher: the art across the window's top (header_template.png guides it)
+void load_header() {
+    std::ifstream f(fs::path(g_exe_dir) / "header.png", std::ios::binary);
+    if (!f) return;
+    std::vector<unsigned char> png((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    int w = 0, h = 0, n = 0;
+    unsigned char* px = stbi_load_from_memory(png.data(), (int)png.size(), &w, &h, &n, 4);
+    if (!px) return;
+    g_header = SDL_CreateTexture(g_ren, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, w, h);
+    if (g_header) {
+        SDL_UpdateTexture(g_header, nullptr, px, w * 4);
+        SDL_SetTextureBlendMode(g_header, SDL_BLENDMODE_BLEND);
+        SDL_SetTextureScaleMode(g_header, SDL_SCALEMODE_LINEAR);
+        g_header_w = w;
+        g_header_h = h;
+    }
+    stbi_image_free(px);
+}
+
 void style() {
     ImGuiStyle& s = ImGui::GetStyle();
     ImGui::StyleColorsDark();
@@ -424,11 +557,11 @@ void style() {
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return 1;
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO)) return 1;
     if (const char* b = SDL_GetBasePath()) g_exe_dir = b;
     std::error_code ec;
     g_portable = fs::exists(fs::path(g_exe_dir) / "portable.txt", ec);
-    std::string shot, play_id;
+    std::string shot, play_id, wav_name, wav_file;
     std::vector<std::string> roms;
     for (int a = 1; a + 1 < argc; a += 2) {
         std::string k = argv[a], v = argv[a + 1];
@@ -436,6 +569,20 @@ int main(int argc, char** argv) {
         else if (k == "--play") play_id = v;
         else if (k == "--shot") shot = v;
         else if (k == "--data") g_data_override = v;
+        else if (k == "--shot-frame") g_shot_frame = std::max(1, std::atoi(v.c_str()));
+        else if (k == "--music-wav" && a + 2 < argc) { wav_name = v; wav_file = argv[a + 2]; ++a; }
+    }
+    if (!wav_name.empty() && !roms.empty()) {   // the decoder's check: the stream as a WAV
+        RomMusic m;
+        std::string err;
+        if (!rom_music_load(roms[0], wav_name.c_str(), m, &err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 2; }
+        std::ofstream w(wav_file, std::ios::binary);
+        uint32_t bytes = (uint32_t)(m.pcm.size() * 2), rate = (uint32_t)m.rate, brate = rate * 4, hdr[] = {
+            0x46464952, 36 + bytes, 0x45564157, 0x20746d66, 16, 0x00020001, rate, brate, 0x00100004, 0x61746164, bytes};
+        w.write((const char*)hdr, sizeof hdr);
+        w.write((const char*)m.pcm.data(), bytes);
+        std::printf("%s: %zu frames at %d Hz, loop %s at %zu\n", wav_name.c_str(), m.frames(), m.rate, m.looped ? "yes" : "no", m.loop);
+        return 0;
     }
     load();
 
@@ -448,6 +595,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     SDL_SetRenderVSync(g_ren, 1);
+    load_header();
     for (int i = 0; i < kCount; ++i) check(i);
     for (auto& r : roms) take(-1, r);
     for (int i = 0; i < kCount; ++i)
@@ -486,22 +634,34 @@ int main(int argc, char** argv) {
         ImGui::SetNextWindowPos(vp->WorkPos);
         ImGui::SetNextWindowSize(vp->WorkSize);
         ImGui::Begin("##main", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
-        ImGui::PushFont(g_big, ImGui::GetStyle().FontSizeBase * 1.6f);
-        ImGui::TextUnformatted(kName);
-        ImGui::PopFont();
+        if (g_header) {                             // the art, the window's width
+            float w = ImGui::GetContentRegionAvail().x;
+            ImGui::Image((ImTextureID)(intptr_t)g_header, ImVec2(w, w * g_header_h / g_header_w));
+        } else {
+            ImGui::PushFont(g_big, ImGui::GetStyle().FontSizeBase * 1.6f);
+            ImGui::TextUnformatted(kName);
+            ImGui::PopFont();
+        }
         ImGui::TextColored(kDim, "Elite Beat Agents and both Osu! Tatakae! Ouendan games, recompiled for PC.   v" EBA_VERSION);
         ImGui::TextColored(kDim, "Each game needs your own dump of its cartridge: nothing of the games is included.");
         ImGui::Spacing();
         ImGui::Spacing();
         bool focused = false;
-        for (int i = 0; i < kCount; ++i) card(i, win, focused);
+        int hovered = -1;
+        for (int i = 0; i < kCount; ++i)
+            if (card(i, win, focused)) hovered = i;
+        music_frame(hovered);
         if (!g_note.empty()) {
             ImGui::Spacing();
             ImGui::TextColored(g_note_bad ? kWarn : kOk, "%s", g_note.c_str());
         }
         // the footer, at the window's foot
+        float fs_ = ImGui::GetFontSize();
         float foot = ImGui::GetTextLineHeightWithSpacing() * 2 + ImGui::GetStyle().WindowPadding.y;
         if (ImGui::GetCursorPosY() < ImGui::GetWindowHeight() - foot) ImGui::SetCursorPosY(ImGui::GetWindowHeight() - foot);
+        if (ImGui::Checkbox("Music", &g_music.on)) save();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Each game's difficulty-select music, from your dump:\nonce when it is added, and while the mouse is on its card.");
+        ImGui::SameLine(0, fs_ * 1.5f);
         ImGui::TextColored(kDim, "Saves and settings: %s.   In a game, F1 shows or hides the options bar.",
                            g_portable ? "beside this program (portable)" : "%APPDATA%\\eba-recomp");
         ImGui::TextColored(kDim, "A fan project, not affiliated with Nintendo or iNiS.");
@@ -510,19 +670,21 @@ int main(int argc, char** argv) {
         SDL_SetRenderDrawColor(g_ren, 19, 19, 23, 255);
         SDL_RenderClear(g_ren);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), g_ren);
-        if (!shot.empty() && ++frames == 5) {
+        if (!shot.empty() && ++frames == g_shot_frame) {
             if (SDL_Surface* s = SDL_RenderReadPixels(g_ren, nullptr)) {
                 SDL_SaveBMP(s, shot.c_str());
                 SDL_DestroySurface(s);
             }
             if (!g_proc) run = false;           // (a game started: wait for it)
         }
-        if (!shot.empty() && frames > 5 && !g_proc) run = false;
+        if (!shot.empty() && frames > g_shot_frame && !g_proc) run = false;
         SDL_RenderPresent(g_ren);
         if (g_proc) SDL_Delay(10);
     }
     for (auto& s : g_slots)
         if (s.icon) SDL_DestroyTexture(s.icon);
+    if (g_header) SDL_DestroyTexture(g_header);
+    if (g_music.stream) SDL_DestroyAudioStream(g_music.stream);
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();

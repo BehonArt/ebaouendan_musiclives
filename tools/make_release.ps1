@@ -62,6 +62,11 @@ Copy-Item (Join-Path $root "ndskit\LICENSE") "$lic\ndskit.txt"
 Copy-Item (Join-Path $root "third_party\imgui\LICENSE.txt") "$lic\imgui.txt"
 Copy-Item (Join-Path $root "third_party\rcheevos\LICENSE") "$lic\rcheevos.txt"
 Copy-Item "$ucrt\share\licenses\sdl3\LICENSE.txt" "$lic\SDL3.txt"
+# stb_image: its licence is at the end of the header
+$stb = Get-Content -Raw (Join-Path $root "third_party\stb\stb_image.h")
+[IO.File]::WriteAllText("$lic\stb_image.txt", $stb.Substring($stb.IndexOf("ALTERNATIVE A - MIT License") - 200))
+$hdr = Join-Path $root "launcher\header.png"
+if (Test-Path $hdr) { Copy-Item $hdr $stage }
 Copy-Item "$ucrt\share\licenses\libiconv\COPYING.LIB" "$lic\libiconv.txt"
 Get-Content "$ucrt\share\licenses\libgcc\COPYING.RUNTIME", "$ucrt\share\licenses\libgcc\COPYING3" | Set-Content "$lic\gcc-runtime.txt" -Encoding utf8
 Copy-Item "$ucrt\share\licenses\libwinpthread\COPYING" "$lic\winpthreads.txt"
