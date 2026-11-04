@@ -535,8 +535,9 @@ decoded: the decoder's check, sample-identical to the toolkit's Python).
 When a dump is added its icon springs in (ease-out back, 0.9 s) with a ring
 spreading from it and the card glowing, and the game's **difficulty-select
 music** plays through once, decoded from the dump itself (`rom_music.cpp`:
-the ROM's file table finds `data/sound_data.sdat`, its SYMB names the stream
-`STRM_MENU_B` in all three games, IMA ADPCM blocks per channel); it loops
+the ROM's file table finds `data/sound_data.sdat`, its SYMB names the stream:
+`STRM_MENU_A` for EBA, `STRM_MENU_B` for both Ouendan games, their stage-select
+loop, which fits better here; IMA ADPCM blocks per channel); it loops
 again while the mouse or a gamepad's focus is on the card, ramped over a
 quarter second, and never over a running game. The Music checkbox in the
 footer turns it off (`music=` in `launcher.ini`). A `header.png` beside the

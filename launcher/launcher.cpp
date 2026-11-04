@@ -64,11 +64,11 @@ struct GameInfo {
     const char* code;                   // the cartridge's game code (its header)
     const char* dump;                   // which dump it needs
     const char* hash;                   // RetroAchievements' hash of that dump
-    const char* menu_strm;              // its difficulty-select music, by the sound archive's name
+    const char* menu_strm;              // its menu music, by the sound archive's name (EBA's difficulty select; the Ouendan games' stage select loop, which fits better here)
 };
 
 const GameInfo kGames[] = {
-    {"EBA", "Elite Beat Agents", "AOSE", "the USA cartridge (AOSE)", "bbf10cada0dcc72068179c600fe79267", "STRM_MENU_B"},
+    {"EBA", "Elite Beat Agents", "AOSE", "the USA cartridge (AOSE)", "bbf10cada0dcc72068179c600fe79267", "STRM_MENU_A"},
     {"OE1", "Osu! Tatakae! Ouendan", "AOSJ", "the Japanese cartridge (AOSJ)", "999654092d72821ef56a7c8de260cc64", "STRM_MENU_B"},
     {"OE2", "Moero! Nekketsu Rhythm Damashii Osu! Tatakae! Ouendan 2", "AO2J", "the Japanese cartridge (AO2J)",
      "899b9c8dd0128097aebb009b49b2a2d5", "STRM_MENU_B"},
