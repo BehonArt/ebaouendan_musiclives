@@ -593,6 +593,12 @@ int main(int argc, char** argv) {
     }
     SDL_SetRenderVSync(g_ren, 1);
     load_header();
+    if (g_header) {                                 // taller by the art's height, less the title text it replaces
+        int w = 0, h = 0;
+        SDL_GetWindowSize(win, &w, &h);
+        SDL_SetWindowSize(win, w, h + (int)((824.0f * g_header_h / g_header_w - 40) * dpi));
+        SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    }
     for (int i = 0; i < kCount; ++i) check(i);
     for (auto& r : roms) take(-1, r);
     for (int i = 0; i < kCount; ++i)
