@@ -443,10 +443,7 @@ bool card(int i, SDL_Window* win, bool& focused) {
     if (s.state == Rom::Good && !s.banner.title.empty() && (g_jp_font || i == 0)) ImGui::TextColored(kDim, "%s", s.banner.title.c_str());
     else ImGui::TextColored(kDim, "Needs your dump of %s.", g.dump);
     if (!exe) ImGui::TextColored(kDim, "Not in this package.");
-    else if (s.state == Rom::None) {
-        ImGui::TextColored(kWarn, "Choose your dump (.nds), or drop it on this window.");
-        ImGui::TextColored(kDim, "To make one from your cartridge: a 3DS with GodMode9, or a DS flashcart with a dumper.");
-    }
+    else if (s.state == Rom::None) ImGui::TextColored(kWarn, "Choose your dump (.nds), or drop it on this window.");
     else if (s.state == Rom::Missing) ImGui::TextColored(kWarn, "The dump chosen is gone: choose it again.");
     else if (s.state == Rom::Wrong)
         ImGui::TextColored(kWarn, s.banner.code == g.code ? "This is the game, but not the dump it needs: an unmodified %s."
