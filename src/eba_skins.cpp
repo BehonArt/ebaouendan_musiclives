@@ -56,6 +56,7 @@ bool hd_rings_available(int width) {
 
 void skins_apply() {
     if (g_cfg.port.count("tex-pack")) return;       // ndsrun's own packs win for that run
+    if (!kSkins) return;                            // skins and the HD rings: not in 1.0 (eba.h)
     fs::path r = root();
     std::vector<std::string> packs;
     std::error_code ec;

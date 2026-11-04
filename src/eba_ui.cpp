@@ -104,7 +104,7 @@ void look_menu() {
         if (ImGui::MenuItem(f[i].name, nullptr, s.filter == i)) { s.filter = i; change(s); }
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", f[i].tip);
     }
-    if (!*game().skins_dir) return;
+    if (!kSkins || !*game().skins_dir) return;
     Skin& k = skin();
     ImGui::Separator();
     heading("Skin (pictures only: the game's sounds stay)");

@@ -41,12 +41,9 @@ if (Test-Path $customs) {
         if ($LASTEXITCODE -ge 8) { throw "robocopy failed on $($d.Name)" }
     }
 }
-# the skins (texture packs: Display > Skin), beside the ROM too
-$skins = Join-Path $root "skins"
-if (Test-Path $skins) {
-    robocopy $skins (Join-Path $dest "skins") /E /NJH /NJS /NFL /NDL /NP | Out-Null
-    if ($LASTEXITCODE -ge 8) { throw "robocopy failed on skins" }
-}
+# no skins for 1.0 (eba.h kSkins): a folder's old copy goes
+$old = Join-Path $dest "skins"
+if (Test-Path $old) { Remove-Item -Recurse -Force $old }
 $bat = @"
 @echo off
 rem $title, recompiled: the game in a window with the options bar.

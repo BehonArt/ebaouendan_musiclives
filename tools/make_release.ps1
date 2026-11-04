@@ -11,7 +11,6 @@
 #   eba-recomp.exe           the launcher (run this)
 #   EBA.exe OE1.exe OE2.exe  the games
 #   SDL3.dll libiconv-2.dll libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll
-#   skins\_hd-rings*\        the HD approach circles (drawn rings, nothing of the games)
 #   README.txt LICENSE THIRD_PARTY.txt licenses\
 #
 # Nothing of the games goes in: the script stops if a ROM or a save is staged.
@@ -33,7 +32,7 @@ function Build-Tree([string]$tree, [string]$release) {
 $stage = Join-Path $root "dist\eba-recomp-v$Version"
 $zip = Join-Path $root "dist\eba-recomp-v$Version-windows-x64.zip"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-New-Item -ItemType Directory -Force $stage, (Join-Path $stage "licenses"), (Join-Path $stage "skins") | Out-Null
+New-Item -ItemType Directory -Force $stage, (Join-Path $stage "licenses") | Out-Null
 
 if (-not $NoBuild) {
     foreach ($id in $games.Keys) { Write-Host "release build: $id"; Build-Tree $games[$id] "ON" }
@@ -52,9 +51,7 @@ if (-not $NoBuild -and -not $KeepRelease) {
 foreach ($dll in "SDL3.dll", "libiconv-2.dll", "libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll") {
     Copy-Item (Join-Path $ucrt "bin\$dll") $stage
 }
-foreach ($d in Get-ChildItem (Join-Path $root "skins") -Directory -Filter "_hd-rings*") {
-    Copy-Item -Recurse $d.FullName (Join-Path $stage "skins")
-}
+# (no skins or HD rings in 1.0: eba.h kSkins)
 $readme = (Get-Content -Raw (Join-Path $root "docs\README_RELEASE.txt")) -replace "@VERSION@", "v$Version"
 $readme = ($readme -replace "`r`n", "`n") -replace "`n", "`r`n"
 [IO.File]::WriteAllText((Join-Path $stage "README.txt"), $readme)

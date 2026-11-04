@@ -3,7 +3,7 @@
 **Elite Beat Agents, Osu! Tatakae! Ouendan and Moero! Nekketsu Rhythm Damashii
 Osu! Tatakae! Ouendan 2 on Windows**, recompiled from their own code to native
 PC programs, with a launcher, Tap mode for controllers (rumble, DualSense
-triggers), HD approach circles, display and look options, assists and
+triggers), display and look options, assists and
 No-Fail, all three games alike.
 
 **You need your own cartridge dumps.** Nothing of the games is in this
@@ -63,8 +63,9 @@ EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
   60, 120, 240, uncapped), Vsync (Auto: on when the display's refresh rate
   suits the frame rate; On: always, no tearing; Off: never, the least
   latency; `--vsync auto|on|off`), fullscreen (F11, Alt+Enter), low latency.
-- **Look:** the filter; skins and HD approach circles (off, normal, thin,
-  thinner), all three games.
+- **Look:** the filter. Skins and HD approach circles are switched off for
+  1.0 (`kSkins` in `src/eba.h`) until a full HD skin is made; the code below
+  stays.
 
 No menu has submenus (in a small window ImGui puts one over its menu): each
 choice is a list under a grey heading.
@@ -201,7 +202,7 @@ motors):
   next note is number 1: a tap, a slider's tail) and every spinner's end;
 - medium (60%, 100 ms) for every other note hit, a slider's head or tail, and
   a miss (its X);
-- low (30%, 65 ms) for slider ticks;
+- low (30%, 65 ms) for slider ticks, panned across the pad by the ball's x;
 - nothing while a spinner turns (a DualSense's triggers push back instead).
 
 Taps, slider heads and misses come from the judge's hook; ticks are the
@@ -309,6 +310,10 @@ what the judge (`Note::Judge`) reads of the session besides the touch:
   gauge function loads the gauge table by judgement, then tests the switch.
 
 ## Skins and texture packs (`src/eba_skins.cpp`, ndskit `texpack.cpp`)
+
+*Off in 1.0:* `kSkins = false` (`src/eba.h`) hides the menus and loads no
+pack (ndsrun's own `--port tex-pack=` still works); the play folders and the
+release zip carry no `skins` folder.
 
 The 3D renderer can draw a PNG in place of any DS texture (patch
 `ndskit-texpacks.patch`). A texture is named by a hash of its texels (and the

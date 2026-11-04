@@ -27,7 +27,7 @@ The games themselves, plus the enhancements that matter most:
 - **Display:** resolution (to 4K), layout, frame rate (DS, 60, 120, 240,
   uncapped), the smoothing filters, Vsync (auto, on, off), fullscreen, low
   latency.
-- **Look:** HD approach circles (normal, thin, thinner).
+- **Look:** the picture filter.
 - **Effects:** the fire behind the squad (all three games).
 - **Controllers:** button mode, hit keys, rumble (high, medium, low) and its
   strength, spinners by the left stick or the triggers, DualSense trigger
@@ -40,8 +40,8 @@ Not in v1 (kept in the code, left out of the release build):
 
 - Customs and Customs Studio
 - RetroAchievements
-- Skins other than the HD approach circles (none ship; a player's own packs
-  still load from the `skins` folder beside the game, so the Skin menu stays)
+- Skins and the HD approach circles (switched off, 4 Nov, until a full HD
+  skin is made: `kSkins` in `src/eba.h`)
 - Replays saved to disk
 
 ## The week (re-planned Monday 2 November)
@@ -62,7 +62,7 @@ the player README and the public repo did not happen. The plan from here:
 v1.0's scope stays as above: all three games, button (Tap) mode and its
 controller options, the display and look options, timing, the fire effect,
 the assists and No-Fail. Out: Customs and Customs Studio, RetroAchievements,
-saved replays, skins other than the HD approach circles.
+saved replays, skins and the HD approach circles.
 
 What needs you: the GitHub repo (or a sign-in for the CLI), the controller
 pass, two or three testers on other GPUs, the Quiver sign-in, and a yes on
@@ -82,14 +82,16 @@ Gap found: only EBA has HD approach-circle packs; Ouendan 1 and 2 have no
 `skins_dir`, so their Look menu has no rings yet.
 
 **Wed 4 Nov (done):** re-scoped to the bare essentials: all three games
-playable by touch or Tap mode, HD approach circles in all three (the ring
-shapes are the same in every game, so EBA's packs serve all), and the skips
+playable by touch or Tap mode, and the skips
 at parity (Ouendan 1's song intro and every game's outro fast-forward on a
 button press; the games' own SKIPs stay). `dist\eba-recomp-v1.0.0-windows-x64.zip`
 (25.7 MB) rebuilt; unpacked with only Windows on the PATH, all three games
 run 500 frames in a window and exit clean, and the launcher opens. Not done:
 crash log, "Copy diagnostics", the OpenGL 4.5 message. Still needs you: the
 DualSense pass, the public repo, testers on other GPUs, the Quiver sign-in.
+Later the same day, after the user's DualSense test: slider ticks' rumble
+panned left to right by the ball's place on the screen, and skins and the HD
+approach circles switched off until a full HD skin exists.
 
 ## The first week (26 October to 2 November)
 

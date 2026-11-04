@@ -4,7 +4,8 @@
 // - high: the note that ends a combo (a tap, a slider's tail: the game's next
 //   note is number 1) and every spinner's end;
 // - medium: every other note hit, a slider's head, and a miss (with its X);
-// - low: a slider's ticks.
+// - low: a slider's ticks, panned across the pad (left to right) by where the
+//   ball is on the screen.
 // Nothing while a spinner turns (a DualSense's triggers push back instead:
 // eba_buttons.cpp). Taps, slider heads and misses come from the judge's hook
 // (eba_timing.cpp); slider ticks are the combo going up without one (the
@@ -35,6 +36,7 @@ int g_combo;
 // the slider being played: held at its last frame seen; its tail felt
 struct { uint32_t note = 0; int end = 0; bool last = false, held = false, tail = false; } g_slider;
 struct { uint32_t note = 0; int end = 0; bool spun = false; } g_spinner;
+double g_tick_pan = 0.5;                // the last tick's place: 0 the screen's left, 1 its right
 uint16_t g_sent_lo, g_sent_hi;
 uint64_t g_sent_at;
 
@@ -57,7 +59,8 @@ void send(uint16_t lo, uint16_t hi, uint64_t vbl) {
     SDL_free(ids);
 }
 
-// the motors from the pulses left: the low (heavy) motor for the high pulses, the high (light) one for all
+// the motors from the pulses left: the low (heavy, left) motor for the high pulses, the high (light,
+// right) one for the high and medium; the ticks on both, panned by the ball's x (constant power)
 void motors(uint64_t vbl) {
     double a[3];
     for (int l = 0; l < 3; ++l) {
@@ -65,7 +68,8 @@ void motors(uint64_t vbl) {
         if (g_left[l]) --g_left[l];
     }
     double k = rumble().on ? rumble().strength / 100.0 : 0;
-    double lo = std::max(a[kHigh], a[kMedium] * 0.5) * k, hi = std::max({a[kHigh] * 0.8, a[kMedium], a[kLow]}) * k;
+    double pan = g_tick_pan * M_PI / 2, tl = a[kLow] * std::cos(pan), tr = a[kLow] * std::sin(pan);
+    double lo = std::max({a[kHigh], a[kMedium] * 0.5, tl}) * k, hi = std::max({a[kHigh] * 0.8, a[kMedium], tr}) * k;
     send((uint16_t)std::lround(std::min(1.0, lo) * 0xFFFF), (uint16_t)std::lround(std::min(1.0, hi) * 0xFFFF), vbl);
 }
 
@@ -123,7 +127,9 @@ void rumble_frame(const SongView& v, uint64_t vbl) {
         g_slider.tail = true;
         if (g_slider.held) pulse(g_slider.last ? kHigh : kMedium, g_slider.last ? "combo end (slider tail)" : "slider tail", v.now);
     } else if (g_slider.note && ticks > 0 && v.now < g_slider.end - 1) {
+        g_tick_pan = v.x >= 0 ? std::clamp(v.x / 255.0, 0.0, 1.0) : 0.5;
         pulse(kLow, "slider tick", v.now);
+        if (g_log) nds_note("eba rumble: the tick at x %d", v.x);
     }
     if (g_slider.note && v.now > g_slider.end + 4) g_slider = {};
 

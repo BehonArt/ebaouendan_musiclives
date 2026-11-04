@@ -470,6 +470,7 @@ void hook(NdsInput& in, uint64_t vbl) {
     m.view = eba::SongView();
     play_input(in, vbl);
     m.view.pen = in.pen;
+    m.view.x = in.pen ? in.x : -1;
     if (!eba::buttons().on || !m.view.live) m.view = eba::SongView();
     eba::rumble_frame(m.view, vbl);
     trigger_feel(m.view.kind == 2 && m.view.now >= m.view.start && m.view.now <= m.view.end, m.view.spin);

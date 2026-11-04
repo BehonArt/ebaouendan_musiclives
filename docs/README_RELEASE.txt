@@ -23,7 +23,7 @@ signed): choose "More info", then "Run anyway".
 In a game
 ---------
 F1 shows or hides the options bar: Display (resolution up to 4K, layout,
-frame rate, Vsync, fullscreen), Look (picture filter, HD approach circles),
+frame rate, Vsync, fullscreen), Look (picture filter),
 Input (Tap mode for gamepads and keys, rumble), Timing (offset and
 calibration), Assist (approach speed, hit circle, No-Fail), Effects (fire).
 F11 or Alt+Enter: fullscreen. F12: a screenshot. Esc: quit.

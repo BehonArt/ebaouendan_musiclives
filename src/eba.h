@@ -152,12 +152,16 @@ struct SongView {                                  // what button mode sees of t
     int kind = -1, now = 0, start = 0, end = 0;    // its kind (0 tap 1 slider 2 spinner, -1 none); its body's frames
     bool last = false, pen = false;                // it ends its combo; the stylus is down
     double spin = 0;                               // a spinner's speed, turns a frame
+    int x = -1;                                    // the stylus's x (0-255; -1: up): a slider's ball, held
 };
 void rumble_frame(const SongView& v, uint64_t vblank);
 void rumble_judged(uint32_t note, int grade);      // each tap the judge judges (eba_timing.cpp)
 void rumble_options();                             // --port rumble[=off] rumble-strength=N rumble-log
 
 // ---- skins (eba_skins.cpp): texture packs for the notes' pictures ----------------------
+// Off for 1.0 (the Look menu shows no Skin or HD rings, saved choices are kept but not
+// loaded) until a full HD skin is made; true brings both back.
+constexpr bool kSkins = false;
 // <skins_dir>/<name>/ (beside the ROM, else here), a pack of pictures by texture hash
 // (tools/make_texture_pack.py makes one from an osu! skin); <skins_dir>/_hd-rings/ the
 // approach circles redrawn smooth, _hd-rings-thin/ and _hd-rings-thinner/ thinner. The
