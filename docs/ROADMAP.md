@@ -81,6 +81,16 @@ and the launcher opens. A truly clean PC is the testers' job (rc1).
 Gap found: only EBA has HD approach-circle packs; Ouendan 1 and 2 have no
 `skins_dir`, so their Look menu has no rings yet.
 
+**Wed 4 Nov (done):** re-scoped to the bare essentials: all three games
+playable by touch or Tap mode, HD approach circles in all three (the ring
+shapes are the same in every game, so EBA's packs serve all), and the skips
+at parity (Ouendan 1's song intro and every game's outro fast-forward on a
+button press; the games' own SKIPs stay). `dist\eba-recomp-v1.0.0-windows-x64.zip`
+(25.7 MB) rebuilt; unpacked with only Windows on the PATH, all three games
+run 500 frames in a window and exit clean, and the launcher opens. Not done:
+crash log, "Copy diagnostics", the OpenGL 4.5 message. Still needs you: the
+DualSense pass, the public repo, testers on other GPUs, the Quiver sign-in.
+
 ## The first week (26 October to 2 November)
 
 The three game executables cannot be merged into one (each is a different
