@@ -1,9 +1,34 @@
+# Elite Beat Ouendan: Music LIVES (eba-recomp)
+
+**Elite Beat Agents, Osu! Tatakae! Ouendan and Moero! Nekketsu Rhythm Damashii
+Osu! Tatakae! Ouendan 2 on Windows**, recompiled from their own code to native
+PC programs, with a launcher, Tap mode for controllers (rumble, DualSense
+triggers), HD approach circles, display and look options, assists and
+No-Fail, all three games alike.
+
+**You need your own cartridge dumps.** Nothing of the games is in this
+repository or its releases: the launcher asks for each game's `.nds` dump
+(EBA USA, Ouendan 1 and 2 Japan) and checks it. The release zip is on the
+[Releases](../../releases) page: unpack it anywhere, run `eba-recomp.exe`,
+point each game at its dump, play. Windows 10 or 11, 64-bit, a graphics
+driver with OpenGL 4.5. The README in the zip covers controls and options.
+
+The project's own code is MIT (`LICENSE`). Built on
+[ndskit](https://github.com/vs-sr-dev/ndskit) (a static recompiler and
+runtime for the Nintendo DS, MIT), SDL3, Dear ImGui and rcheevos. Not
+affiliated with Nintendo or iNiS.
+
+Everything below is the developer's notes.
+
+---
+
 # eba-recomp
 
 Static recompilation of Elite Beat Agents (USA, AOSE), Osu! Tatakae!
 Ouendan (Japan, AOSJ) and Moero! Nekketsu Rhythm Damashii (Japan, AO2J) to
 native PC code with [ndskit](https://github.com/vs-sr-dev/ndskit)
-(submodule at `ndskit/`).
+(submodule at `ndskit/`). The ndskit submodule needs the patches in
+`patches/` applied before building (see "Local ndskit patches").
 
 ## Status (2026-10-22)
 
