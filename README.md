@@ -38,8 +38,8 @@ EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
   60, 120, 240, uncapped), Vsync (Auto: on when the display's refresh rate
   suits the frame rate; On: always, no tearing; Off: never, the least
   latency; `--vsync auto|on|off`), fullscreen (F11, Alt+Enter), low latency.
-- **Look:** the filter; EBA's skin and HD approach circles (off, normal,
-  thin, thinner).
+- **Look:** the filter; skins and HD approach circles (off, normal, thin,
+  thinner), all three games.
 
 No menu has submenus (in a small window ImGui puts one over its menu): each
 choice is a list under a grey heading.
@@ -191,10 +191,18 @@ no spinner). Pressing 10 frames late (`buttons-auto=10`): a medium pulse
 for each of the 8 misses.
 
 A face button (or a hit key) also taps SKIP at the lower right in a stage's
-opening and ending comics, and in a song's intro after GO! (the Agents'
-arrival, the episode's card, ...) up to its first note: while every note of
-the song is still in state 0. EBA: a press 5400 jumps to Are You Ready?;
-Ouendan 2: to GO! 800 frames sooner. Ouendan 1's song intro has no SKIP.
+opening and ending comics (all three games), and in a song's intro after GO!
+(the Agents' arrival, the episode's card, ...) up to its first note, where
+the game has a SKIP there (EBA, Ouendan 2). Where it has none, the same
+press **fast-forwards** instead (`fast_forward`, button mode or not): the
+recomp's turbo runs the game at full speed, frames neither drawn nor paced,
+the sound dropped, until 1.5 s before the first note appears (Ouendan 1's
+intro) or until the song is over (every game's outro, after the last note:
+EBA and Ouendan 1 never let the player skip it, Ouendan 2 does). Checked
+headless: Ouendan 1 from song frame 479 to 767, the first note (948) then
+played; its outro from 10006 to the results; EBA's outro from 9718 to the
+ending comic and results. In a window the screen holds its last picture for
+the second or two the fast-forward takes.
 
 The d-pad hits like the face buttons (in songs and comics), so a stream can
 alternate between the two sets; keyboard hit keys have bits of their own.
@@ -275,7 +283,7 @@ what the judge (`Note::Judge`) reads of the session besides the touch:
   Ouendan 2 `0x020BB294`); the judges load the radius at the same place; the
   gauge function loads the gauge table by judgement, then tests the switch.
 
-## Skins and texture packs (EBA, `src/eba_skins.cpp`, ndskit `texpack.cpp`)
+## Skins and texture packs (`src/eba_skins.cpp`, ndskit `texpack.cpp`)
 
 The 3D renderer can draw a PNG in place of any DS texture (patch
 `ndskit-texpacks.patch`). A texture is named by a hash of its texels (and the
@@ -297,7 +305,10 @@ tex-pack=DIR[;DIR]` loads packs (the first wins).
 
 **Skins** (Display > Skin) are packs in `skins/<name>/` beside the ROM (a
 play folder's) or here; `skins/_hd-rings/` is **HD approach circles**, the
-three approach rings redrawn smooth (under a skin's own), with Thin and
+three approach rings redrawn smooth (under a skin's own): the ring textures'
+shapes are the same in all three games (hashes `bfc0096910488515`,
+`40239154a3f1c691`, `bb1d0471b237cda1`), so the one pack serves EBA, Ouendan
+1 and Ouendan 2, with Thin and
 Thinner variants in `_hd-rings-thin/` (0.6x as thick) and
 `_hd-rings-thinner/` (0.35x). Pictures only: the game's sounds stay.
 `tools/make_texture_pack.py` makes both:

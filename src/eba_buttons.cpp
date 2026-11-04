@@ -8,7 +8,9 @@
 // top of the presses; or a gamepad's triggers, mashed (a DualSense's push back,
 // hard at first, easing as the spinner speeds up). The mouse, when it is down,
 // wins. In a stage's opening or ending comic, and in a song's intro after GO!
-// (up to its first note), a hit button presses SKIP. Elsewhere the buttons are the DS's as before (south B,
+// (up to its first note), a hit button presses SKIP; where the game has none
+// (Ouendan 1's intro) and after a song's last note (every game's outro), it
+// fast-forwards instead (fast_forward below), button mode or not. Elsewhere the buttons are the DS's as before (south B,
 // east A, west Y, north X); in a song and a comic, the face buttons and the
 // d-pad are hits only (both sets: alternating them makes fast streams easier).
 //
@@ -39,6 +41,7 @@
 // buttons-auto: the spinners spun by a left stick turning N times a second, 5
 // by default).
 #include "eba.h"
+#include "display.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cmath>
@@ -259,6 +262,61 @@ void trigger_feel(bool spinning, double speed) {
     SDL_free(ids);
 }
 
+// Fast-forward (all three games): in a song's intro where the game has no SKIP of its
+// own (Ouendan 1), and in every song's outro once its last note is past (EBA and Ouendan
+// 1 never let the player skip it; Ouendan 2 does), a face button, the d-pad or a hit key
+// runs the game at full speed (the recomp's turbo: frames neither drawn nor paced, the
+// sound dropped) up to 1.5 s before the first note appears, or until the song is over
+// (the results, or the ending comic). Button mode or not: the buttons do nothing else
+// there. A test run never presses, so it never fast-forwards.
+struct FastForward {
+    bool on = false;
+    uint32_t until = 0;                 // the song frame to stop at (0: when the song scene ends)
+    uint64_t since = 0;
+    uint32_t mgr = 0;                   // the song whose last note is known
+    int last_time = 0;
+    uint32_t prev = 0;                  // the hit buttons held at the last call
+} ff;
+
+bool fast_forward(NdsInput& in, uint32_t mgr, uint64_t vbl) {
+    const eba::Game& g = eba::game();
+    bool song = eba::scene_is_song();
+    if (ff.on) {                                    // running: until the mark, the scene's end, or 3 minutes
+        uint32_t clk = mgr ? rd(g.clock) : 0;
+        if (!song || !mgr || (ff.until && clk + 1 >= ff.until) || vbl - ff.since > 10800) {
+            ff.on = false;
+            display_set_turbo(false);
+            if (m.log) nds_note("eba buttons: fast-forward over at song frame %u", clk);
+        }
+        in.pen = false;                             // nothing reaches the game meanwhile
+        in.keys = 0;
+        return true;
+    }
+    if (!song || !mgr) { ff.prev = 0; return false; }
+    if (ff.mgr != mgr) {                            // a song: its last note's time (a spinner's is its end)
+        ff.mgr = mgr;
+        ff.last_time = 0;
+        uint32_t arr = rd(mgr + g.notes), n = rd(mgr + g.notes + 8);
+        for (uint32_t i = 0; i < n; ++i) {
+            uint32_t a = rd(arr + 4 * i);
+            if (in_main(a)) ff.last_time = std::max(ff.last_time, note_at(a).time);
+        }
+    }
+    Note first = note_at(rd(rd(mgr + g.notes)));
+    int now = (int)rd(g.clock);
+    bool intro = !g.intro_skip && now < first.appear, outro = now > ff.last_time + 2;   // (a played note may read state 0 again)
+    uint32_t held = hit_buttons(in), pressed = held & ~ff.prev;
+    ff.prev = held;
+    if (!(intro || outro) || !pressed) return false;
+    in.keys &= ~(in.pad_keys & kFaceKeys);
+    ff.on = true;
+    ff.since = vbl;
+    ff.until = intro ? (uint32_t)std::max(0, first.appear - 90) : 0;
+    display_set_turbo(true);
+    if (m.log) nds_note("eba buttons: fast-forward from song frame %d (%s)", now, intro ? "the intro" : "the outro");
+    return true;
+}
+
 // A stage's opening or ending comic: a hit button presses its SKIP, at the lower right.
 void skip_comic(NdsInput& in) {
     static uint32_t prev;
@@ -282,12 +340,14 @@ void play_input(NdsInput& in, uint64_t vbl) {
     eba::fx_frame(vbl);                             // the light behind the 3D
     if (!eba::kRelease && eba::customs_frame(in, vbl)) return;        // Customs' autopilot drives the game to its stage
     if (eba::ui_wants_mouse()) in.pen = false;      // the mouse is on the options bar
+    uint32_t mgr = manager(vbl);
+    if (fast_forward(in, mgr, vbl)) return;        // a song's intro or outro skipped
     if (!eba::buttons().on) return;
     if (eba::scene_has_skip()) { skip_comic(in); return; }
-    uint32_t mgr = manager(vbl);
     // a song's intro, after GO! (the Agents' arrival, the episode's card, ...) up to its first
     // note: SKIP at the lower right too, while no note has appeared (they appear in order)
-    if (eba::scene_is_song() && (!mgr || note_at(rd(rd(mgr + eba::game().notes))).state == 0)) {
+    if (eba::game().intro_skip && eba::scene_is_song() &&
+        (!mgr || note_at(rd(rd(mgr + eba::game().notes))).state == 0)) {
         skip_comic(in);
         m.held_prev = 0;
         return;

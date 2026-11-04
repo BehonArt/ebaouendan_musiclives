@@ -43,7 +43,7 @@ if (Test-Path $customs) {
 }
 # the skins (texture packs: Display > Skin), beside the ROM too
 $skins = Join-Path $root "skins"
-if ($Game -eq "EBA" -and (Test-Path $skins)) {
+if (Test-Path $skins) {
     robocopy $skins (Join-Path $dest "skins") /E /NJH /NJS /NFL /NDL /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy failed on skins" }
 }

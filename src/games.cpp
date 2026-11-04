@@ -92,6 +92,7 @@ Game make_oe2() {
     g.stages = {"OS01", "OS02", "OS04", "OS06", "OS08", "OS10", "OSB02", "OS11", "OS03", "OS07", "OS14", "OS12",
                 "OS13", "OS05", "OS15A", "OS15B", "OSB03", "OSB01", "OS09"};   // the table at 0x02092020
     g.customs_dir = "customs_oe2";
+    g.skins_dir = "skins";              // the HD approach-circle packs: the ring shapes are the same in all three games
     g.menu_button_x = 0.0f;             // the strip's right holds 応援スタイルを選ぶべし
     return g;
 }
@@ -127,6 +128,8 @@ Game make_oe1() {
     g.stages = {"s01", "s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "s13",
                 "s14", "s15"};                // its name is "%c%02d" of the index + 1
     g.customs_dir = "customs_oe1";
+    g.skins_dir = "skins";
+    g.intro_skip = false;               // its song intro has no SKIP: fast-forwarded instead (eba_buttons.cpp)
     return g;
 }
 

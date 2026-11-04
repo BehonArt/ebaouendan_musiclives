@@ -81,6 +81,7 @@ struct Game {
     uint32_t gauge_on = 0;              // s32: 0, the life gauge neither fills nor drains (the song setup sets 1)
     std::vector<uint64_t> life_bar;     // the life bar's textures (texpack hashes): hidden with No-Fail
     const char* skins_dir = "";         // the skins' folder (texture packs made for this game), "": none
+    bool intro_skip = true;             // a song's intro has the game's own SKIP (EBA, Ouendan 2; not Ouendan 1)
     const char* customs_dir = "customs";
     std::vector<const char*> stages;    // the story's stages by index (the charts' stems: SS05, OS03, s03)
     float menu_button_x = 0.5f;         // the CUSTOMS button across the main menu's lower screen (0 left .. 1 right)
