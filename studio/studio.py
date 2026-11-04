@@ -44,6 +44,7 @@ def python_mode():
     if sys.argv[1] == "-c" and len(sys.argv) > 2:
         code = sys.argv[2]
         sys.argv = ["-c"] + sys.argv[3:]
+        sys.path.insert(0, os.getcwd())             # as python -c: the current folder's modules
         exec(compile(code, "<string>", "exec"), {"__name__": "__main__"})
         sys.exit(0)
     if sys.argv[1].lower().endswith(".py"):
@@ -73,6 +74,8 @@ def load_config():
     c["paths"] = DEFAULTS
     if os.path.exists(path):
         c.read(path, encoding="utf-8-sig")         # (a BOM, as PowerShell writes, is fine)
+        for k in ("toolkit", "recomp"):            # a relative path is from the Studio's own folder (the tester kit)
+            c["paths"][k] = os.path.normpath(os.path.join(APP_DIR, os.path.expandvars(c["paths"][k])))
     else:
         with open(path, "w", encoding="utf-8") as f:
             f.write("# Customs Studio: where the toolkit's tools folder and the recomp are\n")
@@ -107,6 +110,15 @@ def main():
         sys.exit("Customs Studio: no seq_editor\\server.py in the toolkit folder %s (set it in %s)" % (paths["toolkit"], ini))
     sys.path.insert(0, seq_editor)
     os.chdir(paths["toolkit"])
+    # the ROMs: the ones in the recomp's play folders (play\EBA.nds, ...), unless the toolkit's own
+    # way (EBA_ROM, original_roms\) already says; so the tester kit needs each ROM in one place only
+    for g, var in (("EBA", "EBA_ROM"), ("OE1", "OE1_ROM"), ("OE2", "OE2_ROM")):
+        try:
+            rom = B.recomp_folder(paths["recomp"], g)["rom"]
+            if os.path.isfile(rom) and not os.environ.get(var):
+                os.environ[var] = rom
+        except FileNotFoundError:
+            pass
     import server as S  # the toolkit's editor, as it is
 
     S._ensure_stock_caches()
