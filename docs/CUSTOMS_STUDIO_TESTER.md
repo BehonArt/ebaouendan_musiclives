@@ -101,6 +101,9 @@ Goal: a song of yours playing on an EBA stage, in ten minutes.
      window) and reports: did it load, every note judged, score, cleared, and
      how much silence follows the last note. **Do this before sharing**; a
      chart that fails here would hang the real game.
+   - **Charted (E N H X)**: untick the difficulties you didn't chart. Players
+     can then choose only the ones you made. A custom without all four is fine
+     to share, but can't go into a full game conversion or fan campaign.
    - **Export custom folder** puts the song into `play\customs\` so it shows
      up in the game's CUSTOMS menu (type a title and artist first).
    - **…as .zip** makes a shareable copy of that folder.

@@ -312,6 +312,11 @@ game needs by running the game's own first boot headless in the background
 (the tutorial to the main menu, about half a minute) into `customs\pristine.sav`;
 every custom then starts from a copy of it, whatever the campaign's progress,
 and the campaign's save is never opened. Scores go to `customs\scores.ini`.
+A custom may chart only some difficulties: `difficulties=n` (of `e n h x`) in its
+`custom.ini`; none given means all four. The Customs screen then offers and scores
+only those (`Custom::pick` takes the nearest for the difficulty chosen above), and
+such a custom is not eligible for a full game conversion or fan campaign
+(`Custom::complete`).
 The autopilot's route waits for a scene that is late (a new save's first-time
 screens) and lets it settle before tapping. HD audio, previews and stage art
 come only from `tools/bake_customs.py` (the author's); an imported custom

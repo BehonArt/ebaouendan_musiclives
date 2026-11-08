@@ -196,7 +196,7 @@ def main():
             customs = os.path.join(work_dir(), "customs_" + game.lower())
             os.makedirs(customs, exist_ok=True)
             c = B.make_custom(rom, stock_rom(game), customs, d.get("title") or "Studio test", d.get("artist", ""),
-                              tag="studio_test")
+                              tag="studio_test", difficulties=d.get("difficulties", "enhx"))
             r = B.launch_test(game, c, d.get("difficulty", "n"), bool(d.get("autoplay")), paths["recomp"],
                               os.path.join(work_dir(), "run_" + game.lower()))
             return dict(r, stage=c["stage"], game=game)
@@ -205,13 +205,14 @@ def main():
             customs = os.path.join(work_dir(), "customs_" + game.lower())
             os.makedirs(customs, exist_ok=True)
             c = B.make_custom(rom, stock_rom(game), customs, d.get("title") or "Studio test", d.get("artist", ""),
-                              tag="studio_test")
+                              tag="studio_test", difficulties=d.get("difficulties", "enhx"))
             r = V.validate_custom(game, c, d.get("difficulty", "n"), paths["recomp"],
                                   os.path.join(work_dir(), "validate_" + game.lower()))
             return dict(r, text=V.report_text(r))
         if name == "export_custom":
             out = d.get("out_dir") or B.recomp_folder(paths["recomp"], game)["customs"]
-            c = B.make_custom(rom, stock_rom(game), out, d.get("title", ""), d.get("artist", ""))
+            c = B.make_custom(rom, stock_rom(game), out, d.get("title", ""), d.get("artist", ""),
+                              difficulties=d.get("difficulties", "enhx"))
             if d.get("zip"):
                 c["zip"] = shutil.make_archive(c["dir"], "zip", os.path.dirname(c["dir"]), c["tag"])
             return c

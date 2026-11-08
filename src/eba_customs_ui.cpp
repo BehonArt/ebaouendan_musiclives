@@ -175,6 +175,7 @@ void scores_line(const Custom& c) {
     for (char d : kDiffs) col = std::max(col, ImGui::CalcTextSize(short_name(d).c_str()).x);
     col += ImGui::GetFontSize();
     for (char d : kDiffs) {
+        if (!c.has(d)) continue;                        // only what it charts
         CustomScore s = custom_best(c.tag, d);
         ImGui::TextDisabled("%s", short_name(d).c_str());
         ImGui::SameLine(col);
@@ -239,12 +240,20 @@ void customs_window() {
             scores_line(c);
             ImGui::Spacing();
             bool here = now && now->tag == c.tag;
+            char play = c.pick(g_diff);                 // the difficulty chosen above, if it charts it
+            std::string label = here ? "Play again" : "Play";
+            if (!c.complete()) label += " " + short_name(play) + "##play";
             ImGui::BeginDisabled(customs_preparing());
-            if (ImGui::Button(here ? "Play again" : "Play", ImVec2(std::min(fs * 8, ImGui::GetContentRegionAvail().x), 0))) {
+            if (ImGui::Button(label.c_str(), ImVec2(std::min(fs * (c.complete() ? 8 : 13), ImGui::GetContentRegionAvail().x), 0))) {
                 preview_stop();
-                customs_launch(c, g_diff, g_autoplay);
+                customs_launch(c, play, g_autoplay);
             }
             ImGui::EndDisabled();
+            if (!c.complete()) {
+                std::string only;
+                for (char d : c.difficulties) only += (only.empty() ? "" : ", ") + short_name(d);
+                ImGui::TextDisabled("Only %s charted", only.c_str());
+            }
             ImGui::TableNextColumn();                   // the stage it replaces: its card and its own preview
             ImGui::PushTextWrapPos(0);
             if (c.replaces == c.stage) ImGui::TextDisabled("Replaces %s", c.stage.c_str());

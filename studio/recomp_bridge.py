@@ -74,8 +74,12 @@ class RomFiles:
         return self.data[a:b]
 
 
-def make_custom(built_rom, stock_rom, out_dir, title="", artist="", tag=None):
-    """The custom's folder (customs/<tag>) from a ROM the editor built."""
+def make_custom(built_rom, stock_rom, out_dir, title="", artist="", tag=None, difficulties="enhx"):
+    """The custom's folder (customs/<tag>) from a ROM the editor built. difficulties: those charted (of
+    e n h x); the recomp offers only these (a custom without all four cannot join a full conversion)."""
+    difficulties = "".join(d for d in "enhx" if d in (difficulties or ""))
+    if not difficulties:
+        raise ValueError("tick at least one difficulty as charted")
     game = game_of(built_rom)
     if game_of(stock_rom) != game:
         raise ValueError("the built ROM and the stock ROM are different games")
@@ -103,7 +107,8 @@ def make_custom(built_rom, stock_rom, out_dir, title="", artist="", tag=None):
         shutil.rmtree(d)                                  # this tag's again: the new build replaces it
     os.makedirs(os.path.join(d, "files"))
     lines = ["title=" + title, "artist=" + artist, "stage=" + stage, "stage_index=%d" % stages.index(stage),
-             "replaces=" + stage, "made_by=Customs Studio from " + os.path.basename(built_rom)]
+             "replaces=" + stage, "difficulties=" + difficulties,
+             "made_by=Customs Studio from " + os.path.basename(built_rom)]
     for i in changed:
         name = stock.names[i]
         with open(os.path.join(d, "files", name.replace("/", "__")), "wb") as f:

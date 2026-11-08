@@ -187,6 +187,12 @@ void load_catalog() {
             else if (k == "stage_index") c.stage_index = std::atoi(v.c_str());
             else if (k == "replaces") c.replaces = v;
             else if (k == "file") c.files.push_back(v);
+            else if (k == "difficulties") {
+                std::string d;
+                for (char ch : std::string("enhx"))     // in the game's order; what is not a difficulty is ignored
+                    if (v.find(ch) != std::string::npos) d += ch;
+                if (!d.empty()) c.difficulties = d;
+            }
             else c.extra[k] = v;
         }
         g_catalog.push_back(c);
@@ -445,6 +451,16 @@ const char* difficulty_name(char d) { return game().difficulties[difficulty_inde
 }  // namespace
 
 const std::vector<Custom>& customs() { return g_catalog; }
+
+char Custom::pick(char want) const {
+    if (has(want) || difficulties.empty()) return difficulties.empty() ? want : want;
+    int w = difficulty_index(want), best = -1, dist = 99;
+    for (char d : difficulties) {                       // (e n h x order: a tie keeps the easier)
+        int n = std::abs(difficulty_index(d) - w);
+        if (n < dist) { dist = n; best = d; }
+    }
+    return (char)best;
+}
 const std::string& customs_folder() { return g_dir; }
 bool customs_preparing() { return g_prep != nullptr; }
 const std::string& customs_prepare_error() { return g_prep_error; }
@@ -502,6 +518,12 @@ void customs_init() {
             if (c.tag == o.at("custom")) g_playing = &c;
         if (!g_playing) nds_note("eba customs: no custom %s in %s", o.at("custom").c_str(), g_dir.c_str());
         if (o.count("difficulty") && !o.at("difficulty").empty()) g_difficulty = o.at("difficulty")[0];
+        if (g_playing && !g_playing->has(g_difficulty)) {
+            char d = g_playing->pick(g_difficulty);
+            nds_note("eba customs: %s has no %s chart: %s instead (charted: %s)", g_playing->title.c_str(),
+                     difficulty_name(g_difficulty), difficulty_name(d), g_playing->difficulties.c_str());
+            g_difficulty = d;
+        }
     }
     if (o.count("customs-first-boot")) {              // this run makes the start save (headless, from the Play)
         g_first_boot = true;
@@ -524,6 +546,7 @@ void customs_init() {
 
 void customs_launch(const Custom& c, char d, bool autoplay) {
     namespace fs = std::filesystem;
+    d = c.pick(d);                                      // only what it charts can be played
     set_autoplay(autoplay ? 1 : 0);
     const Game& g = game();
     if (g_playing && g_playing->tag == c.tag && g.again.ok && g.scenes.map && scene() == g.scenes.map && !g_auto) {

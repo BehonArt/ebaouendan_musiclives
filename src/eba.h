@@ -184,6 +184,13 @@ struct Custom {
     int stage_index = 0;
     std::vector<std::string> files;     // the cartridge's names of the files it replaces
     std::map<std::string, std::string> extra;   // custom.ini's other keys (the bake's: art, previews, HD audio)
+    // the difficulties charted (custom.ini's difficulties=, of e n h x; none given: all four). The
+    // others cannot be played. A custom without all four is not eligible for a full game conversion
+    // or fan campaign, which need every difficulty of every stage.
+    std::string difficulties = "enhx";
+    bool has(char d) const { return difficulties.find(d) != std::string::npos; }
+    bool complete() const { return difficulties.size() == 4; }
+    char pick(char want) const;         // want if charted, else the nearest charted (the easier on a tie)
 };
 struct CustomScore { uint32_t score = 0; int grades[4] = {}; bool cleared = false; };
 void customs_init();

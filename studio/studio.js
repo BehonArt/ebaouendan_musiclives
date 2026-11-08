@@ -54,6 +54,9 @@
       <div id="st-chart" style="color:#aaa"></div>
       <label>Title <input type="text" id="st-title" placeholder="the song's title"></label>
       <label>Artist <input type="text" id="st-artist" placeholder="its artist"></label>
+      <div title="The difficulties you charted. Players can choose only these; a custom without all four can't join a full game conversion or fan campaign.">Charted
+        <label style="display:inline;margin-right:6px"><input type="checkbox" class="st-ch" value="e" checked> E</label><label style="display:inline;margin-right:6px"><input type="checkbox" class="st-ch" value="n" checked> N</label><label style="display:inline;margin-right:6px"><input type="checkbox" class="st-ch" value="h" checked> H</label><label style="display:inline"><input type="checkbox" class="st-ch" value="x" checked> X</label>
+      </div>
       <label>Test on <select id="st-diff"></select></label>
       <label><input type="checkbox" id="st-auto"> Autoplay (watch it played)</label>
       <div>
@@ -85,8 +88,9 @@
   refresh();
 
   async function call(name, extra) {
+    const charted = [...document.querySelectorAll('.st-ch:checked')].map(x => x.value).join('');
     const body = Object.assign({chart: chart(), rom: built[chart()], title: $s('st-title').value.trim(),
-                                artist: $s('st-artist').value.trim()}, extra || {});
+                                artist: $s('st-artist').value.trim(), difficulties: charted}, extra || {});
     const r = await (await realFetch('/studio/api/' + name, {method: 'POST', body: JSON.stringify(body)})).json();
     if (r.error) { say(r.error, true); return null; }
     return r;
