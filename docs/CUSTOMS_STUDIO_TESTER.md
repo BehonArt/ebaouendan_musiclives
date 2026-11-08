@@ -55,13 +55,14 @@ Double-click `Customs Studio\Customs Studio.exe`.
 
 - The first start takes a while (it extracts the stock charts from your
   dumps). After that it opens in a few seconds.
-- It opens as its own window (it uses Edge in app mode). If nothing opens, it
-  opens in your default browser instead; either is fine.
+- It opens as its own window. Closing the window stops the Studio. (On a PC
+  without Microsoft's WebView2 it opens in your default browser instead, with a
+  small console window: keep that open while you work, and close it to stop.)
 - If it fails, it tells you why in a box, and the log is in
   `%LOCALAPPDATA%\eba-recomp\studio\studio.log`. Send me that.
 
-You land in the **Note Editor** (`/`). The **Section Editor** is the other
-page (there's a link, or add `/section_editor` to the address).
+You land in the **Note Editor**. The buttons at the top of the orange **Customs
+Studio** panel switch between it and the **Section Editor**.
 
 **Which one to use:**
 

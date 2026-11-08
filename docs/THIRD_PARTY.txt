@@ -19,6 +19,9 @@ Dear ImGui (built in), MIT
 rcheevos (built in: the dump check), MIT
     https://github.com/RetroAchievements/rcheevos  licenses/rcheevos.txt
 
+pywebview and pythonnet (Customs Studio's window, tester kit only), BSD 3-Clause and MIT
+    https://github.com/r0x0r/pywebview  https://github.com/pythonnet/pythonnet
+
 stb_image (built into the launcher: its header.png), public domain or MIT
     https://github.com/nothings/stb                licenses/stb_image.txt
 

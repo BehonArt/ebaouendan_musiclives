@@ -2,8 +2,12 @@
 
 The toolkit's editor (rom_hacking/tools/seq_editor: the Note Editor and the
 Section Editor, with every rule of a chart that loads) runs as it is, in a
-window of its own (Edge's app mode: no browser around it). The Studio adds a
-bar to both editors for the recomp's side of a custom (recomp_bridge.py):
+window of its own (pywebview on WebView2, part of Windows 11 and most of
+Windows 10): closing it stops the Studio. Without WebView2 (or with --browser)
+it opens in the default browser, with a console window that stops it when
+closed. Started again while it runs, it opens another window on the same
+Studio. The Studio adds a bar to both editors for the recomp's side of a
+custom (recomp_bridge.py):
 
 - Test in recomp: the custom just built, played in the recomp's Customs mode
   at once (its own run, the stage straight away, any difficulty, autoplay).
@@ -12,7 +16,8 @@ bar to both editors for the recomp's side of a custom (recomp_bridge.py):
 - Export patch: a BPS patch of the stock ROM, to share without the game.
 
     studio.exe                 (or: python studio.py)
-    studio.exe --browser       (the default browser instead of a window)
+    studio.exe --browser       (the default browser instead of its own window)
+    studio.exe --no-window     (serve only, no window: tests)
 
 Its settings (studio.ini beside it): the toolkit's tools folder and the
 recomp's folder (play/, play_oe2/, play_oe1/ in it).
@@ -30,6 +35,7 @@ import threading
 import time
 import traceback
 import urllib.parse
+import urllib.request
 import webbrowser
 
 FROZEN = getattr(sys, "frozen", False)
@@ -92,18 +98,31 @@ def work_dir():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=0)
-    ap.add_argument("--browser", action="store_true", help="the default browser instead of an app window")
+    ap.add_argument("--browser", action="store_true", help="the default browser instead of its own window")
     ap.add_argument("--no-window", action="store_true", help="serve only (tests)")
     a = ap.parse_args()
     if FROZEN and sys.platform == "win32":
-        # a console program (so the toolkit's builders, run by it, have their pipes): its own
-        # console, made for it on a double click, is hidden; its log goes to a file
+        # a console program (so the toolkit's builders, run by it, have their pipes). Its own window:
+        # the run itself has no console (hiding one fails under Windows Terminal): started again
+        # with none, which the builders and ffmpeg inherit; this first run ends at once
+        if not a.browser and not a.no_window and not os.environ.get(NO_CONSOLE_ENV):
+            subprocess.Popen(sys.argv, env=dict(os.environ, **{NO_CONSOLE_ENV: "1"}),
+                             creationflags=subprocess.CREATE_NO_WINDOW, close_fds=True)
+            return
         import ctypes
-        k32 = ctypes.windll.kernel32
-        procs = (ctypes.c_uint * 4)()
-        if k32.GetConsoleProcessList(procs, 4) <= 1 and not a.no_window:
-            ctypes.windll.user32.ShowWindow(k32.GetConsoleWindow(), 0)
-            sys.stdout = sys.stderr = open(os.path.join(work_dir(), "studio.log"), "w", encoding="utf-8", buffering=1)
+        if a.browser:
+            ctypes.windll.kernel32.SetConsoleTitleW("Customs Studio (close this window to stop it)")
+        sys.stdout = sys.stderr = Tee(sys.stdout, open(os.path.join(work_dir(), "studio.log"), "w", encoding="utf-8", buffering=1))
+    # already running: its page again, not a second Studio
+    port = a.port or DEFAULT_PORT
+    if port_answers(port):
+        if studio_answers(port):
+            url = "http://127.0.0.1:%d/" % port
+            print("Customs Studio is already running: %s" % url, flush=True)
+            if not a.no_window and (a.browser or not open_app(url)):
+                webbrowser.open(url)
+            return
+        port = free_port()                                # (something else has that port)
     paths, ini = load_config()
     seq_editor = os.path.join(paths["toolkit"], "seq_editor")
     if not os.path.exists(os.path.join(seq_editor, "server.py")):
@@ -201,18 +220,91 @@ def main():
             return B.make_bps(stock_rom(game), rom, out, "%s (Customs Studio)" % os.path.basename(rom))
         raise ValueError("no Studio call " + name)
 
-    port = a.port or free_port()
     httpd = S.ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
     url = "http://127.0.0.1:%d/" % port
     print("Customs Studio: %s (toolkit %s, recomp %s)" % (url, paths["toolkit"], paths["recomp"]), flush=True)
     if a.no_window:
         httpd.serve_forever()
         return
-    if a.browser or not open_app_window(url):
-        webbrowser.open(url)
-        print("(close this window to stop the Studio)", flush=True)
-        httpd.serve_forever()
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    if not a.browser:
+        if open_app(url):                                 # its own window, until it closes
+            os._exit(0)                                   # (a build still running stops with it)
+        print("(No WebView2 here: the default browser instead.)", flush=True)
+        if FROZEN and sys.platform == "win32":            # a run with a console, the way to stop it
+            httpd.server_close()
+            env = {k: v for k, v in os.environ.items() if k != NO_CONSOLE_ENV}
+            subprocess.Popen([sys.executable, "--browser"], env=env, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            os._exit(0)
+    print("\nThe editor is open in your browser: %s\nKeep this window open while you work; close it to stop the Studio.\n" % url, flush=True)
+    webbrowser.open(url)
+    threading.Event().wait()                              # until this console closes, whatever the browser does
+
+
+NO_CONSOLE_ENV = "EBA_STUDIO_NO_CONSOLE"
+DEFAULT_PORT = 8574                                       # the same address each run: a tab or bookmark keeps working
+
+
+class AppApi:
+    """What the page may ask of the app window (studio.js): another window on one of the Studio's pages."""
+
+    def __init__(self, base):
+        self._base = base
+
+    def open_window(self, path):
+        if isinstance(path, str) and path.startswith("/") and not path.startswith("//"):
+            import webview
+            app_window(webview, self._base + path, self)
+
+
+def app_window(webview, url, api):
+    return webview.create_window("Customs Studio", url, js_api=api, width=1500, height=950, min_size=(900, 600),
+                                 text_select=True, zoomable=True)
+
+
+def open_app(url):
+    """The Studio in a window of its own, until the last one closes. False: no WebView2 (or it failed to start)."""
+    try:
+        import webview
+        app_window(webview, url, AppApi(url.rstrip("/")))
+        webview.start(gui="edgechromium", private_mode=False, storage_path=os.path.join(work_dir(), "webview"))
+        return True
+    except Exception:
+        traceback.print_exc()
+        return False
+
+
+class Tee:
+    """The console and the log file."""
+
+    def __init__(self, *streams):
+        self.streams = [x for x in streams if x]
+
+    def write(self, text):
+        for x in self.streams:
+            try:
+                x.write(text)
+                x.flush()
+            except Exception:
+                pass
+        return len(text)
+
+    def flush(self):
+        pass
+
+
+def port_answers(port):
+    with socket.socket() as s:
+        s.settimeout(0.5)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def studio_answers(port):
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:%d/studio/studio.js" % port, timeout=2) as r:
+            return r.status == 200
+    except Exception:
+        return False
 
 
 def free_port():
@@ -221,22 +313,6 @@ def free_port():
     p = s.getsockname()[1]
     s.close()
     return p
-
-
-def open_app_window(url):
-    """Edge in app mode, a profile of its own (so it is its own process): returns once it closes."""
-    edge = None
-    for p in (r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-              r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"):
-        if os.path.exists(p):
-            edge = p
-    if not edge:
-        return False
-    profile = os.path.join(work_dir(), "window")
-    proc = subprocess.Popen([edge, "--app=" + url, "--user-data-dir=" + profile, "--no-first-run",
-                             "--window-size=1500,950"])
-    proc.wait()
-    return True
 
 
 def fail(msg):

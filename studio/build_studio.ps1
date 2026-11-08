@@ -9,7 +9,7 @@ py -3 -W ignore (Join-Path $here "make_deps.py") $Toolkit
 Push-Location $here
 try {
     py -3 -W ignore -m PyInstaller --noconfirm --clean --onedir --console --name "Customs Studio" `
-        --add-data "$(Join-Path $here 'studio.js');." --hidden-import toolkit_deps --hidden-import tkinter --hidden-import tkinter.filedialog --collect-submodules ndspy --collect-all unicorn `
+        --add-data "$(Join-Path $here 'studio.js');." --hidden-import toolkit_deps --hidden-import tkinter --hidden-import tkinter.filedialog --collect-submodules ndspy --collect-all unicorn --collect-all webview --collect-all clr_loader --collect-all pythonnet `
         --distpath (Join-Path $here "dist") --workpath (Join-Path $here "build") --specpath (Join-Path $here "build") `
         studio.py
 } finally { Pop-Location }

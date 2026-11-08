@@ -48,6 +48,9 @@
   box.innerHTML = `<style>${css}</style>
     <h4><span>Customs Studio</span><span id="st-min">–</span></h4>
     <div class="body">
+      <div id="st-nav">
+        <button class="alt" data-go="/">Note Editor</button><button class="alt" data-go="/section_editor">Section Editor</button>
+      </div>
       <div id="st-chart" style="color:#aaa"></div>
       <label>Title <input type="text" id="st-title" placeholder="the song's title"></label>
       <label>Artist <input type="text" id="st-artist" placeholder="its artist"></label>
@@ -126,4 +129,18 @@
     const r = await call('export_patch');
     if (r) say(`patch made (${(r.size / 1e6).toFixed(1)} MB): ${r.path}`);
   };
+})();
+
+// In the app window, the editors' own "open in a new tab" (and these buttons) open another window of it
+(function () {
+  const browserOpen = window.open;
+  window.open = function (u, ...rest) {
+    const api = window.pywebview && window.pywebview.api;
+    if (api && api.open_window && typeof u === 'string' && u.startsWith('/')) { api.open_window(u); return null; }
+    return browserOpen.call(window, u, ...rest);
+  };
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('#st-nav button');
+    if (b) location.href = b.dataset.go;
+  });
 })();

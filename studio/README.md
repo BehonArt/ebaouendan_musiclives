@@ -25,7 +25,7 @@ in both editors for the recomp's side of a custom:
 The toolkit's editor runs as it is, from the toolkit's folder (its charts,
 projects and builds stay where they are); the Studio adds `recomp_bridge.py`.
 
-    py -3 studio.py              # from source (an Edge app window)
+    py -3 studio.py              # from source, in its own window
     py -3 studio.py --browser    # the default browser instead
     studio\build_studio.ps1      # the .exe: studio\dist\Customs Studio\
 
@@ -34,7 +34,12 @@ projects and builds stay where they are); the Studio adds `recomp_bridge.py`.
 
 ## The .exe
 
-PyInstaller, one folder, a console program whose console is hidden. The
+PyInstaller, one folder, a console program that restarts itself with no console
+(`CREATE_NO_WINDOW`, which its builders inherit) for its own window (pywebview
+on WebView2; closing the window stops it). Without WebView2, or with `--browser`, it opens in the default browser and
+the console stays, closing it stops the Studio. The page is at
+http://127.0.0.1:8574/ (a free port if something else has that), so a tab keeps
+working. Started again while it runs, it opens another window on it. The
 toolkit stays `.py` on disk; what it imports is bundled (`make_deps.py` lists
 it, unicorn whole for Ouendan 2's decompressor). The toolkit runs its
 builders as `[sys.executable, builder.py, ...]`: the .exe is Python for them
