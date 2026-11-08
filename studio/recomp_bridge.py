@@ -11,6 +11,7 @@ patch of the stock ROM, the way to share a custom without sharing the game.
 """
 import os
 import shutil
+import time
 import struct
 import subprocess
 import zlib
@@ -103,8 +104,13 @@ def make_custom(built_rom, stock_rom, out_dir, title="", artist="", tag=None, di
     title = title or os.path.splitext(os.path.basename(built_rom))[0]
     tag = tag or (stage + "_" + "".join(c if c.isalnum() or c in "-_" else "_" for c in title))
     d = os.path.join(out_dir, tag)
-    if os.path.exists(d):
-        shutil.rmtree(d)                                  # this tag's again: the new build replaces it
+    for _ in range(40):                                   # this tag's again: the new build replaces it
+        if not os.path.exists(d):                         # (Windows finishes deleting a big folder a moment later)
+            break
+        shutil.rmtree(d, ignore_errors=True)
+        time.sleep(0.25)
+    else:
+        raise RuntimeError("could not replace %s: is a game running from it? Close it and try again" % d)
     os.makedirs(os.path.join(d, "files"))
     lines = ["title=" + title, "artist=" + artist, "stage=" + stage, "stage_index=%d" % stages.index(stage),
              "replaces=" + stage, "difficulties=" + difficulties,
