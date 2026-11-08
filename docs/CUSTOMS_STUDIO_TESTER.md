@@ -1,23 +1,23 @@
-# Customs Studio — tester kit
+# Customs Studio
 
-Thanks for testing. This kit is the chart editor for **Elite Beat Agents**,
-**Osu! Tatakae! Ouendan** and **Ouendan 2**, with the three games recompiled
-for Windows so you can play what you make straight away, and the tools that
-build a patched ROM (a ROM hack) for a real DS or an emulator.
+The chart editor for **Elite Beat Agents**, **Osu! Tatakae! Ouendan** and
+**Ouendan 2**, with the three games recompiled for Windows so you can play what
+you make straight away, and the tools that build a patched ROM (a ROM hack) for
+a real DS or an emulator.
 
-It is a private preview, not a release. The most useful thing you can do is
-tell me where it broke and send the log it wrote.
+It is new and experimental: expect rough edges. Share your customs, get help and
+report problems on the Discord: https://discord.gg/XGPhewDEtn
 
-**You need your own cartridge dumps.** Nothing of the games is in this kit: no
+**You need your own cartridge dumps.** Nothing of the games is in this download: no
 ROM, no charts, no audio. The first time you open the editor it reads the stock
 charts out of *your* dumps into a cache (`toolkit\rom_extract\`). Never share
-that cache or a built ROM; share a **patch** (`.bps`) or a **custom folder**.
+that cache or a built ROM; share a **patch** (`.bps`).
 
 ---
 
 ## 1. Set up (once)
 
-1. Unzip the kit anywhere (a path without special characters is safest, like
+1. Unzip this anywhere (a path without special characters is safest, like
    `C:\Games\customs-studio`). Don't put it inside Program Files.
 2. Put your dumps in, **named exactly like this**:
 
@@ -43,11 +43,12 @@ Double-click `play\Play EBA.bat` (or `Play OE1.bat`, `Play OE2.bat`). The game
 opens in a window; **F1** shows its options bar (resolution, fullscreen, Tap
 mode for a controller, and so on). Play with the mouse like a stylus.
 
-These are **development builds** of the games, so the main menu has an orange
-**CUSTOMS** button: that's where the songs you make will show up.
+The main menu has an orange **CUSTOMS** button: that's where the songs you make
+will show up. These copies keep their own saves in their folders, apart from the
+launcher's games.
 
-If a game doesn't open, read `play\EBA.log` (same folder as the bat) and send
-it to me.
+If a game doesn't open, read `play\EBA.log` (same folder as the bat), and post it
+on the Discord.
 
 ## 3. Open Customs Studio
 
@@ -59,7 +60,7 @@ Double-click `Customs Studio\Customs Studio.exe`.
   without Microsoft's WebView2 it opens in your default browser instead, with a
   small console window: keep that open while you work, and close it to stop.)
 - If it fails, it tells you why in a box, and the log is in
-  `%LOCALAPPDATA%\eba-recomp\studio\studio.log`. Send me that.
+  `%LOCALAPPDATA%\eba-recomp\studio\studio.log`. Post that on the Discord.
 
 You land in the **Note Editor**. The buttons at the top of the orange **Customs
 Studio** panel switch between it and the **Section Editor**.
@@ -106,7 +107,8 @@ Goal: a song of yours playing on an EBA stage, in ten minutes.
      to share, but can't go into a full game conversion or fan campaign.
    - **Export custom folder** puts the song into `play\customs\` so it shows
      up in the game's CUSTOMS menu (type a title and artist first).
-   - **…as .zip** makes a shareable copy of that folder.
+   - **…as .zip** makes a zip of that folder, for your own backups or your other
+     PCs (it holds game files, so don't post it).
    - **Export patch (.bps)** makes a ROM-hack patch of the stock ROM (3–4 MB)
      for a DS or emulator. Anyone applies it with Flips or
      https://www.marcrobledo.com/RomPatcher.js/ to their own dump.
@@ -136,8 +138,7 @@ That path is command-line for now (`toolkit\rom_hacking\tools\osu2eba.bat`,
 files want Python 3 installed (`winget install Python.Python.3.12`, then
 `pip install -r toolkit\requirements.txt`); they find your dumps in the
 `play` folders by themselves. `toolkit\README.md` and
-`toolkit\rom_hacking\tools\WORKFLOW.md` describe them. Tell me if you'd like
-this in the Studio too.
+`toolkit\rom_hacking\tools\WORKFLOW.md` describe them.
 
 ## 7. Known limits (don't report these)
 
@@ -148,8 +149,9 @@ this in the Studio too.
 - EBA stage **SS04** hangs when rebuilt. Avoid it.
 - Derived difficulties (from *Copy timing to other diffs* / auto-fill) pass
   every check, but few people have played them.
-- The games' release build (the public zip) has no Customs menu; only the
-  development builds in this kit do.
+- **Sharing:** a custom folder holds files from the game (its whole sound
+  archive), and every custom holds its song. Share patches (`.bps`) rather than
+  folders, and only songs you have the right to share.
 
 ## 8. What to send when something breaks
 
@@ -162,7 +164,7 @@ this in the Studio too.
    the built ROM in `patched_roms`.
 5. Your GPU and Windows version.
 
-Don't send ROMs, built ROMs, or the `rom_extract` cache.
+Don't post ROMs, built ROMs, custom folders, or the `rom_extract` cache.
 
 ---
 

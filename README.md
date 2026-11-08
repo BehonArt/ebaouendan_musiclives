@@ -4,7 +4,10 @@
 Osu! Tatakae! Ouendan 2 on Windows**, recompiled from their own code to native
 PC programs, with a launcher, Tap mode for controllers (rumble, DualSense
 triggers), display and look options, assists and No-Fail, Customs (your own
-songs, imported) and RetroAchievements, all three games alike.
+songs, imported), RetroAchievements and **Customs Studio** (a chart editor, its
+own download), all three games alike.
+
+**Discord:** https://discord.gg/XGPhewDEtn (customs, help, bug reports)
 
 **You need your own cartridge dumps.** Nothing of the games is in this
 repository or its releases: the launcher asks for each game's `.nds` dump
@@ -529,8 +532,8 @@ window); the launcher keeps their output.
 ## Release builds and where the player's files go
 
 `EBA_RELEASE=ON tools/build.sh` (or `cmake -DEBA_RELEASE=ON`) builds the
-release: Customs, RetroAchievements and saved replays stay in the code with
-their menus and calls off (`kRelease`, `src/eba.h`), the window is titled with
+release: saved replays stay in the code but off (`kRelease`, `src/eba.h`; Customs
+and RetroAchievements are in since 1.0), the window is titled with
 the game and the version, and a window's run writes no memory dumps. The
 version is `-DEBA_VERSION` (1.0.0): the About box, the title, RetroAchievements'
 user agent, and the executable's version resource (`cmake/version.rc.in`).
@@ -590,15 +593,14 @@ In a window (put `C:\msys64\ucrt64\bin` on PATH; mouse = stylus, Esc quits):
 # Future updates (not in 1.0)
 
 The 1.0 release is the three games, playable by touch or Tap mode, with the
-display, timing, assist and effect options above, Customs, RetroAchievements
-and the launcher. Everything
+display, timing, assist and effect options above, Customs, RetroAchievements,
+the launcher and Customs Studio (`studio/`, [its README](studio/README.md): the
+chart editor, a download of its own from `tools/make_studio_kit.ps1`). Everything
 in this part is already in the code but switched off in release builds
 (`kRelease` and `kSkins` in `src/eba.h`) and is planned for later releases:
 
-- **Customs Studio** (`studio/`, [its README](studio/README.md)): the chart
-  editor that tests a custom in the recomp and exports it (a custom folder
-  for the Customs screen, or a BPS patch for a real DS). A download of its
-  own (`tools/make_studio_kit.ps1`), given to testers first.
+- **Custom packs:** one shareable file with a custom's patch, HD audio and art,
+  imported in one step (a custom folder holds game files, so it can't be posted).
 - **Mods:** skins and texture packs, HD approach circles (the code and the
   texture-pack runtime are there; waiting on a full HD skin).
 - **Saved replays.**

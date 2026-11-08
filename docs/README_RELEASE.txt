@@ -48,5 +48,8 @@ eba-recomp.exe.
 
 Needs: Windows 10 or 11 (64-bit), a graphics card with OpenGL 4.5.
 
+Make your own customs with Customs Studio, a separate download on the Releases
+page. Customs, help and bug reports: https://discord.gg/XGPhewDEtn
+
 A fan project, not affiliated with Nintendo or iNiS. Licences: LICENSE,
 THIRD_PARTY.txt and the licenses folder.

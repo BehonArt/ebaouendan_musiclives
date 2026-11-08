@@ -1,20 +1,21 @@
-# The Customs Studio tester kit: the chart editor (Customs Studio), the public
-# toolkit it runs, and the three games' development builds (Customs mode on,
-# unlike the release's), in one folder that works from anywhere. The tester
-# brings their own cartridge dumps (play\EBA.nds, play_oe1\OE1.nds,
+# The Customs Studio download: the chart editor (Customs Studio), the public
+# toolkit it runs, and the three games' release builds (from
+# dist\eba-recomp-v<GameVersion>\, so run make_release.ps1 first), in one folder
+# that works from anywhere. The player brings their own cartridge dumps (play\EBA.nds, play_oe1\OE1.nds,
 # play_oe2\OE2.nds); nothing of the games is in the kit.
 #
-#   tools\make_studio_kit.ps1 [-Version 1.0.0-rc1] [-Toolkit "F:\...\rom_hacking\tools"] [-SkipStudioBuild]
+#   tools\make_studio_kit.ps1 [-Version v1.0.0] [-GameVersion 1.0.0] [-Toolkit "F:\...\rom_hacking\tools"] [-SkipStudioBuild]
 #
 # Steps: the toolkit's own make_release.py stages its public tree (an allowlist,
 # verified: no ROM-derived files); studio\build_studio.ps1 builds the Studio
-# exe (PyInstaller; -SkipStudioBuild reuses studio\dist); the games' dev
-# ndsrun.exe builds go in as EBA.exe/OE1.exe/OE2.exe with the DLLs (the start
+# exe (PyInstaller; -SkipStudioBuild reuses studio\dist); the games' release
+# exes go in as EBA.exe/OE1.exe/OE2.exe with the DLLs (the start
 # save Customs plays from, the game makes itself on the first Play); the guide
 # docs\CUSTOMS_STUDIO_TESTER.md is the kit's README. Then the zip:
 # dist\eba-recomp-customs-studio-<version>-windows-x64.zip
 param(
-    [string]$Version = "1.0.0-rc1",
+    [string]$Version = "v1.0.0",
+    [string]$GameVersion = "1.0.0",
     [string]$Toolkit = "F:\dxvk_remix\Claude\EBAHD Old\rom_hacking\tools",
     [switch]$SkipStudioBuild
 )
@@ -51,10 +52,8 @@ $games = @(
 foreach ($g in $games) {
     $d = Join-Path $kit $g.folder
     New-Item -ItemType Directory -Force (Join-Path $d "customs") | Out-Null
-    $exe = Join-Path $root "$($g.tree)\b\ndsrun.exe"
-    if (Select-String -Path (Join-Path $root "$($g.tree)\b\CMakeCache.txt") -Pattern "EBA_RELEASE:BOOL=ON" -Quiet) {
-        throw "$($g.tree) is a release build (no Customs): rebuild it in development mode first"
-    }
+    $exe = Join-Path $root "dist\eba-recomp-v$GameVersion\$($g.id).exe"
+    if (-not (Test-Path $exe)) { throw "no $exe`: run tools\make_release.ps1 first" }
     Copy-Item $exe (Join-Path $d "$($g.id).exe")
     foreach ($dll in "SDL3.dll", "libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll", "libiconv-2.dll") {
         Copy-Item (Join-Path "$ucrt\bin" $dll) $d
@@ -62,7 +61,7 @@ foreach ($g in $games) {
     # (no start save shipped: the game makes customs\pristine.sav itself on the first Play, from its own first boot)
     $id = $g.id
     $bat = "@echo off`r`n" +
-           "rem $($g.title), recompiled (development build: Customs mode on).`r`n" +
+           "rem $($g.title), recompiled, for Customs Studio.`r`n" +
            "rem Needs your own cartridge dump beside it, named $id.nds. Progress: $id.sav here; the log of the last run: $id.log.`r`n" +
            "cd /d `"%~dp0`"`r`n" +
            "if not exist `"%~dp0$id.nds`" (echo Put your dump of the game beside this file, named $id.nds & pause & exit /b 1)`r`n" +
