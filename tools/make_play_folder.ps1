@@ -32,7 +32,7 @@ $customs = Join-Path $root $(if ($Game -eq "EBA") { "customs" } else { "customs_
 if (Test-Path $customs) {
     $to = Join-Path $dest "customs"
     New-Item -ItemType Directory -Force $to | Out-Null
-    Get-ChildItem $customs -File | Where-Object { $_.Name -notin "scores.ini", "session.sav" } | Copy-Item -Destination $to -Force
+    Get-ChildItem $customs -File | Where-Object { $_.Name -notin "scores.ini", "session.sav", "pristine.sav" } | Copy-Item -Destination $to -Force
     if (-not (Test-Path (Join-Path $to "scores.ini")) -and (Test-Path (Join-Path $customs "scores.ini"))) {
         Copy-Item (Join-Path $customs "scores.ini") $to
     }
