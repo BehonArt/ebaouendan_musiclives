@@ -50,6 +50,7 @@ target_include_directories(ndsrun PRIVATE ${EBA_IMGUI} ${EBA_IMGUI}/backends ${E
 if(WIN32)
     enable_language(RC)
     string(REPLACE "." "," EBA_VERSION_COMMAS "${EBA_VERSION}")
+    set(EBA_MANIFEST ${CMAKE_CURRENT_LIST_DIR}/utf8.manifest)
     configure_file(${CMAKE_CURRENT_LIST_DIR}/version.rc.in ${CMAKE_BINARY_DIR}/eba_version.rc @ONLY)
     target_sources(ndsrun PRIVATE ${CMAKE_BINARY_DIR}/eba_version.rc)
 endif()

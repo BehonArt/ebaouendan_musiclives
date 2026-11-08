@@ -35,7 +35,8 @@ that cache or a built ROM; share a **patch** (`.bps`).
    that you converted yourself (Audacity: Tracks ▸ Resample).
 
 That's it. No Python or anything else to install for the Studio: it carries
-its own.
+its own. Windows may warn about an unknown publisher (the programs aren't signed):
+choose "More info", then "Run anyway".
 
 ## 2. Play a game (check the games run first)
 
@@ -96,7 +97,7 @@ Goal: a song of yours playing on an EBA stage, in ten minutes.
 6. In the orange **Studio bar** at the bottom of the page:
    - **▶ Test in recomp** opens the game straight into your stage. Tick
      *Autoplay* to watch it played perfectly. (The very first test of a game
-     takes half a minute longer: the game makes the start save Customs plays
+     takes a few seconds longer: the game makes the start save Customs plays
      from, by running its own first boot in the background.)
    - **✔ Validate** plays the stage through headless (under a minute, no
      window) and reports: did it load, every note judged, score, cleared, and
@@ -106,7 +107,9 @@ Goal: a song of yours playing on an EBA stage, in ten minutes.
      can then choose only the ones you made. A custom without all four is fine
      to share, but can't go into a full game conversion or fan campaign.
    - **Export custom folder** puts the song into `play\customs\` so it shows
-     up in the game's CUSTOMS menu (type a title and artist first).
+     up in the CUSTOMS menu of this download's games (type a title and artist
+     first). To play it in the launcher's games too, use **Import custom folder**
+     on their Customs screen and pick that folder.
    - **…as .zip** makes a zip of that folder, for your own backups or your other
      PCs (it holds game files, so don't post it).
    - **Export patch (.bps)** makes a ROM-hack patch of the stock ROM (3–4 MB)

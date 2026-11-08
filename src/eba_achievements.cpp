@@ -7,7 +7,8 @@
 // Casual (softcore) only: RA counts hardcore unlocks from the emulators it has
 // approved. And only for the game as it was made: achievements are paused
 // (nothing is checked, and they start over from their own start conditions when
-// the pause ends) in Customs, in button mode, with an assist (approach, hit
+// the pause ends) in Customs, in a song played with Tap mode (it may stay switched
+// on: only using it pauses them, from that press until the next song), with an assist (approach, hit
 // circle, No-Fail), the game's autoplay, a replay played back, or a test's
 // options. The timing offset and the sound's latency, the picture's options
 // and skins, the effects and rumble change nothing the game judges.
@@ -265,7 +266,7 @@ void RC_CCONV logged_in(int result, const char* error, rc_client_t* c, void*) {
 const char* blocked() {
     const auto& o = g_cfg.port;
     if (custom_playing()) return "Customs";
-    if (buttons().on) return "button mode";
+    if (tap_mode_used()) return "Tap mode";
     const Assists& a = assists();
     if (game().approach && a.approach_pct > 0 && a.approach_pct != 100) return "the approach assist";
     if (game().hit_radius && a.hit_extra > 0) return "the hit circle assist";

@@ -116,6 +116,7 @@ struct Mode {
     double stick_prev = 0, stick_turn = 0;   // its angle then (turns); this frame's turn of it
     eba::SongView view;                 // for the rumble
 } m;
+bool g_tap_used;                         // Tap mode played a note in the song (eba::tap_mode_used)
 
 bool manager_ok(uint32_t a) {
     const eba::Game& g = eba::game();
@@ -410,6 +411,7 @@ void play_input(NdsInput& in, uint64_t vbl) {
     }
     int presses = __builtin_popcount(held & ~m.held_prev);
     m.held_prev = held;
+    if ((presses && have) || (m.stick_turn != 0 && have && cur.kind == 2)) g_tap_used = true;
     bool mouse = in.pen;
 
     // a press: a tap on the note being judged, the head of a slider, or a spinner's push
@@ -467,6 +469,10 @@ void play_input(NdsInput& in, uint64_t vbl) {
 
 // each frame: the input, then the rumble from what it saw of the song
 void hook(NdsInput& in, uint64_t vbl) {
+    static bool was_song;                           // a new song: nothing has been played with buttons yet
+    bool is_song = eba::scene_is_song();
+    if (is_song && !was_song) g_tap_used = false;
+    was_song = is_song;
     m.view = eba::SongView();
     play_input(in, vbl);
     m.view.pen = in.pen;
@@ -561,3 +567,5 @@ void debug_pokes(uint64_t vbl) {
 }
 
 }  // namespace eba
+
+bool eba::tap_mode_used() { return g_tap_used; }

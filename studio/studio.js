@@ -95,6 +95,10 @@
   }
   setInterval(refresh, 1500);
   refresh();
+  realFetch('/studio/api/info', {method: 'POST', body: '{}'}).then(r => r.json()).then(i => {
+    if (i.dumps && !i.dumps.length)
+      say('No game dumps found, so there are no charts to load. Put your dump in as ' + Object.values(i.missing).join(', or ') + ', then restart the Studio.', true);
+  }).catch(() => {});
 
   async function call(name, extra) {
     const charted = [...document.querySelectorAll('.st-ch:checked')].map(x => x.value).join('');

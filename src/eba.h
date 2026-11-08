@@ -106,6 +106,7 @@ struct Buttons {
     bool trigger_feel = true;           // a DualSense's triggers push back on spinners
 };
 Buttons& buttons();
+bool tap_mode_used();                   // Tap mode has played a note in this song (or the last one, until the next starts)
 void buttons_options();                 // --port's buttons options
 void debug_pokes(uint64_t vblank);      // --port poke=ADDR:VALUE@VBLANK (tests)
 bool note_ends_combo(uint32_t note);    // the next note starts a new combo (its number 1), or none follows

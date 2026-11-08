@@ -130,16 +130,18 @@ void look_menu() {
 
 void input_menu() {
     Buttons& b = buttons();
-    if (ImGui::MenuItem("Button mode", nullptr, b.on)) { b.on = !b.on; settings_save(); }
+    if (ImGui::MenuItem("Tap mode", nullptr, b.on)) { b.on = !b.on; settings_save(); }
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("In a song, a gamepad's face buttons, its d-pad or the keys below hit the notes:\n"
                           "tap on the beat, hold through sliders; for spinners mash, pull the triggers\n"
-                          "or turn the left stick round. In a song's intro and the comics they press SKIP.");
+                          "or turn the left stick round. In a song's intro and the comics they press SKIP.\n"
+                          "Using it in a song pauses RetroAchievements until the next song; playing with\n"
+                          "the mouse counts, even with this left on.");
     Rumble& r = rumble();
     ImGui::BeginDisabled(!b.on);
     if (ImGui::MenuItem("Rumble", nullptr, r.on)) { r.on = !r.on; settings_save(); }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("In button mode, the gamepad's motors (a DualSense's haptics, a Switch controller's HD rumble):\n"
+        ImGui::SetTooltip("In Tap mode, the gamepad's motors (a DualSense's haptics, a Switch controller's HD rumble):\n"
                           "high for the note that ends a combo and a spinner's end, medium for each hit and miss,\n"
                           "low for slider ticks; nothing while a spinner turns.");
     ImGui::BeginDisabled(!r.on);
@@ -312,7 +314,7 @@ void ra_window() {
     if (const char* why = ra_paused_by(); why && ra_signed_in() && a.on)
         ImGui::TextColored(ImVec4(1, 0.75f, 0.3f, 1), "Paused: %s.", why);
     ImGui::TextDisabled("Casual mode. Achievements count only for the game as made: not in Customs,");
-    ImGui::TextDisabled("button mode, with an assist (approach, hit circle, No-Fail), autoplay or a replay.");
+    ImGui::TextDisabled("a song played with Tap mode, with an assist (approach, hit circle, No-Fail), autoplay or a replay.");
     ImGui::Separator();
     if (!ra_signed_in()) {
         if (a.user[0] && !g_ra_user[0]) std::snprintf(g_ra_user, sizeof g_ra_user, "%s", a.user.c_str());

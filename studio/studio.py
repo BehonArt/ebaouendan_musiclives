@@ -181,10 +181,15 @@ def main():
             last[d.get("chart", "")] = d["rom"]
             return {"ok": True}
         if name == "info":
-            out = {"toolkit": paths["toolkit"], "recomp": paths["recomp"], "ini": ini, "games": {}}
+            out = {"toolkit": paths["toolkit"], "recomp": paths["recomp"], "ini": ini, "games": {}, "dumps": [], "missing": {}}
             for g in B.GAMES:
                 try:
-                    out["games"][g] = B.recomp_folder(paths["recomp"], g)["exe"]
+                    f = B.recomp_folder(paths["recomp"], g)
+                    out["games"][g] = f["exe"]
+                    if os.path.exists(f["rom"]):
+                        out["dumps"].append(g)
+                    else:
+                        out["missing"][g] = f["rom"]
                 except Exception as e:
                     out["games"][g] = None
             return out

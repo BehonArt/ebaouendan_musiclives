@@ -18,7 +18,11 @@ Getting started
 4. Press Play.
 
 Windows may warn that the program is from an unknown publisher (it is not
-signed): choose "More info", then "Run anyway".
+signed): choose "More info", then "Run anyway". The first start can be slow
+while antivirus checks it.
+
+If a game says it needs OpenGL 4.5 or will not open, update your graphics
+driver. A game's log is in its save folder (the launcher's Save folder button).
 
 In a game
 ---------
@@ -34,13 +38,15 @@ pull the triggers, or turn the left stick round.
 
 Customs: Game > Customs (or the CUSTOMS button on the main menu) plays songs
 made by the community over the games' stages, apart from the campaign and
-whatever its progress: import a custom's folder or a custom ROM there, and
-press Play. The first Play prepares Customs (about half a minute, in the
-background). Their scores stay separate from the campaign's.
+whatever its progress. To add one: apply its patch (.bps) to your own dump of
+the game with Flips or Rom Patcher JS, then Import custom ROM there; or Import
+custom folder for a folder you made in Customs Studio. Press Play. The first
+Play prepares Customs for a few seconds. Their scores stay separate from the
+campaign's.
 
-RetroAchievements: Game > RetroAchievements signs in with your account; the
-achievements count when a game is played as made (not with Customs, Tap
-mode or the assists).
+RetroAchievements: Game > RetroAchievements signs in with your account. The
+achievements count when a game is played as made: by touch (the mouse), without
+assists. Customs, or using Tap mode's buttons in a song, pauses them for that song.
 
 Saves and settings are kept in %APPDATA%\eba-recomp. To keep them beside the
 program instead, put an empty file named portable.txt next to

@@ -72,7 +72,7 @@ EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
 
 No menu has submenus (in a small window ImGui puts one over its menu): each
 choice is a list under a grey heading.
-- **Input:** button mode on or off, rumble and its strength, up to four hit keys (click one, then
+- **Input:** Tap mode ("button mode" in these notes) on or off, rumble and its strength, up to four hit keys (click one, then
   press a key; right-click clears), the connected gamepads, the key map.
 - **Timing:** the offset (-8 to +8 frames), the sound's latency (1 to 6
   frames), and **Calibrate...**, a window that counts every tap the game
@@ -415,7 +415,8 @@ loads, with its list and progress, and unlocks pop up at the lower right.
   months public, its compliance list); this one is not.
 - **The game as made.** Achievements are paused (not checked; when the
   pause ends they start over from their own start conditions, `rc_client_reset`)
-  in Customs, in button mode, with the approach or hit circle assist or
+  in Customs, in a song played with Tap mode (from the first press until the next
+  song; it may stay switched on), with the approach or hit circle assist or
   No-Fail, the game's autoplay, a replay played back, or a test's `--port`
   options. A pop-up says so. The timing offset, the sound's latency, the
   picture's options, skins, effects and rumble change nothing the game judges.

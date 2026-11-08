@@ -149,7 +149,7 @@ void import_buttons() {
                           customs_folder().c_str());
     if (customs_preparing())
         ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1),
-                           "Preparing Customs for the first time: the game's first boot runs in the background (about half a minute); "
+                           "Preparing Customs for the first time: the game's first boot runs in the background (a few seconds); "
                            "the song starts when it is done.");
     else if (!customs_prepare_error().empty())
         ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), "Customs could not start: %s", customs_prepare_error().c_str());
