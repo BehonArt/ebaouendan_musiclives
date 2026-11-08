@@ -502,6 +502,7 @@ void buttons_options() {
     if (o.count("buttons")) b.on = o.at("buttons") != "off";
     m.log = o.count("buttons-log") > 0;
     m.autoplay = o.count("buttons-auto") > 0;
+    if (m.autoplay) b.on = true;                    // (the test player plays with buttons, whatever the default)
     m.stick_auto = o.count("stick-auto") > 0;
     if (m.stick_auto && !o.at("stick-auto").empty()) m.stick_rate = std::atof(o.at("stick-auto").c_str());
     if (m.autoplay) m.auto_late = std::atoi(o.at("buttons-auto").c_str());

@@ -53,7 +53,7 @@ void settings_load() {
     display_change(s);
     if (g_cfg.audio_latency == 3) audio_set_latency(num("audio_latency", 3));
     Buttons& b = buttons();
-    b.on = num("buttons", 1) != 0;
+    b.on = num("buttons", 0) != 0;
     b.trigger_feel = num("trigger_feel", 1) != 0;
     for (int i = 0; i < 4; ++i) {
         std::string k = "button_key" + std::to_string(i + 1);

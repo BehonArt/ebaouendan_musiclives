@@ -74,9 +74,10 @@
         <button id="st-check" class="alt" title="The recomp plays the custom through headless, every note on time (under a minute): loads, judged, cleared, and how much song is left after the last note">✔ Validate</button>
       </div>
       <div>
-        <button id="st-custom" class="alt" title="customs\\<tag> in the recomp's play folder: it shows in Customs at once">Export custom folder</button>
+        <button id="st-custom" class="alt" title="Adds it to the Customs menu of your games">Export custom folder</button>
         <button id="st-zip" class="alt" title="The custom folder as a .zip, to share (Import custom folder on the other side)">…as .zip</button>
         <button id="st-bps" class="alt" title="A BPS patch of the stock ROM: share the custom without sharing the game">Export patch (.bps)</button>
+        <button id="st-open" class="alt" title="The folder your built ROMs and patches land in">Open builds folder</button>
       </div>
       <div class="st" id="st-msg"></div>
     </div>`;
@@ -97,7 +98,7 @@
   refresh();
   realFetch('/studio/api/info', {method: 'POST', body: '{}'}).then(r => r.json()).then(i => {
     if (i.dumps && !i.dumps.length)
-      say('No game dumps found, so there are no charts to load. Put your dump in as ' + Object.values(i.missing).join(', or ') + ', then restart the Studio.', true);
+      say('No game dumps found, so there are no charts to load. Choose your dumps in the launcher (eba-recomp.exe), then restart the Studio.', true);
   }).catch(() => {});
 
   async function call(name, extra) {
@@ -132,6 +133,7 @@
       else if (Date.now() - t0 > 600000) { clearInterval(wait); say('the build did not finish', true); }
     }, 500);
   };
+  $s('st-open').onclick = () => realFetch('/studio/api/open_builds', {method: 'POST', body: JSON.stringify({game: game()})});
   $s('st-custom').onclick = async () => {
     say('exporting…');
     const r = await call('export_custom');

@@ -251,6 +251,31 @@ void check(int i) {
     s.has_music = s.state == Rom::Good && rom_music_load(s.rom, kGames[i].menu_strm, s.music);
 }
 
+std::string studio_exe() { return (fs::path(g_exe_dir) / "Customs Studio" / "Customs Studio.exe").string(); }
+bool studio_present() {
+    std::error_code ec;
+    return fs::exists(fs::path(g_exe_dir) / "Customs Studio" / "Customs Studio.exe", ec);
+}
+
+// the chart editor, a program of its own (it stays open when the launcher closes)
+void open_studio() {
+    std::string exe = studio_exe();
+    const char* argv[] = {exe.c_str(), nullptr};
+    SDL_PropertiesID p = SDL_CreateProperties();
+    SDL_SetPointerProperty(p, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)argv);
+    SDL_SetBooleanProperty(p, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
+    SDL_Process* proc = SDL_CreateProcessWithProperties(p);
+    SDL_DestroyProperties(p);
+    if (proc) {
+        SDL_DestroyProcess(proc);
+        g_note_bad = false;
+        g_note = "Customs Studio is starting: its first start takes a little longer.";
+    } else {
+        g_note_bad = true;
+        g_note = std::string("Could not start Customs Studio: ") + SDL_GetError();
+    }
+}
+
 bool exe_present(int i) {
     std::error_code ec;
     return fs::exists(fs::path(g_exe_dir) / (std::string(kGames[i].id) + ".exe"), ec);
@@ -660,8 +685,13 @@ int main(int argc, char** argv) {
         }
         // the footer, at the window's foot
         float fs_ = ImGui::GetFontSize();
-        float foot = ImGui::GetTextLineHeightWithSpacing() * 2 + ImGui::GetStyle().WindowPadding.y;
+        float foot = ImGui::GetFrameHeightWithSpacing() + ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowPadding.y;
         if (ImGui::GetCursorPosY() < ImGui::GetWindowHeight() - foot) ImGui::SetCursorPosY(ImGui::GetWindowHeight() - foot);
+        if (studio_present()) {
+            if (ImGui::Button("Customs Studio")) open_studio();
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("The chart editor: make your own songs for Customs, and ROM patches.\nIts guide: CUSTOMS STUDIO GUIDE.md beside this program.");
+            ImGui::SameLine(0, fs_);
+        }
         if (ImGui::Checkbox("Music", &g_music.on)) save();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Each game's difficulty-select music, from your dump:\nonce when it is added, and while the mouse is on its card.");
         ImGui::SameLine(0, fs_ * 1.5f);

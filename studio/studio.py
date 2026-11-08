@@ -80,13 +80,30 @@ def load_config():
     c["paths"] = DEFAULTS
     if os.path.exists(path):
         c.read(path, encoding="utf-8-sig")         # (a BOM, as PowerShell writes, is fine)
-        for k in ("toolkit", "recomp"):            # a relative path is from the Studio's own folder (the tester kit)
+        for k in ("toolkit", "recomp"):            # a relative path is from the Studio's own folder (the release)
             c["paths"][k] = os.path.normpath(os.path.join(APP_DIR, os.path.expandvars(c["paths"][k])))
     else:
         with open(path, "w", encoding="utf-8") as f:
             f.write("# Customs Studio: where the toolkit's tools folder and the recomp are\n")
             c.write(f)
     return c["paths"], path
+
+
+def deploy_toolkit(paths):
+    """The release: the toolkit runs from the player's own folder, not the install's, so it can write
+    anywhere (Program Files, a launcher's library) and an update never touches their charts and builds.
+    The shipped files are copied over when they differ; what the player made is never in that set."""
+    shipped = os.path.dirname(os.path.dirname(paths["toolkit"]))   # .../toolkit/rom_hacking/tools -> .../toolkit
+    dest = os.path.join(B.data_root(paths["recomp"]), "Studio", "toolkit")
+    for root, _, files in os.walk(shipped):
+        to = os.path.join(dest, os.path.relpath(root, shipped))
+        os.makedirs(to, exist_ok=True)
+        for f in files:
+            a, b = os.path.join(root, f), os.path.join(to, f)
+            sa = os.stat(a)
+            if not os.path.exists(b) or os.path.getsize(b) != sa.st_size or int(os.path.getmtime(b)) != int(sa.st_mtime):
+                shutil.copy2(a, b)
+    return os.path.join(dest, "rom_hacking", "tools")
 
 
 def work_dir():
@@ -124,6 +141,8 @@ def main():
             return
         port = free_port()                                # (something else has that port)
     paths, ini = load_config()
+    if paths.get("deploy", "") == "1":
+        paths["toolkit"] = deploy_toolkit(paths)
     seq_editor = os.path.join(paths["toolkit"], "seq_editor")
     if not os.path.exists(os.path.join(seq_editor, "server.py")):
         sys.exit("Customs Studio: no seq_editor\\server.py in the toolkit folder %s (set it in %s)" % (paths["toolkit"], ini))
@@ -134,7 +153,7 @@ def main():
     for g, var in (("EBA", "EBA_ROM"), ("OE1", "OE1_ROM"), ("OE2", "OE2_ROM")):
         try:
             rom = B.recomp_folder(paths["recomp"], g)["rom"]
-            if os.path.isfile(rom) and not os.environ.get(var):
+            if rom and os.path.isfile(rom) and not os.environ.get(var):
                 os.environ[var] = rom
         except FileNotFoundError:
             pass
@@ -186,13 +205,17 @@ def main():
                 try:
                     f = B.recomp_folder(paths["recomp"], g)
                     out["games"][g] = f["exe"]
-                    if os.path.exists(f["rom"]):
+                    if f["rom"] and os.path.exists(f["rom"]):
                         out["dumps"].append(g)
                     else:
                         out["missing"][g] = f["rom"]
                 except Exception as e:
                     out["games"][g] = None
             return out
+        if name == "open_builds":                         # the folder the built ROMs and patches land in
+            os.startfile(os.path.join(os.path.dirname(paths["toolkit"]), "patched_roms" if not d.get("game") or d["game"] == "EBA"
+                                      else "ouendan%s\\patched_roms" % d["game"][-1]))
+            return {"ok": True}
         rom = d.get("rom") or last.get(d.get("chart", ""))
         if not rom or not os.path.exists(rom):
             raise ValueError("build the ROM first (Build ROM / Build all diffs), then this")

@@ -101,7 +101,7 @@ int difficulty_index(char d);                       // e n h x: 0 .. 3, the sess
 
 // ---- button mode (eba_buttons.cpp) -------------------------------------------------------
 struct Buttons {
-    bool on = true;                     // the face buttons and keys hit notes in a song
+    bool on = false;                    // the face buttons and keys hit notes in a song (Input > Tap mode)
     int keys[4] = {44, 0, 0, 0};        // SDL scancodes that hit too (44: Space), 0: none
     bool trigger_feel = true;           // a DualSense's triggers push back on spinners
 };

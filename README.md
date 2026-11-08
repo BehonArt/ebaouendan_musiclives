@@ -4,17 +4,21 @@
 Osu! Tatakae! Ouendan 2 on Windows**, recompiled from their own code to native
 PC programs, with a launcher, Tap mode for controllers (rumble, DualSense
 triggers), display and look options, assists and No-Fail, Customs (your own
-songs, imported), RetroAchievements and **Customs Studio** (a chart editor, its
-own download), all three games alike.
+songs, imported), RetroAchievements and **Customs Studio** (a chart editor), all
+three games alike.
 
 **Discord:** https://discord.gg/XGPhewDEtn (customs, help, bug reports)
 
 **You need your own cartridge dumps.** Nothing of the games is in this
 repository or its releases: the launcher asks for each game's `.nds` dump
 (EBA USA, Ouendan 1 and 2 Japan) and checks it. The release zip is on the
-[Releases](../../releases) page: unpack it anywhere, run `eba-recomp.exe`,
-point each game at its dump, play. Windows 10 or 11, 64-bit, a graphics
-driver with OpenGL 4.5. The README in the zip covers controls and options.
+[Releases](../../releases) page, and on
+[Quiver](https://quiverlauncher.com/apps/elite-beat-agents-elite-beat-ouendan-music-lives):
+unpack it anywhere, run `eba-recomp.exe`, point each game at its dump, play.
+The mouse is the stylus; for a controller or keyboard, press F1 and turn on Input >
+Tap mode. Windows 10 or 11, 64-bit, a graphics driver with OpenGL 4.5. The README
+in the zip covers controls and options, and
+[its guide](docs/CUSTOMS_STUDIO_GUIDE.md) covers Customs Studio.
 
 The project's own code is MIT (`LICENSE`). Built on
 [ndskit](https://github.com/vs-sr-dev/ndskit) (a static recompiler and
@@ -72,7 +76,7 @@ EBA's window has a menu bar (`src/eba_ui.cpp`, Dear ImGui in
 
 No menu has submenus (in a small window ImGui puts one over its menu): each
 choice is a list under a grey heading.
-- **Input:** Tap mode ("button mode" in these notes) on or off, rumble and its strength, up to four hit keys (click one, then
+- **Input:** Tap mode ("button mode" in these notes; off by default) on or off, rumble and its strength, up to four hit keys (click one, then
   press a key; right-click clears), the connected gamepads, the key map.
 - **Timing:** the offset (-8 to +8 frames), the sound's latency (1 to 6
   frames), and **Calibrate...**, a window that counts every tap the game
@@ -595,8 +599,7 @@ In a window (put `C:\msys64\ucrt64\bin` on PATH; mouse = stylus, Esc quits):
 
 The 1.0 release is the three games, playable by touch or Tap mode, with the
 display, timing, assist and effect options above, Customs, RetroAchievements,
-the launcher and Customs Studio (`studio/`, [its README](studio/README.md): the
-chart editor, a download of its own from `tools/make_studio_kit.ps1`). Everything
+the launcher and Customs Studio (`studio/`, [its README](studio/README.md)). Everything
 in this part is already in the code but switched off in release builds
 (`kRelease` and `kSkins` in `src/eba.h`) and is planned for later releases:
 

@@ -1,7 +1,8 @@
-# The release zip: Elite Beat Ouendan: Music LIVES, the three games and the
-# launcher, for players who bring their own cartridge dumps.
+# The release zip: Elite Beat Ouendan: Music LIVES, the three games, the
+# launcher and Customs Studio, for players who bring their own cartridge dumps.
 #
 #   tools\make_release.ps1 [-Version 1.0.0] [-NoBuild] [-KeepRelease] [-HeaderArt FILE]
+#                           [-Toolkit "F:\...\rom_hacking\tools"] [-SkipStudioBuild]
 #
 # Builds the three games in release mode (cmake/eba.cmake's EBA_RELEASE: no
 # saved replays or dumps; no console window) and the
@@ -11,7 +12,11 @@
 #   eba-recomp.exe           the launcher (run this)
 #   EBA.exe OE1.exe OE2.exe  the games
 #   SDL3.dll libiconv-2.dll libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll
-#   README.txt LICENSE THIRD_PARTY.txt licenses\
+#   Customs Studio\          the chart editor (PyInstaller); studio.ini: deploy=1
+#   toolkit\                 what it runs: the toolkit's own make_release.py public
+#                            tree, allowlisted and verified; copied to the player's
+#                            data folder on start (studio.py deploy_toolkit)
+#   README.txt "CUSTOMS STUDIO GUIDE.md" CHANGELOG.md LICENSE THIRD_PARTY.txt licenses\
 #
 # Nothing of the games goes in: the script stops if a ROM or a save is staged.
 # Header art ships only when named with -HeaderArt (original art only: a
@@ -20,7 +25,8 @@
 # in build\dist_test_keep\ if the script stops on an error).
 # Afterwards the build trees are put back in development mode (only the port's
 # own sources rebuild), unless -KeepRelease. -NoBuild packages what is built.
-param([string]$Version = "1.0.0", [switch]$NoBuild, [switch]$KeepRelease, [string]$HeaderArt = "")
+param([string]$Version = "1.0.0", [switch]$NoBuild, [switch]$KeepRelease, [string]$HeaderArt = "",
+      [string]$Toolkit = "F:\dxvk_remix\Claude\EBAHD Old\rom_hacking\tools", [switch]$SkipStudioBuild)
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 $bash = "C:\msys64\usr\bin\bash.exe"
@@ -69,6 +75,22 @@ $readme = (Get-Content -Raw (Join-Path $root "docs\README_RELEASE.txt")) -replac
 $readme = ($readme -replace "`r`n", "`n") -replace "`n", "`r`n"
 [IO.File]::WriteAllText((Join-Path $stage "README.txt"), $readme)
 Copy-Item (Join-Path $root "LICENSE") (Join-Path $stage "LICENSE.txt")
+Copy-Item (Join-Path $root "CHANGELOG.md") $stage
+Copy-Item (Join-Path $root "docs\CUSTOMS_STUDIO_GUIDE.md") (Join-Path $stage "CUSTOMS STUDIO GUIDE.md")
+# Customs Studio and the public toolkit it runs
+if (-not $SkipStudioBuild) {
+    Write-Host "Customs Studio (PyInstaller)"
+    & (Join-Path $root "studio\build_studio.ps1") -Toolkit $Toolkit
+}
+$studio = Join-Path $root "studio\dist\Customs Studio"
+if (-not (Test-Path (Join-Path $studio "Customs Studio.exe"))) { throw "no Customs Studio.exe in $studio" }
+robocopy $studio (Join-Path $stage "Customs Studio") /E /NJH /NJS /NFL /NDL /NP | Out-Null
+if ($LASTEXITCODE -ge 8) { throw "robocopy failed on the Studio" }
+$global:LASTEXITCODE = 0
+$ini = "# Customs Studio: the shipped toolkit and the games, relative to this folder`r`n[paths]`r`ntoolkit = ..\toolkit\rom_hacking\tools`r`nrecomp = ..`r`ndeploy = 1`r`n"
+[IO.File]::WriteAllText((Join-Path $stage "Customs Studio\studio.ini"), $ini)   # no BOM
+py -3 (Join-Path $Toolkit "make_release.py") --out (Join-Path $stage "toolkit")
+if ($LASTEXITCODE -ne 0) { throw "the toolkit's release verifier failed: nothing packaged" }
 Copy-Item (Join-Path $root "docs\THIRD_PARTY.txt") $stage
 $lic = Join-Path $stage "licenses"
 Copy-Item (Join-Path $root "ndskit\LICENSE") "$lic\ndskit.txt"
@@ -84,7 +106,9 @@ Get-Content "$ucrt\share\licenses\libgcc\COPYING.RUNTIME", "$ucrt\share\licenses
 Copy-Item "$ucrt\share\licenses\libwinpthread\COPYING" "$lic\winpthreads.txt"
 
 # nothing of the games
-$bad = Get-ChildItem -Recurse $stage -File | Where-Object { $_.Extension -in ".nds", ".sav", ".dsv", ".bin" -or $_.Name -eq "portable.txt" }
+$bad = Get-ChildItem -Recurse $stage -File | Where-Object {
+    $_.Extension -in ".nds", ".sav", ".dsv", ".seq_", ".oml_", ".sdat", ".strm", ".swar" -or $_.Name -eq "portable.txt" -or
+    ($_.Extension -eq ".bin" -and $_.FullName -notlike "*\Customs Studio\_internal\*") }
 if ($bad) { throw "not for the package: $($bad.FullName -join ', ')" }
 
 if (Test-Path $zip) { Remove-Item -Force $zip }

@@ -28,9 +28,10 @@
 // customs-first-boot (headless: the first boot that makes the start save, then stop);
 // customs-make-start-save (make it as the Customs screen would, then stop: a test);
 // customs-quit (a test run ends 2 s after the song is over); customs-dir=PATH (where the customs are:
-// by default customs/ beside the cartridge, else in the release the game's data
-// folder (%APPDATA%\eba-recomp\EBA\customs\), else the game's folder in the
-// working directory: customs/ for EBA, customs_oe2/ for Ouendan 2).
+// in the release by default the game's data folder (%APPDATA%\eba-recomp\EBA\customs\),
+// where Customs Studio exports to; in a development build customs/ beside the
+// cartridge, else the game's folder in the working directory: customs/ for EBA,
+// customs_oe2/ for Ouendan 2).
 #include "eba.h"
 #include "display.h"
 #include <SDL3/SDL.h>
@@ -164,8 +165,8 @@ void load_catalog() {
     if (o.count("customs-dir")) g_dir = o.at("customs-dir");
     else {
         fs::path beside = fs::path(g_cfg.rom).parent_path() / "customs";   // a play folder's
-        if (fs::exists(beside)) g_dir = beside.string();
-        else if (kRelease) g_dir = data_dir() + "customs";                // the player's: with the save and settings
+        if (kRelease) g_dir = data_dir() + "customs";                     // the player's: with the save and settings
+        else if (fs::exists(beside)) g_dir = beside.string();
         else g_dir = (fs::current_path() / game().customs_dir).string();
     }
     std::error_code ec;

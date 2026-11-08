@@ -125,9 +125,33 @@ def make_custom(built_rom, stock_rom, out_dir, title="", artist="", tag=None, di
     return dict(game=game, tag=tag, dir=d, stage=stage, files=len(changed))
 
 
+def data_root(recomp_root):
+    """Where the release keeps the player's files: %APPDATA%\\eba-recomp, or userdata beside it when portable."""
+    if os.path.exists(os.path.join(recomp_root, "portable.txt")):
+        return os.path.join(recomp_root, "userdata")
+    return os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "eba-recomp")
+
+
+def launcher_rom(recomp_root, game):
+    """The dump chosen for a game in the launcher (launcher.ini), or "" if none."""
+    try:
+        with open(os.path.join(data_root(recomp_root), "Launcher", "launcher.ini"), encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("rom_%s=" % game):
+                    return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return ""
+
+
 def recomp_folder(recomp_root, game):
-    """The recomp's play folder of a game: its exe, its stock ROM, its save, its customs."""
+    """A game's exe, its stock ROM, its save and its customs. The release: the exes together, the dump
+    chosen in the launcher, the player's files in the data folder. A development tree: its play folders."""
     g = GAMES[game]
+    if os.path.exists(os.path.join(recomp_root, g["exe"])):
+        data = os.path.join(data_root(recomp_root), game)
+        return dict(dir=recomp_root, exe=os.path.join(recomp_root, g["exe"]), rom=launcher_rom(recomp_root, game),
+                    save=os.path.join(data, game + ".sav"), customs=os.path.join(data, "customs"))
     d = os.path.join(recomp_root, g["folder"])
     exe = os.path.join(d, g["exe"])
     if not os.path.exists(exe):

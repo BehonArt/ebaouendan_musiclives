@@ -29,8 +29,11 @@ projects and builds stay where they are); the Studio adds `recomp_bridge.py`.
     py -3 studio.py --browser    # the default browser instead
     studio\build_studio.ps1      # the .exe: studio\dist\Customs Studio\
 
-`studio.ini` beside it says where the toolkit's `tools` folder and the recomp
-(its `play`, `play_oe2`, `play_oe1` folders) are.
+`studio.ini` beside it says where the toolkit's `tools` folder and the recomp are. A
+development tree uses the recomp's `play` folders. The release (`tools/make_release.ps1`)
+has `deploy = 1`: the shipped toolkit is copied to the player's data folder on start and
+runs from there, the dumps are the launcher's, and customs go to the games' data folders.
+The player's guide is `docs/CUSTOMS_STUDIO_GUIDE.md`.
 
 ## The .exe
 
