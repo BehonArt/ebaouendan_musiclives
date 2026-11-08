@@ -138,6 +138,21 @@ void import_buttons() {
         path.swap(g_picked);
     }
     if (!path.empty()) g_import_msg = customs_import(path);
+    ImGui::SameLine();
+    if (ImGui::Button("Open the customs folder")) {
+        std::error_code ec;
+        std::filesystem::create_directories(customs_folder(), ec);
+        SDL_OpenURL(("file:///" + std::filesystem::absolute(customs_folder()).string()).c_str());
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s\nEach custom is a folder in it (custom.ini and files\\): drop one in, or import above.",
+                          customs_folder().c_str());
+    if (customs_preparing())
+        ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1),
+                           "Preparing Customs for the first time: the game's first boot runs in the background (about half a minute); "
+                           "the song starts when it is done.");
+    else if (!customs_prepare_error().empty())
+        ImGui::TextColored(ImVec4(1, 0.5f, 0.4f, 1), "Customs could not start: %s", customs_prepare_error().c_str());
     if (!g_import_msg.empty()) {
         ImGui::PushTextWrapPos(0);
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "%s", g_import_msg.c_str());
@@ -224,10 +239,12 @@ void customs_window() {
             scores_line(c);
             ImGui::Spacing();
             bool here = now && now->tag == c.tag;
+            ImGui::BeginDisabled(customs_preparing());
             if (ImGui::Button(here ? "Play again" : "Play", ImVec2(std::min(fs * 8, ImGui::GetContentRegionAvail().x), 0))) {
                 preview_stop();
                 customs_launch(c, g_diff, g_autoplay);
             }
+            ImGui::EndDisabled();
             ImGui::TableNextColumn();                   // the stage it replaces: its card and its own preview
             ImGui::PushTextWrapPos(0);
             if (c.replaces == c.stage) ImGui::TextDisabled("Replaces %s", c.stage.c_str());
@@ -240,7 +257,9 @@ void customs_window() {
         }
         ImGui::EndTable();
     }
-    if (customs().empty()) ImGui::TextDisabled("No customs found (customs/ beside the cartridge).");
+    if (customs().empty())
+        ImGui::TextDisabled("No customs yet. Import one above (a custom ROM or a custom's folder someone shared),\n"
+                            "or put its folder in %s.", customs_folder().c_str());
     ImGui::EndChild();
     ImGui::End();
     if (!open) { g_open = false; preview_stop(); }

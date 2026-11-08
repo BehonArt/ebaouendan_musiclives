@@ -125,13 +125,35 @@ def recomp_folder(recomp_root, game):
                 customs=os.path.join(d, "customs"))
 
 
+def ensure_start_save(rf, customs_dir):
+    """customs/pristine.sav: the save Customs starts from. The game makes it itself (its first boot,
+    headless, --port customs-make-start-save) when the folder has none; a copy from the play
+    folder's customs when that has one already. Returns its path (raises when it cannot be made)."""
+    pristine = os.path.join(customs_dir, "pristine.sav")
+    if os.path.exists(pristine) and os.path.getsize(pristine) > 0:
+        return pristine
+    have = os.path.join(rf["customs"], "pristine.sav")
+    if os.path.exists(have) and os.path.getsize(have) > 0 and os.path.abspath(rf["customs"]) != os.path.abspath(customs_dir):
+        shutil.copyfile(have, pristine)
+        return pristine
+    os.makedirs(customs_dir, exist_ok=True)
+    work = os.path.join(customs_dir, "first-boot")
+    os.makedirs(work, exist_ok=True)
+    args = [rf["exe"], rf["rom"], "--save", os.path.join(work, "parent.sav"), "--out", work, "--vblanks", "30000",
+            "--no-dump", "--port", "customs-dir=" + customs_dir, "--port", "customs-make-start-save"]
+    with open(os.path.join(work, "parent.log"), "w") as log:
+        subprocess.run(args, cwd=rf["dir"], stdout=log, stderr=subprocess.STDOUT,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if not (os.path.exists(pristine) and os.path.getsize(pristine) > 0):
+        raise RuntimeError("the game could not make its start save (see %s)" % os.path.join(work, "parent.log"))
+    return pristine
+
+
 def launch_test(game, custom, difficulty, autoplay, recomp_root, work_dir):
     """The recomp in Customs mode on this custom: its own run, the customs' known save, the stage at once."""
     rf = recomp_folder(recomp_root, game)
     customs = os.path.dirname(custom["dir"])
-    pristine = os.path.join(customs, "pristine.sav")
-    if not os.path.exists(pristine):                     # the save the Customs route is known on
-        shutil.copyfile(os.path.join(rf["customs"], "pristine.sav"), pristine)
+    pristine = ensure_start_save(rf, customs)            # the save Customs starts from (the game makes it)
     os.makedirs(work_dir, exist_ok=True)
     session = os.path.join(work_dir, "session.sav")
     shutil.copyfile(pristine, session)

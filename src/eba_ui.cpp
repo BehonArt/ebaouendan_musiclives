@@ -419,12 +419,10 @@ void draw(int, int) {
     bool bar = g_shown && (!full || near_top || menu_open);
     if (bar && ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("Game")) {
-            if (!kRelease) {                        // (not in the release yet: docs/ROADMAP.md)
-                if (ImGui::MenuItem("Customs...")) customs_ui_open();
-                if (custom_playing() && ImGui::MenuItem("Back to campaign")) customs_back_to_campaign();
-                if (ImGui::MenuItem("RetroAchievements...")) g_ra = true;
-                ImGui::Separator();
-            }
+            if (ImGui::MenuItem("Customs...")) customs_ui_open();
+            if (custom_playing() && ImGui::MenuItem("Back to campaign")) customs_back_to_campaign();
+            if (ImGui::MenuItem("RetroAchievements...")) g_ra = true;
+            ImGui::Separator();
             if (ImGui::MenuItem("Screenshot", "F12")) push_key(SDL_SCANCODE_F12);
             if (ImGui::MenuItem("Open the save folder")) SDL_OpenURL(("file:///" + std::filesystem::absolute(g_cfg.out).string()).c_str());
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s\nThe save, the settings, screenshots and the log.", g_cfg.out.c_str());
@@ -448,7 +446,7 @@ void draw(int, int) {
     display_set_top_margin(g_shown && !full ? (int)std::ceil(g_bar_h) : 0);
     if (g_calibration) calibration_window();
     help_windows();
-    if (!kRelease) customs_ui_draw();
+    customs_ui_draw();
     ra_window();
     ra_toasts_draw();
     ImGui::Render();

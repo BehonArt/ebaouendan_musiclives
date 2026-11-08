@@ -108,8 +108,8 @@ void init() {
     fx_options();
     skins_options();
     rumble_options();
-    if (!kRelease) customs_init();          // (not in the release yet: docs/ROADMAP.md)
-    if (!kRelease) ra_init();
+    customs_init();
+    ra_init();
 }
 
 }  // namespace eba

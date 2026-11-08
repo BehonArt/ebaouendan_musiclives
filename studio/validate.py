@@ -34,9 +34,7 @@ def validate_custom(game, custom, difficulty, recomp_root, work_dir, max_vblanks
     rf = B.recomp_folder(recomp_root, game)
     customs = os.path.dirname(custom["dir"])
     os.makedirs(work_dir, exist_ok=True)
-    pristine = os.path.join(customs, "pristine.sav")
-    if not os.path.exists(pristine):                     # the save the Customs route is known on
-        shutil.copyfile(os.path.join(rf["customs"], "pristine.sav"), pristine)
+    pristine = B.ensure_start_save(rf, customs)          # the save Customs starts from (the game makes it)
     session = os.path.join(work_dir, "validate_session.sav")
     shutil.copyfile(pristine, session)
     campaign = os.path.join(work_dir, "validate_campaign.sav")   # a copy: the player's own is never touched

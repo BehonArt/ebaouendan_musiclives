@@ -82,7 +82,12 @@ struct Game {
     std::vector<uint64_t> life_bar;     // the life bar's textures (texpack hashes): hidden with No-Fail
     const char* skins_dir = "";         // the skins' folder (texture packs made for this game), "": none
     bool intro_skip = true;             // a song's intro has the game's own SKIP (EBA, Ouendan 2; not Ouendan 1)
+    uint32_t save_size = 8192;          // the cartridge's backup chip: a save made from nothing is this big
     const char* customs_dir = "customs";
+    // Customs' start save, made by the game itself on a first use (customs/pristine.sav): its
+    // first boot on an empty save, headless: the title tapped at `title`, then SKIP tapped at
+    // (skip_x, skip_y) every 250 frames from skip_from until the main menu, within `limit`
+    struct { uint64_t title = 0; int skip_x = 0, skip_y = 0; uint64_t skip_from = 0, limit = 0; } first_boot;
     std::vector<const char*> stages;    // the story's stages by index (the charts' stems: SS05, OS03, s03)
     float menu_button_x = 0.5f;         // the CUSTOMS button across the main menu's lower screen (0 left .. 1 right)
 };
@@ -193,6 +198,9 @@ void customs_launch(const Custom& c, char difficulty, bool autoplay);   // a Cus
 void customs_back_to_campaign();
 std::string customs_import(const std::string& path);   // a custom ROM (.nds) or a custom's folder: what happened
 bool customs_frame(NdsInput& in, uint64_t vblank);       // true: the autopilot drives the input
+const std::string& customs_folder();    // where the customs are (and their start save, scores, session)
+bool customs_preparing();               // the start save is being made (the game's first boot, in the background)
+const std::string& customs_prepare_error();   // why it could not be made ("" while fine)
 bool customs_take_show_request();       // a custom's song is over: the Customs screen, once
 uint32_t scene();                       // the scene's vtable (eba_customs.cpp's table)
 bool scene_is_main_menu();

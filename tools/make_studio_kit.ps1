@@ -9,8 +9,8 @@
 # Steps: the toolkit's own make_release.py stages its public tree (an allowlist,
 # verified: no ROM-derived files); studio\build_studio.ps1 builds the Studio
 # exe (PyInstaller; -SkipStudioBuild reuses studio\dist); the games' dev
-# ndsrun.exe builds go in as EBA.exe/OE1.exe/OE2.exe with the DLLs and each
-# game's customs\pristine.sav (the save Customs mode starts from); the guide
+# ndsrun.exe builds go in as EBA.exe/OE1.exe/OE2.exe with the DLLs (the start
+# save Customs plays from, the game makes itself on the first Play); the guide
 # docs\CUSTOMS_STUDIO_TESTER.md is the kit's README. Then the zip:
 # dist\eba-recomp-customs-studio-<version>-windows-x64.zip
 param(
@@ -59,8 +59,7 @@ foreach ($g in $games) {
     foreach ($dll in "SDL3.dll", "libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll", "libiconv-2.dll") {
         Copy-Item (Join-Path "$ucrt\bin" $dll) $d
     }
-    # the save Customs mode starts every custom from (the campaign's save is never touched)
-    Copy-Item (Join-Path $root "$($g.folder)\customs\pristine.sav") (Join-Path $d "customs\pristine.sav")
+    # (no start save shipped: the game makes customs\pristine.sav itself on the first Play, from its own first boot)
     $id = $g.id
     $bat = "@echo off`r`n" +
            "rem $($g.title), recompiled (development build: Customs mode on).`r`n" +

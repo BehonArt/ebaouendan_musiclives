@@ -56,7 +56,10 @@ Game make_eba() {
     g.difficulties = {"Breezin'", "Cruisin'", "Sweatin'", "Hard Rock"};
     g.stages = {"SS01", "SS02", "SS06", "SS04", "SS05", "SS09", "SS10", "SS03", "SS08", "SS11", "SS13", "SS12",
                 "SSB03", "SS07", "SS15A", "SS15B", "SSB02", "SSB01", "SS14"};   // the table at 0x020B3EE4
+    g.save_size = 262144;               // 256 KiB flash
     g.customs_dir = "customs";
+    // an empty save: the title, then Kahn's briefing (the tutorial) until the main menu
+    g.first_boot = {950, 245, 183, 1350, 7000};
     return g;
 }
 
@@ -74,13 +77,13 @@ Game make_oe2() {
     g.session = 0x020A7A88; g.score = 0x10C; g.combo = 0xF4;
     g.song_channels = 0xC0;
     g.skip_x = 238; g.skip_y = 183;
-    // the title, ひとりで応援 (alone), OK on the difficulty, the map's book (the next
-    // stage's card), OK
+    // the title, ひとりで応援 (alone), OK on the difficulty, the first stage's HELP! character on
+    // the map (the start save is the game's own first boot: one stage, no book), its card's OK
     g.route = {{1850, 128, 150, g.scenes.title}, {2650, 65, 55, g.scenes.menu},
-               {3350, 238, 183, g.scenes.difficulty}, {4350, 238, 178, g.scenes.map},
+               {3350, 238, 183, g.scenes.difficulty}, {4350, 130, 72, g.scenes.map},
                {4750, 238, 183, g.scenes.map}};
     g.route_tap = 9;                    // the card's OK misses a 3-frame tap
-    g.card_from = 4364; g.card_to = 4364; g.hand_over = 4760;  // the card sets its stage by 4362
+    g.card_from = 4364; g.card_to = 4745; g.hand_over = 4760;  // the card open: its stage ours until OK
     g.again = {160, 88, 440, 450, 238, 183};    // the stage last played: its character, in the middle
     g.autoplay = 0x27C; g.replaying = 0x15C; g.replay = 0xA0;   // from its judge (EBA's +0x234, +0x138)
     // matched to EBA's code: the approach in 0x020BB294 (EBA's 0x020681B8), the hit test's
@@ -91,7 +94,9 @@ Game make_oe2() {
     g.difficulties = {"Kigaru (easy)", "Kakan (normal)", "Gekiretsu (hard)", "Karei (insane)"};
     g.stages = {"OS01", "OS02", "OS04", "OS06", "OS08", "OS10", "OSB02", "OS11", "OS03", "OS07", "OS14", "OS12",
                 "OS13", "OS05", "OS15A", "OS15B", "OSB03", "OSB01", "OS09"};   // the table at 0x02092020
+    g.save_size = 262144;               // 256 KiB flash
     g.customs_dir = "customs_oe2";
+    g.first_boot = {1850, 238, 183, 2250, 7000};   // the title, the briefing's スキップ until the menu
     g.skins_dir = "skins";              // the HD approach-circle packs: the ring shapes are the same in all three games
     g.menu_button_x = 0.0f;             // the strip's right holds 応援スタイルを選ぶべし
     return g;
@@ -127,7 +132,9 @@ Game make_oe1() {
     g.difficulties = {"Kigaru (easy)", "Kakan (normal)", "Gekiretsu (hard)", "Karei (insane)"};
     g.stages = {"s01", "s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09", "s10", "s11", "s12", "s13",
                 "s14", "s15"};                // its name is "%c%02d" of the index + 1
+    g.save_size = 8192;                 // 8 KiB EEPROM
     g.customs_dir = "customs_oe1";
+    g.first_boot = {700, 238, 183, 1100, 7000};
     g.skins_dir = "skins";
     g.intro_skip = false;               // its song intro has no SKIP: fast-forwarded instead (eba_buttons.cpp)
     return g;

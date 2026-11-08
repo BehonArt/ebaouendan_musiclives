@@ -3,8 +3,8 @@
 **Elite Beat Agents, Osu! Tatakae! Ouendan and Moero! Nekketsu Rhythm Damashii
 Osu! Tatakae! Ouendan 2 on Windows**, recompiled from their own code to native
 PC programs, with a launcher, Tap mode for controllers (rumble, DualSense
-triggers), display and look options, assists and
-No-Fail, all three games alike.
+triggers), display and look options, assists and No-Fail, Customs (your own
+songs, imported) and RetroAchievements, all three games alike.
 
 **You need your own cartridge dumps.** Nothing of the games is in this
 repository or its releases: the launcher asks for each game's `.nds` dump
@@ -300,6 +300,121 @@ portrait) come at 30, 60, 100 and 150, not 90.
   background shows through it (the compose pass). `--port fx-debug` draws it
   in front of everything; `--port combo-log` logs the combo.
 
+## Customs (all three games)
+
+**In 1.0.** Game > Customs... (or the orange CUSTOMS button on the main menu)
+lists the customs in the game's own customs folder (`%APPDATA%\eba-recomp\EBA\customs\`
+and so on; Open the customs folder opens it). The list starts empty: Import
+custom ROM... takes a custom ROM of the game (the files it changes are taken
+from it), Import custom folder... a custom's folder someone shared (a Studio
+export, or a .zip of one unpacked). The first Play makes the **start save** the
+game needs by running the game's own first boot headless in the background
+(the tutorial to the main menu, about half a minute) into `customs\pristine.sav`;
+every custom then starts from a copy of it, whatever the campaign's progress,
+and the campaign's save is never opened. Scores go to `customs\scores.ini`.
+The autopilot's route waits for a scene that is late (a new save's first-time
+screens) and lets it settle before tapping. HD audio, previews and stage art
+come only from `tools/bake_customs.py` (the author's); an imported custom
+plays with the game's own audio and its title stands in for the art.
+
+
+A mode of its own, apart from the campaign: songs charted over story stages,
+each with its own scores and HD audio. An orange **CUSTOMS** button sits at
+the top of the main menu's lower screen (also Game > Customs...). The screen
+lists each custom: its art and an HD preview, its best score per difficulty,
+**Play**, and the stage it replaces (that stage's card and its own preview).
+
+- **Play** starts a new run of ndsrun (the same window settings, fullscreen
+  too) on the stock ROM with the custom's files in place (`--replace-file
+  NAME=PATH`: the files are appended to the image and the FAT points at
+  them) and a save copied from `customs/pristine.sav`. An autopilot (turbo,
+  behind a loading screen) takes the menus to the card of the stage, sets
+  the session's stage (`*0x020CD248 + 8`) and difficulty (`+0`: 0 Breezin'
+  .. 3 Hard Rock), and hands over at the stage's comic. Each step checks the
+  scene it expects (the scene's vtable); a wrong one stops it and says so.
+- **HD audio:** the song's original recording (44.1 or 48 kHz) plays in
+  place of the DS's 15 kHz stream (channels 6 and 7 muted), kept on the
+  game's song clock: `tools/bake_customs.py` measures the stream's offset
+  and the clock's rate per custom. `--port hd=off` plays the DS stream.
+- **Scores** go to `customs/scores.ini`, never the campaign's save: the best
+  per custom and difficulty, with the grades and whether it was cleared
+  (the ending comic follows a clear, Regroup a fail). None is kept for a run
+  with autoplay, a replay or a wider hit circle.
+- **Autoplay** (a checkbox on the Customs screen): the game's own, to watch
+  or hear a custom.
+- **Import** (two buttons on the Customs screen): a custom ROM of the game
+  (`.nds`): the files that differ from the stock cartridge's (its FNT and
+  FAT) go to `customs/<stage>_<title>/files/`, the stage from the story
+  charts it changes, the title from the file's name (`Elite Beat Agents
+  (FG_SS04_ReadyToGo).nds`: Ready To Go); or a custom's folder someone shared
+  (`custom.ini` and `files/`), copied in. An imported custom has no art,
+  previews or HD audio until `tools/bake_customs.py` makes them: its title
+  stands in. `--port customs-import=PATH` does the same headless. Checked:
+  Ready To Go imported from its ROM and played through to a clear.
+- **Again, without the reboot:** Play on the same custom from the map after
+  its results (any difficulty, autoplay or not) skips the new run: the map
+  is centred on the stage just played, so the autopilot taps it (EBA its
+  marker, Ouendan 2 its character), sets the stage and difficulty as the
+  card shows, and presses OK, about 11 s of game time in turbo. Another
+  custom still needs a run of its own (each replaces the same sound data).
+- **Back to campaign** (on the Customs screen and in the Game menu) starts a
+  run on the campaign's save again.
+
+The five: All Star (over Rock This Town, SS05), Movies (Makes No Difference,
+SS02), Life Is a Highway (Highway Star, SS09), Come and Get Your Love (YMCA,
+SS10), Girls Just Want to Have Fun (SS11). `tools/extract_customs.py` takes
+each custom's files from its built ROM; `tools/bake_customs.py` makes the
+placeholder art, the stage cards and both previews, and the HD timing.
+`customs/` is not committed (the songs' audio).
+
+Ouendan 2's four, in `customs_oe2/` (`--game OE2` for both tools): Hohoemi no
+Bakudan (over Real Life Real Heart, OS02), I Want You (VISTA, OSB02), Madder
+(Kibun Jojo, OS03), Takedown (Music Hour, OS05). Its facts (clock, notes,
+judge, scenes, session) are in `src/games.cpp`.
+
+Ouendan 1's five, in `customs_oe1/` (`--game OE1`): Danger Zone (over Guts Da
+Ze, s03), I Just Can't Wait to Be King (Thrill, s08), I Think I'm OKAY (One
+Night Carnival, s11), Home (Over the Distance, s12), Through the Night
+(Shanghai Honey, s14), all with HD audio. Ouendan 1's engine is older: its
+notes are EBA's objects with the fields from +0x14 on 4 bytes later (the
+profile's `shift`), its manager's Array at +0x6C; its judge (`0x0202EE30`,
+`--hook 0202EE30`) is `judge(note, now)` as EBA's, with autoplay at session
+`+0x1F8` and no replays. Its stage is the session's `+4` (its name built as
+`"%c%02d"`: index 0 is s01), and its card shows the map's man tapped
+whatever the session says, so the Customs screen shows the replaced stage's
+opening comic, and the original preview is its song's start. The bake's
+clock fit is now a median-based line (a window matched at the wrong place no
+longer pulls it).
+
+## RetroAchievements (all three games, `src/eba_achievements.cpp`)
+
+**Game > RetroAchievements...**: sign in with a retroachievements.org account
+(only RA's token is kept, in `%APPDATA%\eba-recomp\RetroAchievements\login.ini`,
+shared by the three games; never the password), then each game's own set
+loads, with its list and progress, and unlocks pop up at the lower right.
+
+- **rcheevos** v12.5.0 (`third_party/rcheevos`, a submodule, MIT), its
+  rc_client, built as a static library by `cmake/eba.cmake`. The network is
+  WinHTTP (Windows' own, on a thread of its own): no DLL to ship.
+- **Memory:** RA's DS addresses are the recomp's own buffers: 0 to 0x3FFFFF
+  main RAM (0x02000000), 0x1000000 to 0x1003FFF the ARM9's DTCM. Checked once
+  a game frame, on the RAM the game left.
+- **The game:** RA's hash of the ROM (header, ARM9, ARM7, icon). All three
+  stock ROMs are in RA's Nintendo DS hash list: EBA `bbf10cada0dcc72068179c600fe79267`
+  (game 9232), Ouendan 2 `899b9c8dd0128097aebb009b49b2a2d5` (17353), Ouendan 1
+  `999654092d72821ef56a7c8de260cc64` (1226).
+- **Casual only.** RA counts hardcore from emulators it has approved (six
+  months public, its compliance list); this one is not.
+- **The game as made.** Achievements are paused (not checked; when the
+  pause ends they start over from their own start conditions, `rc_client_reset`)
+  in Customs, in button mode, with the approach or hit circle assist or
+  No-Fail, the game's autoplay, a replay played back, or a test's `--port`
+  options. A pop-up says so. The timing offset, the sound's latency, the
+  picture's options, skins, effects and rumble change nothing the game judges.
+- User agent: `eba-recomp/0.1.0 (Windows NT 10.0) eba/0.1.0` plus rcheevos's.
+- `--port ra-log` logs rc_client; `--port ra-spectator` checks achievements and
+  sends nothing (tests; a headless run then signs in with the saved token).
+
 ## Local ndskit patches
 
 In `patches/`, applied in this order to upstream ndskit (5ee24af); together
@@ -470,91 +585,20 @@ In a window (put `C:\msys64\ucrt64\bin` on PATH; mouse = stylus, Esc quits):
 # Future updates (not in 1.0)
 
 The 1.0 release is the three games, playable by touch or Tap mode, with the
-display, timing, assist and effect options above and the launcher. Everything
+display, timing, assist and effect options above, Customs, RetroAchievements
+and the launcher. Everything
 in this part is already in the code but switched off in release builds
 (`kRelease` and `kSkins` in `src/eba.h`) and is planned for later releases:
 
-- **Customs:** your own songs charted over the story stages, each with its
-  own scores, and **Customs Studio** (`studio/`, [its README](studio/README.md)),
-  the chart editor that tests a custom in the recomp and exports it, or a
-  patch for a real DS.
+- **Customs Studio** (`studio/`, [its README](studio/README.md)): the chart
+  editor that tests a custom in the recomp and exports it (a custom folder
+  for the Customs screen, or a BPS patch for a real DS). A download of its
+  own (`tools/make_studio_kit.ps1`), given to testers first.
 - **Mods:** skins and texture packs, HD approach circles (the code and the
   texture-pack runtime are there; waiting on a full HD skin).
-- **RetroAchievements:** each game's set, played as made (off with Customs,
-  Tap mode or the assists).
 - **Saved replays.**
 
 The developer's notes on each follow.
-
-## Customs (all three games)
-
-A mode of its own, apart from the campaign: songs charted over story stages,
-each with its own scores and HD audio. An orange **CUSTOMS** button sits at
-the top of the main menu's lower screen (also Game > Customs...). The screen
-lists each custom: its art and an HD preview, its best score per difficulty,
-**Play**, and the stage it replaces (that stage's card and its own preview).
-
-- **Play** starts a new run of ndsrun (the same window settings, fullscreen
-  too) on the stock ROM with the custom's files in place (`--replace-file
-  NAME=PATH`: the files are appended to the image and the FAT points at
-  them) and a save copied from `customs/pristine.sav`. An autopilot (turbo,
-  behind a loading screen) takes the menus to the card of the stage, sets
-  the session's stage (`*0x020CD248 + 8`) and difficulty (`+0`: 0 Breezin'
-  .. 3 Hard Rock), and hands over at the stage's comic. Each step checks the
-  scene it expects (the scene's vtable); a wrong one stops it and says so.
-- **HD audio:** the song's original recording (44.1 or 48 kHz) plays in
-  place of the DS's 15 kHz stream (channels 6 and 7 muted), kept on the
-  game's song clock: `tools/bake_customs.py` measures the stream's offset
-  and the clock's rate per custom. `--port hd=off` plays the DS stream.
-- **Scores** go to `customs/scores.ini`, never the campaign's save: the best
-  per custom and difficulty, with the grades and whether it was cleared
-  (the ending comic follows a clear, Regroup a fail). None is kept for a run
-  with autoplay, a replay or a wider hit circle.
-- **Autoplay** (a checkbox on the Customs screen): the game's own, to watch
-  or hear a custom.
-- **Import** (two buttons on the Customs screen): a custom ROM of the game
-  (`.nds`): the files that differ from the stock cartridge's (its FNT and
-  FAT) go to `customs/<stage>_<title>/files/`, the stage from the story
-  charts it changes, the title from the file's name (`Elite Beat Agents
-  (FG_SS04_ReadyToGo).nds`: Ready To Go); or a custom's folder someone shared
-  (`custom.ini` and `files/`), copied in. An imported custom has no art,
-  previews or HD audio until `tools/bake_customs.py` makes them: its title
-  stands in. `--port customs-import=PATH` does the same headless. Checked:
-  Ready To Go imported from its ROM and played through to a clear.
-- **Again, without the reboot:** Play on the same custom from the map after
-  its results (any difficulty, autoplay or not) skips the new run: the map
-  is centred on the stage just played, so the autopilot taps it (EBA its
-  marker, Ouendan 2 its character), sets the stage and difficulty as the
-  card shows, and presses OK, about 11 s of game time in turbo. Another
-  custom still needs a run of its own (each replaces the same sound data).
-- **Back to campaign** (on the Customs screen and in the Game menu) starts a
-  run on the campaign's save again.
-
-The five: All Star (over Rock This Town, SS05), Movies (Makes No Difference,
-SS02), Life Is a Highway (Highway Star, SS09), Come and Get Your Love (YMCA,
-SS10), Girls Just Want to Have Fun (SS11). `tools/extract_customs.py` takes
-each custom's files from its built ROM; `tools/bake_customs.py` makes the
-placeholder art, the stage cards and both previews, and the HD timing.
-`customs/` is not committed (the songs' audio).
-
-Ouendan 2's four, in `customs_oe2/` (`--game OE2` for both tools): Hohoemi no
-Bakudan (over Real Life Real Heart, OS02), I Want You (VISTA, OSB02), Madder
-(Kibun Jojo, OS03), Takedown (Music Hour, OS05). Its facts (clock, notes,
-judge, scenes, session) are in `src/games.cpp`.
-
-Ouendan 1's five, in `customs_oe1/` (`--game OE1`): Danger Zone (over Guts Da
-Ze, s03), I Just Can't Wait to Be King (Thrill, s08), I Think I'm OKAY (One
-Night Carnival, s11), Home (Over the Distance, s12), Through the Night
-(Shanghai Honey, s14), all with HD audio. Ouendan 1's engine is older: its
-notes are EBA's objects with the fields from +0x14 on 4 bytes later (the
-profile's `shift`), its manager's Array at +0x6C; its judge (`0x0202EE30`,
-`--hook 0202EE30`) is `judge(note, now)` as EBA's, with autoplay at session
-`+0x1F8` and no replays. Its stage is the session's `+4` (its name built as
-`"%c%02d"`: index 0 is s01), and its card shows the map's man tapped
-whatever the session says, so the Customs screen shows the replaced stage's
-opening comic, and the original preview is its song's start. The bake's
-clock fit is now a median-based line (a window matched at the wrong place no
-longer pulls it).
 
 ## Skins and texture packs (`src/eba_skins.cpp`, ndskit `texpack.cpp`)
 
@@ -602,35 +646,6 @@ glow, the judgements, the miss X, the spinner and SPIN!, each fitted to the
 DS picture's box (from a dump of all four difficulties, `--dump`). EBA's
 textures are the same on every difficulty. `skins/` is not in git (a skin's
 art is its author's).
-
-## RetroAchievements (all three games, `src/eba_achievements.cpp`)
-
-**Game > RetroAchievements...**: sign in with a retroachievements.org account
-(only RA's token is kept, in `%APPDATA%\eba-recomp\RetroAchievements\login.ini`,
-shared by the three games; never the password), then each game's own set
-loads, with its list and progress, and unlocks pop up at the lower right.
-
-- **rcheevos** v12.5.0 (`third_party/rcheevos`, a submodule, MIT), its
-  rc_client, built as a static library by `cmake/eba.cmake`. The network is
-  WinHTTP (Windows' own, on a thread of its own): no DLL to ship.
-- **Memory:** RA's DS addresses are the recomp's own buffers: 0 to 0x3FFFFF
-  main RAM (0x02000000), 0x1000000 to 0x1003FFF the ARM9's DTCM. Checked once
-  a game frame, on the RAM the game left.
-- **The game:** RA's hash of the ROM (header, ARM9, ARM7, icon). All three
-  stock ROMs are in RA's Nintendo DS hash list: EBA `bbf10cada0dcc72068179c600fe79267`
-  (game 9232), Ouendan 2 `899b9c8dd0128097aebb009b49b2a2d5` (17353), Ouendan 1
-  `999654092d72821ef56a7c8de260cc64` (1226).
-- **Casual only.** RA counts hardcore from emulators it has approved (six
-  months public, its compliance list); this one is not.
-- **The game as made.** Achievements are paused (not checked; when the
-  pause ends they start over from their own start conditions, `rc_client_reset`)
-  in Customs, in button mode, with the approach or hit circle assist or
-  No-Fail, the game's autoplay, a replay played back, or a test's `--port`
-  options. A pop-up says so. The timing offset, the sound's latency, the
-  picture's options, skins, effects and rumble change nothing the game judges.
-- User agent: `eba-recomp/0.1.0 (Windows NT 10.0) eba/0.1.0` plus rcheevos's.
-- `--port ra-log` logs rc_client; `--port ra-spectator` checks achievements and
-  sends nothing (tests; a headless run then signs in with the saved token).
 
 ## Next (developer notes)
 

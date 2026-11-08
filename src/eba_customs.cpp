@@ -3,7 +3,9 @@
 // changes on the cartridge and custom.ini (its title, artist, the stage it
 // replaces and that stage's index). Customs mode is a run of its own, started
 // by this one: the stock cartridge with the custom's files (--replace-file),
-// a fresh copy of a known save (customs/pristine.sav, never the campaign's),
+// a fresh copy of a known save (customs/pristine.sav, never the campaign's;
+// made by the game itself on the first use: its first boot on an empty save,
+// headless, through the tutorial to the main menu, Game::first_boot),
 // and an autopilot that takes the game from its boot to the custom's stage at
 // turbo speed behind a loading screen: the title, Single Player, the
 // difficulty, a stage card (The Anthem's, the one the known save shows
@@ -23,9 +25,12 @@
 //
 // Options (ndsrun --port): custom=TAG difficulty=e|n|h|x campaign-save=PATH
 // (Customs mode, set by the launch); hd=off (the game's own song, not the HD one);
+// customs-first-boot (headless: the first boot that makes the start save, then stop);
+// customs-make-start-save (make it as the Customs screen would, then stop: a test);
 // customs-quit (a test run ends 2 s after the song is over); customs-dir=PATH (where the customs are:
-// by default customs/ beside the cartridge, else the game's folder in the working
-// directory: customs/ for EBA, customs_oe2/ for Ouendan 2).
+// by default customs/ beside the cartridge, else in the release the game's data
+// folder (%APPDATA%\eba-recomp\EBA\customs\), else the game's folder in the
+// working directory: customs/ for EBA, customs_oe2/ for Ouendan 2).
 #include "eba.h"
 #include "display.h"
 #include <SDL3/SDL.h>
@@ -58,6 +63,15 @@ bool g_again_asked;                     // the same custom again, from the map (
 uint64_t g_again_at;                    // its route's first frame (0: none)
 uint32_t g_scene_prev;
 bool g_show_after;
+uint64_t g_route_shift;                 // frames the route has waited for a scene (a first-time screen)
+constexpr uint64_t kRouteWait = 5400;   // the most it waits (90 s of the game's time; turbo)
+constexpr uint64_t kRouteSettle = 600;  // frames a scene waited for gets before its tap (a known save gave the map ~1000)
+uint64_t g_route_settle;                // frames of settling left
+const RouteStep* g_route_waiting;       // the step whose scene is being waited for
+bool g_first_boot;                      // this run makes the start save (--port customs-first-boot)
+SDL_Process* g_prep;                    // the first boot making the start save, in the background
+struct { std::string tag; char difficulty = 'n'; bool autoplay = false; } g_pending;   // the Play that waits for it
+std::string g_prep_error;
 
 uint32_t session() { uint32_t s = game().session ? rd(game().session) : 0; return in_main(s) ? s : 0; }
 
@@ -150,7 +164,9 @@ void load_catalog() {
     if (o.count("customs-dir")) g_dir = o.at("customs-dir");
     else {
         fs::path beside = fs::path(g_cfg.rom).parent_path() / "customs";   // a play folder's
-        g_dir = fs::exists(beside) ? beside.string() : (fs::current_path() / game().customs_dir).string();
+        if (fs::exists(beside)) g_dir = beside.string();
+        else if (kRelease) g_dir = data_dir() + "customs";                // the player's: with the save and settings
+        else g_dir = (fs::current_path() / game().customs_dir).string();
     }
     std::error_code ec;
     for (const auto& e : fs::directory_iterator(g_dir, ec)) {
@@ -346,8 +362,8 @@ std::string exe_path() {
 #endif
 }
 
-// A new run of this program with these arguments; this one then closes.
-void relaunch(const std::vector<std::string>& args, const std::string& log) {
+// A new run of this program with these arguments, its output to `log`: the process (nullptr: it could not start).
+SDL_Process* spawn(const std::vector<std::string>& args, const std::string& log) {
     std::vector<const char*> argv;
     for (const auto& a : args) argv.push_back(a.c_str());
     argv.push_back(nullptr);
@@ -362,15 +378,65 @@ void relaunch(const std::vector<std::string>& args, const std::string& log) {
     SDL_SetBooleanProperty(p, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true);
     SDL_Process* proc = SDL_CreateProcessWithProperties(p);
     SDL_DestroyProperties(p);
-    if (!proc) {
-        nds_note("eba customs: cannot start %s: %s", args[0].c_str(), SDL_GetError());
-        if (out) SDL_CloseIO(out);
-        return;
-    }
-    nds_note("eba customs: started %s (%s)", base_name(args[0]).c_str(), log.c_str());
+    if (out) SDL_CloseIO(out);                      // (the child holds its own handle)
+    if (!proc) nds_note("eba customs: cannot start %s: %s", args[0].c_str(), SDL_GetError());
+    else nds_note("eba customs: started %s (%s)", base_name(args[0]).c_str(), log.c_str());
+    return proc;
+}
+
+// A new run of this program with these arguments; this one then closes.
+void relaunch(const std::vector<std::string>& args, const std::string& log) {
+    if (!spawn(args, log)) return;
     SDL_Event e{};
     e.type = SDL_EVENT_QUIT;
     SDL_PushEvent(&e);
+}
+
+// The start save: made by the game's own first boot on an empty save (Game::first_boot), headless,
+// in the background. True when it is being made (the Play waits for it), false when it is there.
+bool prepare_start_save(const std::string& tag, char d, bool autoplay) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path pristine = fs::path(g_dir) / "pristine.sav";
+    if (fs::exists(pristine, ec) && fs::file_size(pristine, ec) > 0) return false;
+    g_pending = {tag, d, autoplay};
+    if (g_prep) return true;
+    g_prep_error.clear();
+    if (!game().first_boot.limit) { g_prep_error = "no first boot known for this game"; return true; }
+    fs::create_directories(g_dir, ec);
+    std::string out = (fs::path(g_dir) / "first-boot").string();
+    fs::create_directories(out, ec);
+    fs::remove(pristine, ec);
+    std::vector<std::string> a = {exe_path(), g_cfg.rom, "--save", pristine.string(), "--out", out,
+                                  "--vblanks", "9000", "--no-dump", "--port", "customs-first-boot"};
+    nds_note("eba customs: making the start save: the game's first boot, headless, in %s", g_dir.c_str());
+    g_prep = spawn(a, (fs::path(out) / "first-boot.log").string());
+    if (!g_prep) g_prep_error = "the first boot could not start";
+    return true;
+}
+
+// each frame: the first boot done, the save checked, the Play that waited for it
+void poll_start_save() {
+    if (!g_prep) return;
+    int code = 0;
+    if (!SDL_WaitProcess(g_prep, false, &code)) return;
+    SDL_DestroyProcess(g_prep);
+    g_prep = nullptr;
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path pristine = fs::path(g_dir) / "pristine.sav";
+    bool ok = code == 0 && fs::exists(pristine, ec) && fs::file_size(pristine, ec) > 0;
+    if (!ok) {
+        fs::remove(pristine, ec);
+        g_prep_error = "the game's first boot did not make a save (its log: " +
+                       (fs::path(g_dir) / "first-boot" / "first-boot.log").string() + ")";
+        nds_note("eba customs: %s", g_prep_error.c_str());
+        return;
+    }
+    nds_note("eba customs: the start save made: %s", pristine.string().c_str());
+    if (g_cfg.port.count("customs-make-start-save")) { g_cfg.stop_vblanks = 1; return; }   // (a test: done)
+    for (const Custom& c : g_catalog)
+        if (c.tag == g_pending.tag) customs_launch(c, g_pending.difficulty, g_pending.autoplay);
 }
 
 // the four difficulties, as the charts' letters (SSxx_e/n/h/x.seq_)
@@ -379,6 +445,9 @@ const char* difficulty_name(char d) { return game().difficulties[difficulty_inde
 }  // namespace
 
 const std::vector<Custom>& customs() { return g_catalog; }
+const std::string& customs_folder() { return g_dir; }
+bool customs_preparing() { return g_prep != nullptr; }
+const std::string& customs_prepare_error() { return g_prep_error; }
 
 std::string customs_import(const std::string& path) {
     namespace fs = std::filesystem;
@@ -434,6 +503,11 @@ void customs_init() {
         if (!g_playing) nds_note("eba customs: no custom %s in %s", o.at("custom").c_str(), g_dir.c_str());
         if (o.count("difficulty") && !o.at("difficulty").empty()) g_difficulty = o.at("difficulty")[0];
     }
+    if (o.count("customs-first-boot")) {              // this run makes the start save (headless, from the Play)
+        g_first_boot = true;
+        nds_note("eba customs: first boot: the tutorial to the main menu, then the save");
+    }
+    if (o.count("customs-make-start-save")) prepare_start_save("", 'n', false);
     if (g_playing && game().route.empty()) {
         nds_note("eba customs: no way to a stage known in %s", game().id);
         g_playing = nullptr;
@@ -459,6 +533,7 @@ void customs_launch(const Custom& c, char d, bool autoplay) {
                  autoplay ? ", autoplay" : "");
         return;
     }
+    if (prepare_start_save(c.tag, d, autoplay)) return;   // no start save yet: made first, this Play after it
     std::string session_save = (fs::path(g_dir) / "session.sav").string();
     std::error_code ec;
     fs::copy_file(fs::path(g_dir) / "pristine.sav", session_save, fs::copy_options::overwrite_existing, ec);
@@ -503,6 +578,31 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
     const Game& g = game();
     const Scenes& k = g.scenes;
     uint32_t sc = scene();
+    poll_start_save();
+    if (g_first_boot) {                                 // the first boot: the title, SKIP through the tutorial, the menu
+        const auto& fb = g.first_boot;
+        static uint64_t done_at;
+        in = NdsInput();
+        if (sc != g_scene_prev && g_cfg.port.count("scene-log"))
+            nds_note("eba customs: scene %08X at VBlank %llu", sc, (unsigned long long)vbl);
+        g_scene_prev = sc;
+        if (!done_at && k.menu && sc == k.menu && vbl > fb.title) {
+            done_at = vbl + 300;                        // the menu: the save is written; a moment, then stop
+            g_cfg.stop_vblanks = done_at;
+            nds_note("eba customs: first boot: the main menu at VBlank %llu", (unsigned long long)vbl);
+        }
+        if (done_at) return true;
+        if (vbl >= fb.title && vbl < fb.title + (uint64_t)g.route_tap) { in.pen = true; in.x = 128; in.y = 150; }
+        else if (vbl >= fb.skip_from && (vbl - fb.skip_from) % 250 < (uint64_t)g.route_tap) {
+            in.pen = true; in.x = fb.skip_x; in.y = fb.skip_y;
+        }
+        if (vbl > fb.limit) {
+            nds_note("eba customs: first boot: no main menu by VBlank %llu (scene %08X): giving up", (unsigned long long)vbl, sc);
+            g_first_boot = false;
+            g_cfg.stop_vblanks = vbl + 1;
+        }
+        return true;
+    }
     bool song = k.song && sc == k.song, was_song = k.song && g_scene_prev == k.song;
     // a song of Customs mode ending: its score to the scores file, the Customs screen after the results
     static bool pending;                                // a song over, its score kept until the next scene says how
@@ -595,11 +695,23 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
     }
     if (!g_auto) return false;
 
-    // the autopilot: the route on the known save, each step checked against the scene it needs
+    // the autopilot: the route on the known save, each step checked against the scene it needs; a
+    // scene not there yet (a first-time screen before the map on a new save) is waited for, the
+    // rest of the route shifted by the wait
     in = NdsInput();
+    if (g_route_settle) { --g_route_settle; ++g_route_shift; return true; }   // the scene waited for, settling
+    uint64_t t = vbl - g_route_shift;
     for (const RouteStep& st : g.route) {
-        if (vbl < st.at || vbl >= st.at + g.route_tap) continue;
-        if (vbl == st.at && sc != st.scene) {
+        if (t < st.at || t >= st.at + g.route_tap) continue;
+        if (t == st.at && sc != st.scene) {
+            if (g_route_shift < kRouteWait) {
+                if (g_route_waiting != &st)
+                    nds_note("eba customs: the route found scene %08X at VBlank %llu, not %08X: waiting for it", sc,
+                             (unsigned long long)vbl, st.scene);
+                g_route_waiting = &st;
+                ++g_route_shift;
+                return true;
+            }
             nds_note("eba customs: the route found scene %08X at VBlank %llu, not %08X: autopilot stopped", sc,
                      (unsigned long long)vbl, st.scene);
             g_auto = false;
@@ -607,20 +719,28 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
             display_set_turbo(false);
             return false;
         }
+        if (t == st.at && g_route_waiting == &st) {   // found: it settles before the tap
+            nds_note("eba customs: scene %08X at VBlank %llu, after a %llu-frame wait: %llu frames to settle", sc,
+                     (unsigned long long)vbl, (unsigned long long)g_route_shift, (unsigned long long)kRouteSettle);
+            g_route_waiting = nullptr;
+            g_route_settle = kRouteSettle;
+            ++g_route_shift;
+            return true;
+        }
         in.pen = true;
         in.x = st.x;
         in.y = st.y ? st.y : g.difficulty_rows[difficulty_index(g_difficulty)];
     }
-    if (vbl >= g.card_from && vbl <= g.card_to) {       // the card open: the custom's stage instead, and its difficulty
+    if (t >= g.card_from && t <= g.card_to) {           // the card open: the custom's stage instead, and its difficulty
         uint32_t s = session();
         if (s) {
             uint32_t d = (uint32_t)difficulty_index(g_difficulty);
-            if (vbl == g.card_from && rd(s) != d) nds_note("eba customs: difficulty %u on the card, set to %u", rd(s), d);
+            if (t == g.card_from && rd(s) != d) nds_note("eba customs: difficulty %u on the card, set to %u", rd(s), d);
             g_main[(s + g.stage) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
             std::memcpy(g_main + (s & 0x3FFFFF), &d, 4);
         }
     }
-    if (vbl >= g.hand_over) {
+    if (t >= g.hand_over) {
         g_auto = false;
         display_set_turbo(false);
         nds_note("eba customs: on its way into %s", g_playing->stage.c_str());

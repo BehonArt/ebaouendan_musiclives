@@ -93,6 +93,26 @@ Later the same day, after the user's DualSense test: slider ticks' rumble
 panned left to right by the ball's place on the screen, and skins and the HD
 approach circles switched off until a full HD skin exists.
 
+**Sun 8 Nov (done):** rc1 published Wed 4 Nov (GitHub + Quiver; a Linux
+"runs well" report Nov 7). The user chose to put **Customs and
+RetroAchievements into 1.0** (Customs as its own menu of individual tracks,
+apart from the campaign's progress). Done: the start save Customs plays from
+is made by the game itself on the first Play (its own first boot on an empty
+save, headless, through the tutorial to the main menu: `Game::first_boot`,
+`--port customs-first-boot`), so no save ships and progress does not matter;
+the autopilot's route waits for a late scene (a new save's first-time screen
+before Ouendan 2's map) and lets it settle; Ouendan 2's route taps the first
+stage's character (a fresh map has no book); the customs folder is the
+game's data folder in the release, with Open the customs folder and the
+imports on the Customs screen; `kRelease` no longer hides Customs or RA.
+**Bug found on the way, fixed:** saves the launcher-started games made from
+nothing were 8 KiB for every game; EBA and Ouendan 2 have 256 KiB flash
+(`Game::save_size`), and a too-small save is padded with erased bytes. All
+three games checked headless: start save made in 3-5 s, a custom played and
+cleared from it. Still to do before v1.0: the user's windowed checks (Customs
+import + Play from an empty data folder, RetroAchievements sign-in in each
+game), the release zip, the notes.
+
 ## The first week (26 October to 2 November)
 
 The three game executables cannot be merged into one (each is a different

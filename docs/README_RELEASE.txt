@@ -32,6 +32,16 @@ The mouse is the stylus. In Tap mode a gamepad's face buttons or d-pad (or
 Space) tap the note on the beat; hold through sliders; for spinners, mash,
 pull the triggers, or turn the left stick round.
 
+Customs: Game > Customs (or the CUSTOMS button on the main menu) plays songs
+made by the community over the games' stages, apart from the campaign and
+whatever its progress: import a custom's folder or a custom ROM there, and
+press Play. The first Play prepares Customs (about half a minute, in the
+background). Their scores stay separate from the campaign's.
+
+RetroAchievements: Game > RetroAchievements signs in with your account; the
+achievements count when a game is played as made (not with Customs, Tap
+mode or the assists).
+
 Saves and settings are kept in %APPDATA%\eba-recomp. To keep them beside the
 program instead, put an empty file named portable.txt next to
 eba-recomp.exe.

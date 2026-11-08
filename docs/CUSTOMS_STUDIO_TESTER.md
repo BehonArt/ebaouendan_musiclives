@@ -93,7 +93,9 @@ Goal: a song of yours playing on an EBA stage, in ten minutes.
    `ouendan2\patched_roms\` for the Ouendan games).
 6. In the orange **Studio bar** at the bottom of the page:
    - **▶ Test in recomp** opens the game straight into your stage. Tick
-     *Autoplay* to watch it played perfectly.
+     *Autoplay* to watch it played perfectly. (The very first test of a game
+     takes half a minute longer: the game makes the start save Customs plays
+     from, by running its own first boot in the background.)
    - **✔ Validate** plays the stage through headless (under a minute, no
      window) and reports: did it load, every note judged, score, cleared, and
      how much silence follows the last note. **Do this before sharing**; a
