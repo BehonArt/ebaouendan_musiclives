@@ -14,13 +14,22 @@
     OE1: ['Kigaru (easy)', 'Kakan (normal)', 'Gekiretsu (hard)', 'Karei (insane)'],
   };
   const built = {};                                    // chart -> the ROM its last build made
+  let buildFailedAt = 0;                               // when the last build failed
 
   // the page's builds: their ROMs, as they finish
   const realFetch = window.fetch.bind(window);
   window.fetch = async (url, opts) => {
-    const r = await realFetch(url, opts);
-    if (typeof url === 'string' && /\/api\/(save|section_build|build_all_diffs)$/.test(url)) {
+    const isBuild = typeof url === 'string' && /\/api\/(save|section_build|build_all_diffs)$/.test(url);
+    let r;
+    try {
+      r = await realFetch(url, opts);
+    } catch (e) {                                      // no answer at all: say so, not "building" for ever
+      if (isBuild) { buildFailedAt = Date.now(); say('the build stopped with no answer: its log is in %LOCALAPPDATA%\eba-recomp\studio\studio.log', true); }
+      throw e;
+    }
+    if (isBuild) {
       r.clone().json().then(j => {
+        if (j && j.error) { buildFailedAt = Date.now(); say('the build failed: ' + j.error, true); }
         if (j && j.rom) {
           built[chart()] = j.rom;
           realFetch('/studio/api/built', {method: 'POST', body: JSON.stringify({chart: chart(), rom: j.rom})});
@@ -114,7 +123,8 @@
     b.click();
     const t0 = Date.now();
     const wait = setInterval(() => {                   // the build's ROM, then the test
-      if (built[chart()] && built[chart()] !== before) { clearInterval(wait); test(); }
+      if (buildFailedAt >= t0) clearInterval(wait);    // (it said why)
+      else if (built[chart()] && built[chart()] !== before) { clearInterval(wait); test(); }
       else if (Date.now() - t0 > 600000) { clearInterval(wait); say('the build did not finish', true); }
     }, 500);
   };
