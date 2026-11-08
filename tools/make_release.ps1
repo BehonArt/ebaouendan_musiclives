@@ -1,10 +1,10 @@
 # The release zip: Elite Beat Ouendan: Music LIVES, the three games and the
 # launcher, for players who bring their own cartridge dumps.
 #
-#   tools\make_release.ps1 [-Version 1.0.0] [-NoBuild] [-KeepRelease]
+#   tools\make_release.ps1 [-Version 1.0.0] [-NoBuild] [-KeepRelease] [-HeaderArt FILE]
 #
 # Builds the three games in release mode (cmake/eba.cmake's EBA_RELEASE: no
-# Customs, RetroAchievements or saved replays; no console window) and the
+# saved replays or dumps; no console window) and the
 # launcher, then stages dist\eba-recomp-v<version>\ and zips it to
 # dist\eba-recomp-v<version>-windows-x64.zip:
 #
@@ -14,9 +14,13 @@
 #   README.txt LICENSE THIRD_PARTY.txt licenses\
 #
 # Nothing of the games goes in: the script stops if a ROM or a save is staged.
+# Header art ships only when named with -HeaderArt (original art only: a
+# launcher\header.png is never picked up by itself). A test's userdata\ and
+# portable.txt in the staged folder are kept (out of the zip, back afterwards;
+# in build\dist_test_keep\ if the script stops on an error).
 # Afterwards the build trees are put back in development mode (only the port's
 # own sources rebuild), unless -KeepRelease. -NoBuild packages what is built.
-param([string]$Version = "1.0.0", [switch]$NoBuild, [switch]$KeepRelease)
+param([string]$Version = "1.0.0", [switch]$NoBuild, [switch]$KeepRelease, [string]$HeaderArt = "")
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 $bash = "C:\msys64\usr\bin\bash.exe"
@@ -31,7 +35,16 @@ function Build-Tree([string]$tree, [string]$release) {
 
 $stage = Join-Path $root "dist\eba-recomp-v$Version"
 $zip = Join-Path $root "dist\eba-recomp-v$Version-windows-x64.zip"
-if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+$keep = Join-Path $root "build\dist_test_keep"
+if (Test-Path $stage) {
+    foreach ($n in "userdata", "portable.txt") {
+        if (Test-Path (Join-Path $stage $n)) {
+            New-Item -ItemType Directory -Force $keep | Out-Null
+            Move-Item (Join-Path $stage $n) (Join-Path $keep $n) -Force
+        }
+    }
+    Remove-Item -Recurse -Force $stage
+}
 New-Item -ItemType Directory -Force $stage, (Join-Path $stage "licenses") | Out-Null
 
 if (-not $NoBuild) {
@@ -65,8 +78,7 @@ Copy-Item "$ucrt\share\licenses\sdl3\LICENSE.txt" "$lic\SDL3.txt"
 # stb_image: its licence is at the end of the header
 $stb = Get-Content -Raw (Join-Path $root "third_party\stb\stb_image.h")
 [IO.File]::WriteAllText("$lic\stb_image.txt", $stb.Substring($stb.IndexOf("ALTERNATIVE A - MIT License") - 200))
-$hdr = Join-Path $root "launcher\header.png"
-if (Test-Path $hdr) { Copy-Item $hdr $stage }
+if ($HeaderArt) { Copy-Item $HeaderArt (Join-Path $stage "header.png") }
 Copy-Item "$ucrt\share\licenses\libiconv\COPYING.LIB" "$lic\libiconv.txt"
 Get-Content "$ucrt\share\licenses\libgcc\COPYING.RUNTIME", "$ucrt\share\licenses\libgcc\COPYING3" | Set-Content "$lic\gcc-runtime.txt" -Encoding utf8
 Copy-Item "$ucrt\share\licenses\libwinpthread\COPYING" "$lic\winpthreads.txt"
@@ -81,3 +93,7 @@ $size = (Get-Item $zip).Length / 1MB
 $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
 Write-Host ("{0}  {1:N1} MB  sha256 {2}" -f $zip, $size, $sha)
 Get-ChildItem $stage -Recurse -File | ForEach-Object { "{0,10:N0}  {1}" -f $_.Length, $_.FullName.Substring($stage.Length + 1) }
+if (Test-Path $keep) {                              # the test's folder back, after the zip
+    Get-ChildItem $keep | ForEach-Object { Move-Item $_.FullName (Join-Path $stage $_.Name) -Force }
+    Remove-Item -Force -Recurse $keep
+}

@@ -512,7 +512,7 @@ quarter second, and never over a running game. The Music checkbox in the
 footer turns it off (`music=` in `launcher.ini`). A `header.png` beside the
 launcher is drawn across the window's top in place of the title text;
 `launcher/header_template.png` (1600x300, safe area marked) is the guide,
-and `make_release.ps1` ships `launcher/header.png` when it exists.
+and `make_release.ps1 -HeaderArt FILE` ships original art (nothing by default).
 
 Checked (a portable folder: the launcher, a release `EBA.exe`, the DLLs):
 first run asks for each dump; EBA's and Ouendan 2's dumps are recognised

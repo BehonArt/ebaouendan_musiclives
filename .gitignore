@@ -14,3 +14,4 @@ studio/toolkit_deps.py
 studio/*.log
 skins/
 dist/
+launcher/header.png
