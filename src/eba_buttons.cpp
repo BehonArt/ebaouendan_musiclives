@@ -294,21 +294,23 @@ bool fast_forward(NdsInput& in, uint32_t mgr, uint64_t vbl) {
         return true;
     }
     if (!song || !mgr) { ff.prev = 0; return false; }
-    if (ff.mgr != mgr) {                            // a song: its last note's time (a spinner's is its end)
-        ff.mgr = mgr;
-        ff.last_time = 0;
-        uint32_t arr = rd(mgr + g.notes), n = rd(mgr + g.notes + 8);
-        for (uint32_t i = 0; i < n; ++i) {
-            uint32_t a = rd(arr + 4 * i);
-            if (in_main(a)) ff.last_time = std::max(ff.last_time, note_at(a).time);
-        }
-    }
-    Note first = note_at(rd(rd(mgr + g.notes)));
-    int now = (int)rd(g.clock);
-    bool intro = !g.intro_skip && now < first.appear, outro = now > ff.last_time + 2;   // (a played note may read state 0 again)
     uint32_t held = hit_buttons(in), pressed = held & ~ff.prev;
     ff.prev = held;
-    if (!(intro || outro) || !pressed) return false;
+    if (!pressed) return false;
+    // This song's last note's time (a spinner's is its end), read at the press: the next song's
+    // notes are often at the last one's address, so a time kept per address went stale, and a press
+    // late in a longer song fast-forwarded it (a player's report, 9 Nov 2026).
+    uint32_t arr = rd(mgr + g.notes), n = rd(mgr + g.notes + 8);
+    ff.last_time = 0;
+    for (uint32_t i = 0; i < n; ++i) {
+        uint32_t a = rd(arr + 4 * i);
+        if (!in_main(a)) return false;              // (not all there: no fast-forward on a guess)
+        ff.last_time = std::max(ff.last_time, note_at(a).time);
+    }
+    Note first = note_at(rd(arr));
+    int now = (int)rd(g.clock);
+    bool intro = !g.intro_skip && now < first.appear, outro = now > ff.last_time + 2;   // (a played note may read state 0 again)
+    if (!(intro || outro)) return false;
     in.keys &= ~(in.pad_keys & kFaceKeys);
     ff.on = true;
     ff.since = vbl;
