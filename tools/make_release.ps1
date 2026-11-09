@@ -1,7 +1,7 @@
 # The release zip: Elite Beat Ouendan: Music LIVES, the three games, the
 # launcher and Customs Studio, for players who bring their own cartridge dumps.
 #
-#   tools\make_release.ps1 [-Version 1.0.0] [-NoBuild] [-KeepRelease] [-HeaderArt FILE]
+#   tools\make_release.ps1 [-Version 1.0.1] [-NoBuild] [-KeepRelease] [-HeaderArt FILE]
 #                           [-Toolkit "F:\...\rom_hacking\tools"] [-SkipStudioBuild]
 #
 # Builds the three games in release mode (cmake/eba.cmake's EBA_RELEASE: no
@@ -25,7 +25,7 @@
 # in build\dist_test_keep\ if the script stops on an error).
 # Afterwards the build trees are put back in development mode (only the port's
 # own sources rebuild), unless -KeepRelease. -NoBuild packages what is built.
-param([string]$Version = "1.0.0", [switch]$NoBuild, [switch]$KeepRelease, [string]$HeaderArt = "",
+param([string]$Version = "1.0.1", [switch]$NoBuild, [switch]$KeepRelease, [string]$HeaderArt = "",
       [string]$Toolkit = "F:\dxvk_remix\Claude\EBAHD Old\rom_hacking\tools", [switch]$SkipStudioBuild)
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent

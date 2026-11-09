@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.1
+
+A bug-fix release.
+
+### Fixed
+- **A button press could fast-forward the rest of a song.** Pressing a controller button or hit key after the last note skips a song's outro. The game could mistake the middle of a song for its outro when the song before it was shorter. This affected Tap mode most, and Space or a gamepad button with Tap mode off.
+- **Customs:** if the first-time setup failed, it could leave a bad start save that was kept. It is now made again.
+- **Customs Studio:** Open builds folder did nothing before the first build.
+
 ## v1.0.0
 
 The first full release of Elite Beat Ouendan: Music LIVES.
