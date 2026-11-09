@@ -123,7 +123,7 @@ def main():
         # the run itself has no console (hiding one fails under Windows Terminal): started again
         # with none, which the builders and ffmpeg inherit; this first run ends at once
         if not a.browser and not a.no_window and not os.environ.get(NO_CONSOLE_ENV):
-            subprocess.Popen(sys.argv, env=dict(os.environ, **{NO_CONSOLE_ENV: "1"}),
+            subprocess.Popen([sys.executable] + sys.argv[1:], env=dict(os.environ, **{NO_CONSOLE_ENV: "1"}),
                              creationflags=subprocess.CREATE_NO_WINDOW, close_fds=True)
             return
         import ctypes
@@ -213,8 +213,10 @@ def main():
                     out["games"][g] = None
             return out
         if name == "open_builds":                         # the folder the built ROMs and patches land in
-            os.startfile(os.path.join(os.path.dirname(paths["toolkit"]), "patched_roms" if not d.get("game") or d["game"] == "EBA"
-                                      else "ouendan%s\\patched_roms" % d["game"][-1]))
+            folder = os.path.join(os.path.dirname(paths["toolkit"]), "patched_roms" if not d.get("game") or d["game"] == "EBA"
+                                  else "ouendan%s\\patched_roms" % d["game"][-1])
+            os.makedirs(folder, exist_ok=True)            # (nothing built yet: the folder all the same)
+            os.startfile(folder)
             return {"ok": True}
         rom = d.get("rom") or last.get(d.get("chart", ""))
         if not rom or not os.path.exists(rom):

@@ -433,6 +433,11 @@ void poll_start_save() {
     std::error_code ec;
     fs::path pristine = fs::path(g_dir) / "pristine.sav";
     bool ok = code == 0 && fs::exists(pristine, ec) && fs::file_size(pristine, ec) > 0;
+    if (ok) {                                           // and it reached the main menu (a run that gave up saves too)
+        std::ifstream log(fs::path(g_dir) / "first-boot" / "first-boot.log");
+        std::string text((std::istreambuf_iterator<char>(log)), {});
+        ok = text.find("first boot: the main menu") != std::string::npos;
+    }
     if (!ok) {
         fs::remove(pristine, ec);
         g_prep_error = "the game's first boot did not make a save (its log: " +

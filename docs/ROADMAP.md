@@ -8,6 +8,15 @@ GitHub or GitLab repository's release assets, a zip or an MSI).
 **Target: v1.0 published and submitted to Quiver by Sunday 8 November 2026** (first target, 2 November, missed: see the re-planned week).
 (What is in our hands is the submission; Quiver's review time is not.)
 
+## Next update (v1.0.1)
+
+From the first report on the Discord (8 Nov): a player set Z and X as hit keys, with Tap mode off.
+
+- **Input menu:** grey out the hit keys while Tap mode is off, with a line saying they need it on; no tick on Rumble or DualSense trigger resistance while they are greyed out (a tick there reads as Tap mode's).
+- **Keys click at the mouse** (new Input option, osu!-style): a hit key acts as pressing the stylus at the cursor, so the player aims with the mouse; held, it follows sliders and spinners like the mouse button.
+- **Achievements:** using that option pauses them, as Tap mode does, from the first key press in a song until the next song. They are only for the intended input method: the mouse button as the stylus (user's rule, 8 Nov).
+- Docs for players: README.txt, the changelog.
+
 ## Rules
 
 - The package carries the recompiled executables and nothing of the games:
