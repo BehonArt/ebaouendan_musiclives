@@ -9,7 +9,7 @@
 # version (the About box, the window's title, the executable's version
 # resource). Both apply to the port's own sources only, so switching them
 # rebuilds those and not the recompiled game.
-set(EBA_VERSION "1.0.1" CACHE STRING "eba-recomp's version")
+set(EBA_VERSION "1.2.0" CACHE STRING "eba-recomp's version")
 option(EBA_RELEASE "the release build" OFF)
 set(EBA_IMGUI ${CMAKE_CURRENT_LIST_DIR}/../third_party/imgui)
 set(EBA_RC ${CMAKE_CURRENT_LIST_DIR}/../third_party/rcheevos)

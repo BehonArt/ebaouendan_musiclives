@@ -9,6 +9,8 @@ customs_*/
 __pycache__/
 studio/build/
 studio/dist/
+studio/dist_release/
+studio/build_dist*/
 studio/studio.ini
 studio/toolkit_deps.py
 studio/*.log

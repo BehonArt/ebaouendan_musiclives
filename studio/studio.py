@@ -46,6 +46,15 @@ def python_mode():
     [sys.executable, builder.py, ...] and its save dialog as [sys.executable, -c, CODE, ...]."""
     if not FROZEN or len(sys.argv) < 2:
         return
+    # The frozen Python ignores PYTHONUTF8, so a builder's output went out in the Windows code
+    # page and a print of a path with Japanese letters (a user name, a folder) crashed the build
+    # (v1.0.2 test, 2026-11-13). Its output is UTF-8 like the editor reads it; nothing fails on a
+    # letter the console can't show.
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     import runpy
     if sys.argv[1] == "-c" and len(sys.argv) > 2:
         code = sys.argv[2]
@@ -118,6 +127,11 @@ def main():
     ap.add_argument("--browser", action="store_true", help="the default browser instead of its own window")
     ap.add_argument("--no-window", action="store_true", help="serve only (tests)")
     a = ap.parse_args()
+    for _s in (sys.stdout, sys.stderr):                 # the same for the editor's own prints (see python_mode)
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     if FROZEN and sys.platform == "win32":
         # a console program (so the toolkit's builders, run by it, have their pipes). Its own window:
         # the run itself has no console (hiding one fails under Windows Terminal): started again
@@ -160,7 +174,8 @@ def main():
     import server as S  # the toolkit's editor, as it is
 
     S._ensure_stock_caches()
-    last = {}                                             # the last ROM built, by chart
+    last = {}                                             # the newest ROM built, by stage (SS03, OSB03, s12...)
+    stage_of = lambda c: os.path.basename(c or "").split("_")[0]   # a name or a whole path (the Section Editor's)
 
     class Handler(S.Handler):
         def _json(self, obj, code=200):
@@ -195,9 +210,47 @@ def main():
     def stock_rom(game):
         return {"EBA": S.CLEAN_ROM, "OE2": S.OE2_ROM, "OE1": S.OE1_ROM}[game]
 
+    def hd_source(d):
+        """The audio file a custom carries at full quality: the one chosen, else the chart's own song
+        file when it is better than the ROM's 15401 Hz ('' with hd_on off: the game's own sound)."""
+        if not d.get("hd_on", True):
+            return ""
+        if d.get("hd"):
+            return d["hd"]
+        for wav in (d.get("wav"), ):                      # the WAV the page builds with, first
+            try:
+                found = B.hd_guess(wav or "")
+                if found:
+                    return found
+            except Exception:
+                pass
+        for c in (d.get("page_chart"), d.get("chart")):   # else what the chart was made with
+            try:
+                found = B.hd_guess(S._wav_for_chart(c or ""))
+                if found:
+                    return found
+            except Exception:
+                pass
+        return ""
+
+    def newer_charts(game, chart, rom):
+        """This stage's saved charts that are newer than the ROM (so not in it): [[name, HH:MM], ...].
+        Copy timing to other diffs and Save .seq_ write charts without building."""
+        stem = stage_of(chart)
+        folder = {"EBA": S.EDIT_DIR, "OE1": S.OE1_EDIT_DIR, "OE2": S.OE2_EDIT_DIR}[game]
+        if not stem or not os.path.isdir(folder):
+            return []
+        t0, out = os.path.getmtime(rom) + 5, []
+        for f in sorted(os.listdir(folder)):
+            if f.startswith(stem + "_") and f.endswith(".seq_"):
+                t = os.path.getmtime(os.path.join(folder, f))
+                if t > t0:
+                    out.append([f[:-5], time.strftime("%H:%M", time.localtime(t))])
+        return out
+
     def api(name, d):
         if name == "built":                               # the page's build finished: its ROM
-            last[d.get("chart", "")] = d["rom"]
+            last[stage_of(d.get("chart", ""))] = d["rom"]
             return {"ok": True}
         if name == "info":
             out = {"toolkit": paths["toolkit"], "recomp": paths["recomp"], "ini": ini, "games": {}, "dumps": [], "missing": {}}
@@ -218,18 +271,37 @@ def main():
             os.makedirs(folder, exist_ok=True)            # (nothing built yet: the folder all the same)
             os.startfile(folder)
             return {"ok": True}
-        rom = d.get("rom") or last.get(d.get("chart", ""))
+        if name == "pick_art":                            # the system's Open dialog: {path} ('' = cancelled)
+            return S.native_save_dialog({"title": "Choose the custom's cover art",
+                                         "initialdir": d.get("initialdir") or os.path.expanduser("~"),
+                                         "initialfile": "", "defaultextension": "", "mode": "open",
+                                         "filetypes": [["Pictures", "*.png *.jpg *.jpeg *.bmp *.webp *.gif"],
+                                                       ["All files", "*.*"]]})
+        if name == "pick_audio":                          # the song's own file, for the custom's full-quality sound
+            return S.native_save_dialog({"title": "Choose the song's audio file (full quality)",
+                                         "initialdir": d.get("initialdir") or os.path.expanduser("~"),
+                                         "initialfile": "", "defaultextension": "", "mode": "open",
+                                         "filetypes": [["Audio", "*.wav *.flac *.mp3 *.ogg *.m4a *.opus *.aac"],
+                                                       ["All files", "*.*"]]})
+        if name == "hd_guess":                            # the chart's song file, at full quality, if it has one
+            return {"path": hd_source({"chart": d.get("chart", ""), "wav": d.get("wav", ""), "hd_on": True})}
+        rom = d.get("rom") or last.get(stage_of(d.get("chart", "")))
         if not rom or not os.path.exists(rom):
             raise ValueError("build the ROM first (Build ROM / Build all diffs), then this")
         game = B.game_of(rom)
+        if name in ("test", "export_custom", "export_patch") and not d.get("stale_ok"):
+            newer = newer_charts(game, d.get("chart", ""), rom)
+            if newer:                                     # charts saved since: they are not in this ROM
+                return {"stale": True, "rom": os.path.basename(rom), "built": time.strftime("%H:%M", time.localtime(os.path.getmtime(rom))),
+                        "charts": newer}
         if name == "test":
             customs = os.path.join(work_dir(), "customs_" + game.lower())
             os.makedirs(customs, exist_ok=True)
             c = B.make_custom(rom, stock_rom(game), customs, d.get("title") or "Studio test", d.get("artist", ""),
-                              tag="studio_test", difficulties=d.get("difficulties", "enhx"))
+                              tag="studio_test", difficulties=d.get("difficulties", "enhx"), hd=hd_source(d))
             r = B.launch_test(game, c, d.get("difficulty", "n"), bool(d.get("autoplay")), paths["recomp"],
                               os.path.join(work_dir(), "run_" + game.lower()))
-            return dict(r, stage=c["stage"], game=game)
+            return dict(r, stage=c["stage"], game=game, hd_note=c.get("hd_note", ""))
         if name == "validate":                            # the recomp plays it through headless: a report
             import validate as V
             customs = os.path.join(work_dir(), "customs_" + game.lower())
@@ -242,7 +314,8 @@ def main():
         if name == "export_custom":
             out = d.get("out_dir") or B.recomp_folder(paths["recomp"], game)["customs"]
             c = B.make_custom(rom, stock_rom(game), out, d.get("title", ""), d.get("artist", ""),
-                              difficulties=d.get("difficulties", "enhx"))
+                              difficulties=d.get("difficulties", "enhx"), art=d.get("art") or None,
+                              hd=hd_source(d))
             if d.get("zip"):
                 c["zip"] = shutil.make_archive(c["dir"], "zip", os.path.dirname(c["dir"]), c["tag"])
             return c

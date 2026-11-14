@@ -75,9 +75,12 @@ class RomFiles:
         return self.data[a:b]
 
 
-def make_custom(built_rom, stock_rom, out_dir, title="", artist="", tag=None, difficulties="enhx"):
+def make_custom(built_rom, stock_rom, out_dir, title="", artist="", tag=None, difficulties="enhx", art=None,
+                hd=None):
     """The custom's folder (customs/<tag>) from a ROM the editor built. difficulties: those charted (of
-    e n h x); the recomp offers only these (a custom without all four cannot join a full conversion)."""
+    e n h x); the recomp offers only these (a custom without all four cannot join a full conversion).
+    hd: the song's own audio file at full quality, played in Customs mode in place of the ROM's
+    15401 Hz copy (write_hd); the result's hd_note says what came of it."""
     difficulties = "".join(d for d in "enhx" if d in (difficulties or ""))
     if not difficulties:
         raise ValueError("tick at least one difficulty as charted")
@@ -120,9 +123,203 @@ def make_custom(built_rom, stock_rom, out_dir, title="", artist="", tag=None, di
         with open(os.path.join(d, "files", name.replace("/", "__")), "wb") as f:
             f.write(mine.file(i))
         lines.append("file=" + name)
+    if art:
+        lines.append("art=" + write_art(art, d))
+    hd_note = ""
+    if hd:
+        try:
+            vals, hd_note = write_hd(hd, mine, stage, d)
+            lines += ["%s=%s" % kv for kv in vals.items()]
+        except Exception as e:                            # the custom all the same, with the game's own sound
+            hd_note = "the game's own sound (full-quality audio: %s)" % e
     with open(os.path.join(d, "custom.ini"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
-    return dict(game=game, tag=tag, dir=d, stage=stage, files=len(changed))
+    return dict(game=game, tag=tag, dir=d, stage=stage, files=len(changed), hd_note=hd_note)
+
+
+# ---- full-quality song audio (2026-11-13) -------------------------------------------------------
+# The ROM carries the song at 15401 Hz ADPCM, the DS's own format; a custom can carry the song's
+# own file as well (hd.wav), which Customs mode plays in its place, held to the song clock
+# (src/eba_customs.cpp, hd_frame): HD time = hd_offset + (clock - clock0) / clock_rate.
+# The song clock is the stream's playback time (ms x 60 / 1000: docs/DECOMP_FINDINGS.md §19), so
+# clock_rate is 60 and clock0 the clock's frame of lag (tools/bake_customs.py measured 0.2 to 3.5
+# on 14 customs by running the game, their lines 1.5 frames from 60 x t on average over the 55 s
+# they measured: 1.5 here). hd_offset is where the ROM's song starts in the file,
+# found by correlating the two; it matched bake_customs' measures on all of them (0.98 to 0.99).
+
+def _mono_8k(a, rate):
+    m = a.mean(axis=1) if a.ndim == 2 else a
+    t = np.arange(0, len(m) / rate, 1 / 8000)
+    return np.interp(t, np.arange(len(m)) / rate, m).astype(np.float32)
+
+
+def _lag(hay, needle, pad=8000 * 30):
+    """Where (s) needle starts in hay (both mono 8 kHz), and how well (0-1); up to 30 s before
+    hay's start (the ROM's song can open with silence the file doesn't have)."""
+    hay = np.concatenate([np.zeros(pad, np.float32), hay])
+    n = 1 << int(np.ceil(np.log2(len(hay) + len(needle))))
+    c = np.fft.irfft(np.fft.rfft(hay, n) * np.conj(np.fft.rfft(needle, n)), n)[:len(hay)]
+    i = int(np.argmax(c))
+    seg = hay[i:i + len(needle)]
+    q = float(np.dot(seg, needle[:len(seg)]) / (np.linalg.norm(seg) * np.linalg.norm(needle[:len(seg)]) + 1e-9))
+    return (i - pad) / 8000, q
+
+
+def _wav_info(path):
+    """(rate, channels, sample width) of a WAV's header, or None."""
+    import wave
+    try:
+        with wave.open(path, "rb") as w:
+            return w.getframerate(), w.getnchannels(), w.getsampwidth()
+    except Exception:
+        return None
+
+
+def _read_pcm16(path):
+    """(samples x channels float32, rate) of a 16-bit PCM WAV."""
+    import wave
+    with wave.open(path, "rb") as w:
+        n, ch, rate = w.getnframes(), w.getnchannels(), w.getframerate()
+        a = np.frombuffer(w.readframes(n), np.int16).reshape(-1, ch).astype(np.float32)
+    return a, rate
+
+
+def rom_song(rom_files, stage):
+    """The stage's song as the ROM plays it: mono float32 at its rate (15401), its streams at
+    their places in the chart (seconds from the song clock's 0)."""
+    import ndspy.soundArchive
+    import stage_length as SL
+    from seq_codec import SeqFile
+    from strm_tool import decode_strm
+    names = {n: i for i, n in enumerate(rom_files.names)}
+    seq = SeqFile.fromRaw(SL.decompress(rom_files.file(names["data/seq/%s_n.seq_" % stage]))[0])
+    streams = dict(ndspy.soundArchive.SDAT(rom_files.file(names["data/sound_data.sdat"])).streams)
+    placed, rate = [], 15401
+    for t, sid in seq.markers:
+        s = streams.get("STRM_%d" % sid) if sid is not None else None
+        if s is None:
+            continue
+        rate, ch = decode_strm(s)
+        placed.append((t, np.mean([np.asarray(c, np.float32) for c in ch], axis=0)))
+    if not placed:
+        raise ValueError("the ROM's %s has no song stream" % stage)
+    total = max(int(t / 60.0 * rate) + len(m) for t, m in placed)
+    mix = np.zeros(total, np.float32)
+    for t, m in placed:
+        off = int(t / 60.0 * rate)
+        mix[off:off + len(m)] = m
+    return mix, rate
+
+
+def write_hd(src, rom_files, stage, custom_dir):
+    """hd.wav in the custom's folder from src (WAV, FLAC, MP3, OGG...; all but a 16-bit WAV need
+    ffmpeg), lined up with the ROM's song. Returns ({custom.ini key: value}, a note for the author);
+    raises ValueError when src is not the song the ROM was built with."""
+    if not os.path.isfile(src):
+        raise ValueError("not found: " + src)
+    out = os.path.join(custom_dir, "hd.wav")
+    info = _wav_info(src)
+    if info and 15401 < info[0] <= 48000 and info[1] <= 2 and info[2] == 2:
+        shutil.copyfile(src, out)                         # as it is
+    else:
+        try:
+            r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-ac", "2", "-sample_fmt", "s16",
+                                "-ar", str(min(info[0], 48000)) if info else "44100", out],
+                               capture_output=True, text=True, timeout=300,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            ok = r.returncode == 0
+        except FileNotFoundError:
+            ok = False
+        if not ok:                                        # no ffmpeg: the toolkit's built-in reader
+            try:
+                import audio_io
+                a, r_in = audio_io.decode(src)
+                rate_out = min(r_in, 48000)
+                audio_io.write_wav16(out, audio_io.channels(audio_io.resample(a, r_in, rate_out), 2), rate_out)
+            except Exception as e:
+                raise ValueError("could not read %s (%s): install ffmpeg (in a terminal: winget install "
+                                 "Gyan.FFmpeg), or choose a 16-bit WAV" % (os.path.basename(src), e))
+    a, rate = _read_pcm16(out)
+    if rate <= 15401:
+        os.remove(out)
+        raise ValueError("%s is %d Hz, no better than the ROM's own" % (os.path.basename(src), rate))
+    b, brate = rom_song(rom_files, stage)
+    bm, hm = _mono_8k(b, brate), _mono_8k(a, rate)
+    off, q = _lag(hm, bm[:8000 * 40])
+    strays = []                                           # the same edit all along: every 20 s
+    for k in range(0, int(len(bm) / 8000) - 10, 20):
+        seg = bm[8000 * k:8000 * (k + 8)]
+        best = None                                       # the best of a few samples either side (bright songs
+        for d in range(-3, 4):                            # correlate poorly one 8 kHz sample out)
+            at = int(round((off + k) * 8000)) + d
+            if at < 0:
+                continue
+            hs = hm[at:at + 8000 * 8]
+            n = min(len(seg), len(hs))
+            if n < 8000 or np.linalg.norm(seg[:n]) < 1 or np.linalg.norm(hs[:n]) < 1:   # past an end, or silence
+                continue
+            qk = float(np.dot(seg[:n], hs[:n]) / (np.linalg.norm(seg[:n]) * np.linalg.norm(hs[:n]) + 1e-9))
+            best = qk if best is None else max(best, qk)
+        if best is not None and best < 0.6:
+            strays.append(k)
+    if q < 0.6 or strays:
+        os.remove(out)
+        raise ValueError("%s is not the song this ROM was built with (%s)" % (
+            os.path.basename(src), "start match %.2f" % q if q < 0.6 else "it differs at %s s" % strays[:4]))
+    # its level against the ROM's (the author's volume settings): 30 s from 5 s into the song
+    a0 = max(0, int(round(-off * 8000))) + 8000 * 5
+    bs = bm[a0:a0 + 8000 * 30]
+    hs = hm[int(round(off * 8000)) + a0:int(round(off * 8000)) + a0 + len(bs)]
+    n = min(len(bs), len(hs))
+    gain = float(np.sqrt(np.mean(bs[:n] ** 2)) / (np.sqrt(np.mean(hs[:n] ** 2)) + 1e-9)) if n > 8000 else 1.0
+    gain = min(max(gain, 0.05), 4.0)
+    vals = {"hd": "hd.wav", "hd_offset": "%.4f" % off, "clock0": "1.50", "clock_rate": "60.0000",
+            "hd_gain": "%.3f" % gain}
+    return vals, "full-quality song (%s, %d Hz)" % (os.path.basename(src), rate)
+
+
+def hd_guess(chart_wav):
+    """The song's own file behind the WAV a chart was built with: that WAV when it is better than
+    15401 Hz, else its source beside it (the editor's converter writes NAME_15401.wav beside NAME.mp3;
+    the MIDI import NAME_hq.wav). '' when there is none."""
+    import re
+    if not chart_wav:
+        return ""
+    base = os.path.splitext(chart_wav)[0]
+    stem = re.sub(r"_15401(_lead\d+f)?$", "", base)   # (_leadNf: the copy padded for the stage's intro)
+    for c in [chart_wav, base + "_hq.wav", stem + "_hq.wav"] + \
+             [stem + e for e in (".flac", ".wav", ".mp3", ".ogg", ".m4a", ".opus", ".aac")]:
+        if not os.path.isfile(c):
+            continue
+        if c.lower().endswith(".wav"):
+            info = _wav_info(c)
+            if info and info[0] <= 15401:
+                continue
+        return c
+    return ""
+
+
+def write_art(src, custom_dir, max_side=512):
+    """A custom's cover art: the picture the author chose (PNG, JPG, BMP, WebP, GIF), as
+    art.bmp in the custom's folder, which the Customs menu shows in place of the plain
+    title card. A 24-bit BMP no larger than max_side: the game reads BMP (SDL_LoadBMP),
+    v1.0.0 and v1.0.1 included. Returns the file's name for custom.ini's art= line."""
+    from PIL import Image
+    if not os.path.isfile(src):
+        raise ValueError("cover art not found: " + src)
+    try:
+        im = Image.open(src)
+        im.seek(0)                                        # an animation's first frame
+        if im.mode in ("RGBA", "LA", "P"):                # see-through parts on black, like the menu
+            im = im.convert("RGBA")
+            bg = Image.new("RGBA", im.size, (0, 0, 0, 255))
+            im = Image.alpha_composite(bg, im)
+        im = im.convert("RGB")
+    except Exception as e:
+        raise ValueError("could not read the cover art (%s): %s" % (os.path.basename(src), e))
+    im.thumbnail((max_side, max_side), Image.LANCZOS)
+    im.save(os.path.join(custom_dir, "art.bmp"), "BMP")
+    return "art.bmp"
 
 
 def data_root(recomp_root):

@@ -2,7 +2,7 @@
 # rcheevos for the ROMs' hashes. tools/build_launcher.sh builds it.
 cmake_minimum_required(VERSION 3.20)
 project(eba_launcher C CXX)
-set(EBA_VERSION "1.0.1" CACHE STRING "eba-recomp's version")
+set(EBA_VERSION "1.2.0" CACHE STRING "eba-recomp's version")
 set(CMAKE_CXX_STANDARD 20)
 find_package(SDL3 REQUIRED)
 set(IMGUI ${CMAKE_CURRENT_LIST_DIR}/../third_party/imgui)

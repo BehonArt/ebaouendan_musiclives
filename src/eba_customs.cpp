@@ -68,6 +68,8 @@ uint64_t g_route_shift;                 // frames the route has waited for a sce
 constexpr uint64_t kRouteWait = 5400;   // the most it waits (90 s of the game's time; turbo)
 constexpr uint64_t kRouteSettle = 600;  // frames a scene waited for gets before its tap (a known save gave the map ~1000)
 uint64_t g_route_settle;                // frames of settling left
+uint64_t g_through_at;                  // after the results: the screens before the map, tapped through from then
+constexpr uint64_t kThroughMax = 36000; // at most (10 min of the game's time, a finale's credits; turbo)
 const RouteStep* g_route_waiting;       // the step whose scene is being waited for
 bool g_first_boot;                      // this run makes the start save (--port customs-first-boot)
 SDL_Process* g_prep;                    // the first boot making the start save, in the background
@@ -116,7 +118,7 @@ void hd_start() {
     if (!g_hd.buf || g_hd.stream || !g_cfg.window) return;
     g_hd.stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &g_hd.spec, nullptr, nullptr);
     if (!g_hd.stream) { nds_note("eba customs: no stream for the HD audio: %s", SDL_GetError()); return; }
-    SDL_SetAudioStreamGain(g_hd.stream, (float)g_hd.gain);
+    SDL_SetAudioStreamGain(g_hd.stream, (float)g_hd.gain * audio_volume());   // the game's Volume too
     SDL_ResumeAudioStreamDevice(g_hd.stream);
     sound_set_muted(game().song_channels);
     g_hd.fed = -1;
@@ -451,12 +453,27 @@ void poll_start_save() {
         if (c.tag == g_pending.tag) customs_launch(c, g_pending.difficulty, g_pending.autoplay);
 }
 
+// the custom's stage in the session (and Ouendan 2's team for it, from the game's own table)
+void set_stage(uint32_t s) {
+    const Game& g = game();
+    g_main[(s + g.stage) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
+    if (g.team_table) {
+        uint32_t team = rd(g.team_table + 4 * (uint32_t)g_playing->stage_index);
+        std::memcpy(g_main + ((s + g.team) & 0x3FFFFF), &team, 4);
+    }
+}
+
 // the four difficulties, as the charts' letters (SSxx_e/n/h/x.seq_)
 const char* difficulty_name(char d) { return game().difficulties[difficulty_index(d)]; }
 
 }  // namespace
 
 const std::vector<Custom>& customs() { return g_catalog; }
+
+// The Volume option changed: the HD song follows it at once.
+void customs_volume_changed() {
+    if (g_hd.stream) SDL_SetAudioStreamGain(g_hd.stream, (float)g_hd.gain * audio_volume());
+}
 
 char Custom::pick(char want) const {
     if (has(want) || difficulties.empty()) return difficulties.empty() ? want : want;
@@ -486,7 +503,7 @@ std::string customs_import(const std::string& path) {
 }
 const Custom* custom_playing() { return g_playing; }
 char custom_difficulty() { return g_difficulty; }
-bool customs_autopilot() { return g_auto || g_again_at || g_again_asked; }
+bool customs_autopilot() { return g_auto || g_again_at || g_again_asked || g_through_at; }
 bool customs_autopilot_failed() { return g_failed; }
 const char* customs_difficulty_name(char d) { return difficulty_name(d); }
 uint32_t scene() {
@@ -679,6 +696,35 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
             save_scores();
         }
     }
+    // After the results, Customs mode goes back to the map (and the Customs screen); what the story puts
+    // between them (Ouendan 2's rank-up 020ADAC8, a stage's story screens, the credits after a finale)
+    // is not the custom's: tapped through at turbo speed behind the loading screen.
+    static bool results_seen;
+    if (g_playing && k.results && sc == k.results) results_seen = true;
+    if (g_playing && results_seen && sc && sc != k.results) {
+        results_seen = false;
+        if (sc != k.map && sc != k.title && sc != k.menu) {
+            g_through_at = vbl;
+            display_set_turbo(true);
+            nds_note("eba customs: scene %08X after the results: through it to the map", sc);
+        }
+    }
+    if (g_through_at) {
+        bool done = sc == k.map || sc == k.title || sc == k.menu;
+        if (done || vbl - g_through_at > kThroughMax) {
+            if (!done) nds_note("eba customs: no map after %llu frames (scene %08X): stopped", (unsigned long long)(vbl - g_through_at), sc);
+            g_through_at = 0;
+            display_set_turbo(false);
+            if (sc == k.title || sc == k.menu) g_show_after = true;   // (the map's own check below covers the map)
+        } else {
+            in = NdsInput();
+            uint64_t t = (vbl - g_through_at) % 60;         // "next" at the lower right, then A
+            if (t < 9) { in.pen = true; in.x = 236; in.y = 183; }
+            else if (t >= 30 && t < 39) in.keys |= 1u;   // (A: KEYINPUT bit 0)
+            g_scene_prev = sc;
+            return true;
+        }
+    }
     if (g_playing && k.map && g_scene_prev != k.map && sc == k.map && !g_auto) g_show_after = true;
     if (g_cfg.port.count("clock-log") && song && vbl % 30 == 0)   // tools/bake_customs.py's measure
         nds_note("eba clock %llu %u", (unsigned long long)vbl, rd(g.clock));
@@ -711,7 +757,7 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
             uint32_t s = session();
             if (s) {
                 uint32_t d = (uint32_t)difficulty_index(g_difficulty);
-                g_main[(s + g.stage) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
+                set_stage(s);
                 std::memcpy(g_main + (s & 0x3FFFFF), &d, 4);
             }
         }
@@ -765,7 +811,7 @@ bool customs_frame(NdsInput& in, uint64_t vbl) {
         if (s) {
             uint32_t d = (uint32_t)difficulty_index(g_difficulty);
             if (t == g.card_from && rd(s) != d) nds_note("eba customs: difficulty %u on the card, set to %u", rd(s), d);
-            g_main[(s + g.stage) & 0x3FFFFF] = (uint8_t)g_playing->stage_index;
+            set_stage(s);
             std::memcpy(g_main + (s & 0x3FFFFF), &d, 4);
         }
     }

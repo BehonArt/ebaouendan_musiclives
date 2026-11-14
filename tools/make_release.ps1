@@ -1,7 +1,7 @@
 # The release zip: Elite Beat Ouendan: Music LIVES, the three games, the
 # launcher and Customs Studio, for players who bring their own cartridge dumps.
 #
-#   tools\make_release.ps1 [-Version 1.0.1] [-NoBuild] [-KeepRelease] [-HeaderArt FILE]
+#   tools\make_release.ps1 [-Version 1.2.0] [-NoBuild] [-KeepRelease] [-HeaderArt FILE]
 #                           [-Toolkit "F:\...\rom_hacking\tools"] [-SkipStudioBuild]
 #
 # Builds the three games in release mode (cmake/eba.cmake's EBA_RELEASE: no
@@ -25,7 +25,7 @@
 # in build\dist_test_keep\ if the script stops on an error).
 # Afterwards the build trees are put back in development mode (only the port's
 # own sources rebuild), unless -KeepRelease. -NoBuild packages what is built.
-param([string]$Version = "1.0.1", [switch]$NoBuild, [switch]$KeepRelease, [string]$HeaderArt = "",
+param([string]$Version = "1.2.0", [switch]$NoBuild, [switch]$KeepRelease, [string]$HeaderArt = "",
       [string]$Toolkit = "F:\dxvk_remix\Claude\EBAHD Old\rom_hacking\tools", [switch]$SkipStudioBuild)
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
@@ -80,16 +80,17 @@ Copy-Item (Join-Path $root "docs\CUSTOMS_STUDIO_GUIDE.md") (Join-Path $stage "CU
 # Customs Studio and the public toolkit it runs
 if (-not $SkipStudioBuild) {
     Write-Host "Customs Studio (PyInstaller)"
-    & (Join-Path $root "studio\build_studio.ps1") -Toolkit $Toolkit
+    & (Join-Path $root "studio\build_studio.ps1") -Toolkit $Toolkit -DistDir "dist_release"
 }
-$studio = Join-Path $root "studio\dist\Customs Studio"
+# (its own folder: studio\dist is the development Studio, which may be open while this runs)
+$studio = Join-Path $root "studio\dist_release\Customs Studio"
 if (-not (Test-Path (Join-Path $studio "Customs Studio.exe"))) { throw "no Customs Studio.exe in $studio" }
 robocopy $studio (Join-Path $stage "Customs Studio") /E /NJH /NJS /NFL /NDL /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed on the Studio" }
 $global:LASTEXITCODE = 0
 $ini = "# Customs Studio: the shipped toolkit and the games, relative to this folder`r`n[paths]`r`ntoolkit = ..\toolkit\rom_hacking\tools`r`nrecomp = ..`r`ndeploy = 1`r`n"
 [IO.File]::WriteAllText((Join-Path $stage "Customs Studio\studio.ini"), $ini)   # no BOM
-py -3 (Join-Path $Toolkit "make_release.py") --out (Join-Path $stage "toolkit")
+py -3.13 (Join-Path $Toolkit "make_release.py") --out (Join-Path $stage "toolkit")
 if ($LASTEXITCODE -ne 0) { throw "the toolkit's release verifier failed: nothing packaged" }
 Copy-Item (Join-Path $root "docs\THIRD_PARTY.txt") $stage
 $lic = Join-Path $stage "licenses"

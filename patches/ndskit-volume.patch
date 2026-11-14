@@ -1,0 +1,45 @@
+diff --git a/runtime/audio.cpp b/runtime/audio.cpp
+--- a/runtime/audio.cpp
++++ b/runtime/audio.cpp
+@@ -48,6 +48,8 @@ void wav_header() {
+     std::fseek(wav, 0, SEEK_END);
+ }
+ 
++float volume = 1.0f;   // the game's volume, 0..1 (a port's option): the stream's gain, kept for when it opens
++
+ }  // namespace
+ 
+ bool audio_open(bool device, const std::string& wav_path) {
+@@ -63,6 +65,7 @@ bool audio_open(bool device, const std::string& wav_path) {
+         if (!stream) { nds_note("audio: no device: %s", SDL_GetError()); return false; }
+         std::vector<int16_t> silence((size_t)target / 2);
+         SDL_PutAudioStreamData(stream, silence.data(), (int)target);
++        SDL_SetAudioStreamGain(stream, volume);
+         queued_avg = target;
+         SDL_ResumeAudioStreamDevice(stream);
+         SDL_AudioSpec dev;
+@@ -108,6 +111,12 @@ void audio_frame() {
+ 
+ void audio_set_speed(double s) { speed = s; }
+ 
++void audio_set_volume(float v) {
++    volume = std::clamp(v, 0.0f, 1.0f);
++    if (stream) SDL_SetAudioStreamGain(stream, volume);
++}
++float audio_volume() { return volume; }
++
+ void audio_set_latency(double f) { target = std::clamp(f, 0.5, 12.0) * kFrameBytes; }
+ double audio_latency() { return target / kFrameBytes; }
+ double audio_ratio() { return last_ratio; }
+diff --git a/runtime/display.h b/runtime/display.h
+--- a/runtime/display.h
++++ b/runtime/display.h
+@@ -77,6 +77,8 @@ void audio_frame();                     // after a VBlank: the frame's samples o
+ void audio_set_speed(double speed);     // the game's pace against the DS's (1: 59.83 frames a second)
+ void audio_set_latency(double frames);  // the sound queued ahead of the device, in frames (3 by default)
+ double audio_latency();
++void audio_set_volume(float v);           // the game's volume, 0..1 (1 by default; the stream's gain)
++float audio_volume();
+ double audio_ratio();                   // the playback ratio set last (the game's pace and the queue's nudge)
+ double audio_queued_seconds();          // the sound waiting in the device's stream
+ void audio_close();

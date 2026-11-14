@@ -183,6 +183,15 @@ void input_menu() {
 }
 
 void timing_menu() {
+    int vol = (int)std::lround(audio_volume() * 100);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
+    if (ImGui::SliderInt("Volume", &vol, 0, 100, "%d%%")) {
+        audio_set_volume(vol / 100.0f);
+        customs_volume_changed();
+        settings_save();
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("The game's sound: songs, voices and effects (75%% by default).");
+    ImGui::Separator();
     int off = offset();
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
     char fmt[64];
@@ -434,7 +443,7 @@ void draw(int, int) {
         if (ImGui::BeginMenu("Display")) { display_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Look")) { look_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Input")) { input_menu(); ImGui::EndMenu(); }
-        if (ImGui::BeginMenu("Timing")) { timing_menu(); ImGui::EndMenu(); }
+        if (ImGui::BeginMenu("Sound & Timing")) { timing_menu(); ImGui::EndMenu(); }
         if (game().approach && ImGui::BeginMenu("Assist")) { assist_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Effects")) { effects_menu(); ImGui::EndMenu(); }
         if (ImGui::BeginMenu("Help")) {

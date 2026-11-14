@@ -57,6 +57,8 @@ struct Game {
     uint32_t shift = 0;                 // a note's fields from +0x14 on are this much later (Ouendan 1: 4)
     uint32_t number = 7;                // the byte of a note's combo number
     uint32_t stage = 8;                 // the session's stage index
+    uint32_t team = 0;                  // the session's team (Ouendan 2: +4, 0 the red Ouendan, 1 the blue), set
+    uint32_t team_table = 0;            // with the stage from the game's own table, a word a stage (0: none)
     uint32_t judge = 0;                 // the judge (recompiled with --hook)
     uint32_t scene_root = 0;            // the scene's vtable, scene_depth reads from here
     int scene_depth = 0;
@@ -204,6 +206,7 @@ bool customs_autopilot_failed();
 CustomScore custom_best(const std::string& tag, char difficulty);
 void customs_launch(const Custom& c, char difficulty, bool autoplay);   // a Customs run (or the map again)
 void customs_back_to_campaign();
+void customs_volume_changed();          // the Volume option moved: the HD song's gain follows
 std::string customs_import(const std::string& path);   // a custom ROM (.nds) or a custom's folder: what happened
 bool customs_frame(NdsInput& in, uint64_t vblank);       // true: the autopilot drives the input
 const std::string& customs_folder();    // where the customs are (and their start save, scores, session)

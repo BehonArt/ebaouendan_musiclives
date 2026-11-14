@@ -11,6 +11,7 @@
 #include "display.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -52,6 +53,8 @@ void settings_load() {
             if (v["layout"] == kLayouts[l]) s.layout = (NdsLayout)l;
     display_change(s);
     if (g_cfg.audio_latency == 3) audio_set_latency(num("audio_latency", 3));
+    // 75% by default: the games are mixed louder than most of what plays beside them
+    audio_set_volume((float)std::clamp(num("volume", 75), 0.0, 100.0) / 100.0f);
     Buttons& b = buttons();
     b.on = num("buttons", 0) != 0;
     b.trigger_feel = num("trigger_feel", 1) != 0;
@@ -89,6 +92,7 @@ void settings_save() {
     for (int i = 0; i < 4; ++i)
         std::fprintf(f, "button_key%d=%s\n", i + 1, b.keys[i] ? SDL_GetScancodeName((SDL_Scancode)b.keys[i]) : "");
     std::fprintf(f, "offset=%d\n", offset());
+    std::fprintf(f, "volume=%d\n", (int)std::lround(audio_volume() * 100));
     std::fprintf(f, "filter=%d\nvsync=%d\n", s.filter, s.vsync);
     std::fprintf(f, "fx=%d\nfx_intensity=%d\nfx_flashes=%d\n", effects().on ? 1 : 0, effects().intensity,
                  effects().flashes ? 1 : 0);

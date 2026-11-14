@@ -75,6 +75,10 @@ Game make_oe2() {
     g.scenes = {0x020ADA5C, 0x020ADC98, 0x020ADD50, 0x020ADEC4, 0x020B0820, 0x020B0888, 0x020B07BC, 0x020B0668,
                 0x020B0978};
     g.session = 0x020A7A88; g.score = 0x10C; g.combo = 0xF4;
+    // each stage's team: the stage setter 0x02058320 writes session+4 from the word table at
+    // 0x02091FCC (by the stage index; 1, the blue Ouendan, on OS02 OS03 OS05 OS06 OS09 OS12 OS14
+    // OSB02 OSB03). Customs set the index after the map's man set his own team: set it again.
+    g.team = 4; g.team_table = 0x02091FCC;
     g.song_channels = 0xC0;
     g.skip_x = 238; g.skip_y = 183;
     // the title, ひとりで応援 (alone), OK on the difficulty, the first stage's HELP! character on

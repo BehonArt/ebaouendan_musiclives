@@ -99,6 +99,7 @@ void preview_play(const std::string& path) {
     if (!SDL_LoadWAV(path.c_str(), &spec, &g_preview_buf, &len)) return;
     g_preview = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
     if (!g_preview) return;
+    SDL_SetAudioStreamGain(g_preview, audio_volume());   // the game's Volume
     SDL_PutAudioStreamData(g_preview, g_preview_buf, (int)len);
     SDL_FlushAudioStream(g_preview);
     SDL_ResumeAudioStreamDevice(g_preview);

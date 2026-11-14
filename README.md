@@ -78,7 +78,8 @@ No menu has submenus (in a small window ImGui puts one over its menu): each
 choice is a list under a grey heading.
 - **Input:** Tap mode ("button mode" in these notes; off by default) on or off, rumble and its strength, up to four hit keys (click one, then
   press a key; right-click clears), the connected gamepads, the key map.
-- **Timing:** the offset (-8 to +8 frames), the sound's latency (1 to 6
+- **Sound & Timing:** the **Volume** (75% at first: the games are mixed loud), the
+  offset (-8 to +8 frames), the sound's latency (1 to 6
   frames), and **Calibrate...**, a window that counts every tap the game
   judges by how many frames after its note it came (before the offset):
   a histogram, the average and spread, the grades, and **Apply** to set the
@@ -476,6 +477,11 @@ they reproduce the submodule's working tree exactly:
 - `ndskit-config-hook.patch`: a port's look at the options once they are
   read, before the cartridge boots (`nds_set_config_hook`: where the save
   and the run's files go), and a window title of its own (`NdsConfig::title`).
+- `ndskit-volume.patch`: the game's volume (`audio_set_volume`, `audio_volume`:
+  the sound stream's gain; the port's Volume option, 75% by default).
+- `ndskit-turbo-load.patch`: turbo draws only the frames it shows (`display_picture_due`:
+  the 2D and 3D engines skip the other 19 of 20, as headless runs do) and waits for no
+  vertical sync: Customs' route to a stage in about 4 s instead of 9.
 
 The discovery fixes, both to report upstream (drafts in `upstream/`):
 1. `Program.run()` gave up after 4 refuse passes and wiped everything, so
@@ -494,7 +500,7 @@ The discovery fixes, both to report upstream (drafts in `upstream/`):
 Re-apply after updating the submodule:
 
     cd ndskit
-    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch ../patches/ndskit-texpacks.patch ../patches/ndskit-vsync.patch ../patches/ndskit-config-hook.patch
+    git apply ../patches/ndskit-discover.patch ../patches/ndskit-display-options.patch ../patches/ndskit-input-hook.patch ../patches/ndskit-display-live.patch ../patches/ndskit-function-hooks.patch ../patches/ndskit-customs-runtime.patch ../patches/ndskit-filters.patch ../patches/ndskit-effects.patch ../patches/ndskit-texpacks.patch ../patches/ndskit-vsync.patch ../patches/ndskit-config-hook.patch ../patches/ndskit-volume.patch ../patches/ndskit-turbo-load.patch
 
 ## The launcher (`launcher/`, `tools/build_launcher.sh`)
 
@@ -662,7 +668,7 @@ art is its author's).
 
 EBA only for now:
 
-1. Playtest the options bar and calibrate the offset (Timing > Calibrate).
+1. Playtest the options bar and calibrate the offset (Sound & Timing > Calibrate).
 2. HD note layer: the notes drawn natively between frames, for 120/240
    (the same note reading as button mode).
 3. OE1 and OE2: re-emit and rebuild on the current ndskit (their trees

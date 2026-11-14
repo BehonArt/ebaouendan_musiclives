@@ -1,0 +1,67 @@
+diff --git a/runtime/display.cpp b/runtime/display.cpp
+--- a/runtime/display.cpp
++++ b/runtime/display.cpp
+@@ -73,6 +73,7 @@ bool changed;
+ DisplayHooks hooks;
+ int top_margin;
+ bool turbo;                                             // display_set_turbo
++uint64_t turbo_frames;                                  // turbo: every 20th frame is a picture
+ float refresh_hz;
+ GlTarget t_win, t_one;                                  // the 3D at the picture's scale, and at 1
+ GLuint comp_prog, words_tex, empty_vao;
+@@ -521,12 +522,14 @@ const char* display_fx_glsl() { return kFxLightGLSL; }
+ void display_set_turbo(bool on) {
+     if (on == turbo) return;
+     turbo = on;
++    if (vsync) SDL_GL_SetSwapInterval(on ? 0 : 1);      // turbo's pictures wait for no refresh
+     if (!on && visible) {               // the pace, and the run's measures, start again from now
+         next_ns = locked_last_ns = left_ns = SDL_GetTicksNS();
+         run_frames = run_pictures = steady_pictures = late_frames = late_worst_ns = run_worst_ns = 0;
+     }
+ }
+ bool display_turbo() { return turbo; }
++bool display_picture_due() { return !turbo || (turbo_frames + 1) % 20 == 0; }
+ 
+ bool display_screen_rect(int screen, float* x, float* y, float* w, float* h) {
+     if (!visible) return false;
+@@ -690,7 +693,6 @@ bool display_frame() {
+     cur.fullscreen = SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN;
+     if (g_cfg.input.empty()) read_input();     // a script drives the input instead
+     if (shot) display_shot(g_cfg.out + "/shot" + std::to_string(++shots_taken) + ".png");
+-    static uint64_t turbo_frames;
+     if (turbo && ++turbo_frames % 20) return true;   // turbo: no picture, no pace
+ 
+     int ww, wh;
+@@ -752,7 +754,7 @@ bool display_frame() {
+             capture.clear();
+         }
+         SDL_GL_SwapWindow(win);
+-        if (cur.low_latency) glFinish();
++        if (cur.low_latency && !turbo) glFinish();
+         ++run_pictures;
+         ++title_pictures;
+     };
+diff --git a/runtime/display.h b/runtime/display.h
+--- a/runtime/display.h
++++ b/runtime/display.h
+@@ -67,6 +67,7 @@ void display_set_texture_packs(const std::vector<std::string>& dirs);
+ // Textures not drawn at all (their hashes, as a dump names them): an empty list draws all.
+ void display_set_texture_hidden(const std::vector<uint64_t>& hashes);          // its GLSL: fx_light(q) and its uniforms
+ bool display_turbo();
++bool display_picture_due();             // the next frame is shown (turbo shows every 20th: the others aren't drawn)
+ // Where a screen (0 upper, 1 lower) is in the window now, in pixels; false if the layout hides it.
+ bool display_screen_rect(int screen, float* x, float* y, float* w, float* h);
+ void write_png(const std::string& path, int w, int h, const uint8_t* rgb);   // RGB8, top row first
+diff --git a/runtime/main.cpp b/runtime/main.cpp
+--- a/runtime/main.cpp
++++ b/runtime/main.cpp
+@@ -142,7 +142,8 @@ int main(int argc, char** argv) {
+                          std::find(cfg.shots.begin(), cfg.shots.end(), vbl) != cfg.shots.end());
+     };
+     for (;;) {
+-        g_2d_on = cfg.window || shot_at(nds_vblanks() + 1);   // headless, the 2D engines draw only what a picture shows
++        // the 2D and 3D engines draw only what a picture shows (headless, and turbo's unshown frames)
++        g_2d_on = (cfg.window && display_picture_due()) || shot_at(nds_vblanks() + 1);
+         if (!nds_run_frame()) break;
+         uint64_t vbl = nds_vblanks();
+         audio_frame();
