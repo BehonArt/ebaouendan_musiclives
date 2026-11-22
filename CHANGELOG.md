@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.2.1
+
+Customs Studio fixes from the first week of 1.2 customs, plus two new options. The games themselves are unchanged.
+
+### Your favourite songs, charted for you: osu! beatmaps and guitar-game charts become customs
+**➕ New song** in Customs Studio turns a song you already have a chart for into a custom in a few clicks:
+- **An osu! beatmap:** pick the `.osu` file and its notes, sliders and spinners become the chart, timed by the beatmap itself, over your whole song.
+- **A Clone Hero / Rock Band / YARG song folder:** the stems are mixed into the song, the vocal line leads and the band fills in, and all four difficulties come from the song's own Easy to Expert charts.
+
+Both are charted the way the three games are, learned from their own charts: their slider shapes, their hit-sound patterns, the stage's final spinner. Pick a stage, build, and play it in the game. This arrived in 1.2.0; **1.2.1 keeps conversions in sync** after you edit and rebuild them (see Fixed). The guide's section 6 walks through it.
+
+### Also new in Customs Studio
+- **No break cutscenes for your song on a stage** (➕ New song, *My song on a stage's chart*): every section and its checkpoint is kept, the break cutscenes are left out, and only the intro and the outro play, with your song running straight through between them. Each section keeps its opening bars at your song's BPM.
+- **Ouendan 2's finale customs line up with your song's own intro** (OS15A *Countdown*, OS15B *Sekai wa...*): the new **finale note1@** box in the editors is how many seconds into your song the first note should hit. The stage's opening plays up to that point, fading out under your intro, so the song is in sync on note 1. Left empty, it uses the *First note at* you gave ➕ New song.
+
+### Fixed
+- **No-break customs flashed every break cutscene for a second at each section change** once they were rebuilt from an editor: the rebuild put the break shots back. Every build now leaves them out of a no-break chart and holds section 1's background and top screen, and building one difficulty of a no-break set uses the no-break charts for the others too.
+- **osu! conversions started late after Build+Test.** When a map's first note comes before the stage's countdown ends, the import pads the song with silence and moves the notes later, but the editors kept the unpadded song and Build+Test used it, so the music ran 9-12 s ahead of the notes. The editors now use the padded copy, and conversions made before the fix are repaired automatically.
+- **osu! and MIDI import could stay switched off** for anyone who had tried a pre-release test build of Customs Studio (New song said they "come in a later update"). Updating now clears that.
+- **Clicking ahead while the song plays in an editor no longer plays every note in between at once.**
+- **Ouendan 2's two-part finale was missing from every stage list** (OS15A *Countdown* and OS15B *Sekai wa Sore o Ai to Yobundaze*, in the Note Editor, the Section Editor and New song).
+
 ## v1.2.0
 
 The big one: osu! beatmaps and guitar-game charts become customs right in Customs Studio, customs keep your song at full quality, and the games get a Volume option, faster Customs loading and no story screens after a custom. (v1.0.2 was never released; everything prepared for it is here.)

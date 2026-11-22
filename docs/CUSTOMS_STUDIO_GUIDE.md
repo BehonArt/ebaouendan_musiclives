@@ -136,9 +136,18 @@ the beat** along with it. It builds the ROM and opens the new chart with your so
 
 - **A song longer than the stage** is charted to the end: with *Stretch the chart to the song's
   end* ticked, the busiest closing bars repeat on the beat until shortly before your song ends.
+- **No break cutscenes (only the intro and outro):** every section of the stage stays (the
+  results still judge each one), but the break cutscenes are left out and your song runs
+  straight through. Each section keeps its opening bars at your BPM, trimmed to share out
+  the song, so short and long songs both fit. Leave *First note at* empty to start where the
+  stage does.
 - **First note at** is where in your song the first note should land. If that's sooner than the
   stage's intro needs (its title card and countdown), your song simply starts a little later, so
   the intro still plays at its normal speed.
+- **Ouendan 2's finale (OS15A, OS15B)** opens with a long scripted scene before the first note.
+  The **finale note1@** box beside the song's audio is how many seconds into your song the
+  first note should hit: the stage's opening plays until then and fades out under your intro.
+  Left empty, it uses your *First note at*.
 
 ## 4. Editing notes (Note Editor)
 

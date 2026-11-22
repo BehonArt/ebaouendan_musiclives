@@ -112,6 +112,15 @@ def deploy_toolkit(paths):
             sa = os.stat(a)
             if not os.path.exists(b) or os.path.getsize(b) != sa.st_size or int(os.path.getmtime(b)) != int(sa.st_mtime):
                 shutil.copy2(a, b)
+    # Switches a release ships only while it holds a feature back: an update that no longer ships
+    # one must remove it, or the player keeps the old release's limits (2026-11-22: a HELD_FEATURES
+    # left by the unreleased 1.0.2 build kept osu! and MIDI import off under 1.2.x).
+    for rel in (os.path.join("rom_hacking", "tools", "seq_editor", "HELD_FEATURES"),):
+        if not os.path.exists(os.path.join(shipped, rel)) and os.path.exists(os.path.join(dest, rel)):
+            try:
+                os.remove(os.path.join(dest, rel))
+            except OSError:
+                pass
     return os.path.join(dest, "rom_hacking", "tools")
 
 
