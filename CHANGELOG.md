@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.1
+
+A Recomp Achievements fix. If you have 1.3.0, update: your saves, settings, customs and charts are kept.
+
+### Fixed
+- **Recomp Achievements: songs you had already cleared before 1.3.0 never earned their achievement.** Clearing a song now earns it even if your save had it cleared already, and so does rolling the credits; getting an S earns every S-rank milestone your save has reached. RecompLauncher still shows each achievement once. The "New songs!" waves, overall ranks and bonus unlocks are earned as they happen.
+
 ## v1.3.0
 
 Achievements in RecompLauncher. The games, Customs and Customs Studio are otherwise unchanged; if you have 1.2.1, update: your saves, settings, customs and charts are kept.

@@ -449,7 +449,9 @@ points: `docs/recomp-achievements/` (made by `tools/make_rla_lists.py`).
   (`games.cpp`'s `Progress`: each stage's best rank and score per difficulty,
   its state; the game's own tier and overall rank tables). What the progress
   meets is taken as each song starts; what it meets after the song, new, is
-  fired. A loaded save fires nothing by itself.
+  fired. A loaded save fires nothing by itself. Re-clears count: a song
+  cleared live fires its clear (the finale its credits) and an S got live
+  every S milestone the save reaches, even with old progress.
 - **Any input counts** (the stylus, Tap mode, a gamepad, the assists). A song
   played with autoplay or a replay fires nothing (what it brought is never
   fired); Customs (their own runs, on their own save) never connect.

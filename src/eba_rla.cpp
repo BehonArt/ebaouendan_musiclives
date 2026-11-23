@@ -11,8 +11,12 @@
 // starts; after the song, each event it meets that it did not is fired. So a
 // save loaded at the start fires nothing by itself, and what a song played
 // with autoplay or a replay brought is never fired (the next song starts from
-// it). Any input counts: the stylus, Tap mode, a gamepad, the assists. Customs
-// (a run of their own, on their own save) never connect.
+// it). Re-clears count: a song cleared live fires its clear (and on the finale
+// its credits) even if the save had it cleared already, and an S got live fires
+// every S milestone the save's S ranks reach; the map's tiers, the overall
+// rank and the bonus songs fire as they first happen. Any input counts: the
+// stylus, Tap mode, a gamepad, the assists. Customs (a run of their own, on
+// their own save) never connect.
 //
 // The events (P the game's: eba, oe1, oe2; D e n h x; STAGE the chart's stem, lower case):
 //   P_clear_STAGE    the stage cleared, any difficulty
@@ -24,11 +28,13 @@
 //   P_s_N, P_s_all   N S ranks (1 5 10 20, a stage on a difficulty each), an S on every one
 //
 // Options (ndsrun --port): rla-print=VBLANK (the events the progress meets then, in the log:
-// tests); rla-quiet (no summary at each song's start).
+// tests); rla-quiet (no summary at each song's start); rla-stage=N (a test: the story's stage N
+// played whatever card is picked, set in the session during the opening comic, as Customs do).
 #include "eba.h"
 #include "rl_achievements.h"
 #include <cctype>
 #include <climits>
+#include <cstring>
 #include <set>
 #include <string>
 #include <vector>
@@ -40,7 +46,14 @@ bool g_on;                      // rla_init ran (not Customs)
 bool g_was_song, g_counts, g_armed, g_loaded;
 const char* g_why = "";         // why this song fires nothing
 std::set<std::string> g_seen;   // what the progress met as the song started (and what was fired since)
+std::set<std::string> g_sent;   // what was fired since the song started
 uint64_t g_print = ~0ull;
+int g_test_stage = -1;          // rla-stage=N
+// the song played, as the session has it: its stage, difficulty and score
+int g_stage = -1, g_diff = -1;
+int32_t g_score = 0;
+bool g_after;                   // the scene after the song is known
+bool g_cleared;                 // it was cleared: the ending comic or the results came next (not Regroup)
 
 const char* launcher_id() {     // the game's id in RecompLauncher (recomplauncher.json's games)
     std::string e = game().progress.event;
@@ -76,6 +89,26 @@ Record record(uint32_t b, int stage, int d) {
     }
     if (p.state >= 0) x.state = byte(r + (uint32_t)p.state);
     return x;
+}
+
+// the song just played got an S: its record holds this run's score with an S
+bool live_s(uint32_t b, int stage, int d, int32_t score) {
+    const Game::Progress& p = game().progress;
+    uint32_t r = b + 0x10 + (uint32_t)stage * p.stage_stride + (uint32_t)d * p.record;
+    if (score <= 0) return false;
+    if (p.three) {
+        for (int i = 0; i < 3; ++i)
+            if ((int32_t)rd(r + 4 * i) == score && byte(r + 0x1F + i) == 0) return true;
+        return false;
+    }
+    return (int32_t)rd(r) == 0 && (int32_t)rd(r + 4) == score;
+}
+
+void fire(const std::string& e) {
+    if (!g_sent.insert(e).second) return;
+    g_seen.insert(e);
+    rl_ach_event(e.c_str());
+    nds_note("eba rla: event %s", e.c_str());
 }
 
 std::string lower(const char* s) {
@@ -158,6 +191,7 @@ std::vector<std::string> rla_events() {
 void rla_init() {
     const auto& o = g_cfg.port;
     if (o.count("rla-print")) g_print = std::strtoull(o.at("rla-print").c_str(), nullptr, 10);
+    if (o.count("rla-stage")) g_test_stage = std::atoi(o.at("rla-stage").c_str());
     // Customs are a mode of their own: their runs (and the start save's first boot) never connect
     if (custom_playing() || o.count("custom") || o.count("customs-first-boot") || o.count("customs-make-start-save"))
         return;
@@ -182,19 +216,33 @@ void rla_frame(uint64_t vbl) {
     if (!g_loaded && base()) { g_loaded = true; rl_ach_save_loaded(); }
     const Game& g = game();
     bool song = scene_is_song();
+    uint32_t s = g.session ? rd(g.session) : 0;
+    if (!in_main(s)) s = 0;
+    if (g_test_stage >= 0 && s && g.scenes.intro && scene() == g.scenes.intro) {   // a test's stage, as Customs set one
+        g_main[(s + g.stage) & 0x3FFFFFu] = (uint8_t)g_test_stage;
+        if (g.team_table) {
+            uint32_t team = rd(g.team_table + 4 * (uint32_t)g_test_stage);
+            std::memcpy(g_main + ((s + g.team) & 0x3FFFFFu), &team, 4);
+        }
+    }
     if (song && !g_was_song) {                      // a song starts: what the progress meets now is the base
         std::vector<std::string> ev = rla_events();
         g_seen = std::set<std::string>(ev.begin(), ev.end());
+        g_sent.clear();
         g_counts = true;
         g_why = "";
-        if (!g_cfg.port.count("rla-quiet")) nds_note("eba rla: a song starts; %s", summary().c_str());
+        g_stage = s ? (int)(rd(s + g.stage) & 0xFF) : -1;
+        g_diff = s ? (int)rd(s) : -1;
+        g_score = 0;
+        g_after = g_cleared = false;
+        if (!g_cfg.port.count("rla-quiet"))
+            nds_note("eba rla: a song starts (stage %d, difficulty %d); %s", g_stage, g_diff, summary().c_str());
     }
     if (song) {
-        uint32_t s = g.session ? rd(g.session) : 0;
         const char* why = autoplay() ? "autoplay"
                         : replay_playing() ? "a replay"
-                        : in_main(s) && g.autoplay && rd(s + g.autoplay) ? "the game's autoplay (its demo)"
-                        : in_main(s) && g.replaying && rd(s + g.replaying) ? "the game's replay"
+                        : s && g.autoplay && rd(s + g.autoplay) ? "the game's autoplay (its demo)"
+                        : s && g.replaying && rd(s + g.replaying) ? "the game's replay"
                         : nullptr;
         if (why && g_counts) {
             g_counts = false;
@@ -202,14 +250,31 @@ void rla_frame(uint64_t vbl) {
             nds_note("eba rla: this song is played with %s: what it brings fires nothing", why);
         }
         g_armed = g_counts;
+        if (s && g.score) g_score = (int32_t)rd(s + g.score);
     }
     g_was_song = song;
+    if (!song && g_armed && !g_after) {             // the scene after the song: cleared or not
+        uint32_t sc = scene();
+        if (sc) {
+            g_after = true;
+            g_cleared = sc == g.scenes.ending || sc == g.scenes.results;
+            nds_note("eba rla: the song %s (score %d)", g_cleared ? "is cleared" : "is not cleared", g_score);
+        }
+    }
     if (!song && g_armed && vbl % 15 == 0) {        // after it: what it brought, as the game saves it
+        const Game::Progress& p = g.progress;
+        uint32_t b = base();
+        int n = (int)g.stages.size();
+        if (g_cleared && b && g_stage >= 0 && g_stage < n && g_diff >= 0 && g_diff < 4 &&
+            record(b, g_stage, g_diff).cleared) {   // re-clears count: the song, the finale's credits
+            fire(std::string(p.event) + "_clear_" + lower(g.stages[g_stage]));
+            if (g_stage == p.finale) fire(std::string(p.event) + "_credits_" + "enhx"[g_diff]);
+            if (live_s(b, g_stage, g_diff, g_score))  // an S got live: every S milestone the save reaches
+                for (const std::string& e : rla_events())
+                    if (e.rfind(std::string(p.event) + "_s_", 0) == 0) fire(e);
+        }
         for (const std::string& e : rla_events())
-            if (g_seen.insert(e).second) {
-                rl_ach_event(e.c_str());
-                nds_note("eba rla: event %s", e.c_str());
-            }
+            if (!g_seen.count(e)) fire(e);
     }
 }
 

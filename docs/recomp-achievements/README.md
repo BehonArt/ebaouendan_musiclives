@@ -62,9 +62,14 @@ The game fires them (`src/eba_rla.cpp`), with its prefix `eba`, `oe1` or `oe2`:
 
 **When they fire.** What the progress meets is taken as each song starts; after the song (the
 results, the map), each event it meets that it did not is fired, once. So loading a save fires
-nothing, a player with an old save earns what they do from then on (an S on a song already
-S-ranked earns nothing new), and a song played with **autoplay or a replay fires nothing** (the
-next song starts from what it brought). **Customs** are a mode of their own: their runs never
+nothing by itself, and a song played with **autoplay or a replay fires nothing** (the next song
+starts from what it brought). **Re-clears count:** a song cleared live (the ending comic or the
+results come next, not Regroup) fires its clear, and on the finale that difficulty's credits,
+even when the save had it cleared already; an S got live (its record holds this run's score with
+an S) fires every S milestone the save's S ranks reach. So a player with an old save earns the
+song, credits and S achievements by playing them again; the map's tiers, the overall ranks and
+the bonus songs fire when they first happen. RecompLauncher unlocks each achievement once: an
+event sent again shows nothing (the game itself shows no pop-ups for these). **Customs** are a mode of their own: their runs never
 connect. Nothing is sent as "casual": RecompLauncher judges Ranked or Casual itself.
 
 ## Where the progress is (the save, in RAM)
@@ -89,6 +94,9 @@ Started without RecompLauncher, the game still logs each event (`eba rla: event 
 ndsrun ROM --save COPY.sav --port rla-print=2400 --vblanks 2401   (the events a save meets, in the log)
 python tools/rla_fake_launcher.py OUT.jsonl "eba_clear_ss01,!eba_s_1" -- ndsrun ROM ...
 ```
+
+`tools/rla_stage_test.py` clears every stage of the three games headless (`--port rla-stage=N` sets
+the stage during the opening comic, as Customs do) and checks each sends its own song's event.
 
 `rla_fake_launcher.py` opens the pipe as RecompLauncher does, runs the game with `RL_SESSION`
 set, and checks the events it sends (`!NAME`: must not; `offline`: must not connect). Headless,
