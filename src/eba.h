@@ -92,6 +92,22 @@ struct Game {
     struct { uint64_t title = 0; int skip_x = 0, skip_y = 0; uint64_t skip_from = 0, limit = 0; } first_boot;
     std::vector<const char*> stages;    // the story's stages by index (the charts' stems: SS05, OS03, s03)
     float menu_button_x = 0.5f;         // the CUSTOMS button across the main menu's lower screen (0 left .. 1 right)
+    // the game's own progress, as its save keeps it in RAM (Recomp Achievements, eba_rla.cpp):
+    // *progress, from +0x10 a record per stage (stage_stride apart) and difficulty (record
+    // apart: e n h x, then Training's in EBA and Ouendan 1)
+    struct Progress {
+        const char* event = "";         // the events' prefix: eba, oe1, oe2
+        uint32_t ptr = 0;               // where the pointer to it is
+        uint32_t stage_stride = 0, record = 0;
+        int records = 4;                // a stage's records (all are summed for the overall rank)
+        bool three = false;             // Ouendan 2: three best scores at +0 (-1: none), their ranks u8 at +0x1F
+                                        // (0xFF: none); else the best rank s32 at +0 (INT_MAX: not cleared), score +4
+        int state = -1;                 // a record's byte: 0 the stage is locked (-1: none kept)
+        int story = 0;                  // the story's stages (the ones after are the bonus songs)
+        int finale = 0;                 // the stage whose clear rolls the credits
+        std::vector<int> tiers;         // the map's tier by the first stage not cleared (the game's table)
+        std::vector<uint32_t> ranks;    // the overall rank's total scores, rank 1 up (the game's table)
+    } progress;
 };
 const Game& game();
 Game game_of(const std::string& rom);               // the profile for a ROM file (before g_cfg is set)
@@ -235,6 +251,15 @@ const char* ra_paused_by();                         // why they are paused now (
 struct RaToast { std::string title, text; };
 std::vector<RaToast> ra_toasts();                   // the pop-ups to show now
 rc_client_t* ra_client();                           // for the list (rc_client.h)
+
+// ---- Recomp Achievements (eba_rla.cpp): RecompLauncher's own set --------------------------
+// Events the game's progress fires (its save's data in RAM), checked after each song; the list
+// RecompLauncher hosts maps them to achievements. Any input counts (the stylus, Tap mode, a
+// gamepad); a song played with autoplay or a replay fires nothing, and Customs never do.
+// Started without RecompLauncher, nothing is sent (the events are still logged).
+void rla_init();                                    // after the settings
+void rla_frame(uint64_t vblank);                    // each frame
+std::vector<std::string> rla_events();              // every event the progress meets now (tests, the log)
 
 // ---- the options bar (eba_ui.cpp) --------------------------------------------------------
 bool ui_wants_mouse();                  // the mouse is over the bar or a menu: not the stylus

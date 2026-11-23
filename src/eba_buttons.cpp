@@ -483,6 +483,7 @@ void hook(NdsInput& in, uint64_t vbl) {
     eba::rumble_frame(m.view, vbl);
     trigger_feel(m.view.kind == 2 && m.view.now >= m.view.start && m.view.now <= m.view.end, m.view.spin);
     eba::ra_frame(vbl);                             // the achievements, on the frame's RAM as it is
+    eba::rla_frame(vbl);                            // Recomp Achievements (RecompLauncher's): the progress after a song
 }
 
 struct Register {

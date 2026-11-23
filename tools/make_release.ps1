@@ -97,6 +97,8 @@ $lic = Join-Path $stage "licenses"
 Copy-Item (Join-Path $root "ndskit\LICENSE") "$lic\ndskit.txt"
 Copy-Item (Join-Path $root "third_party\imgui\LICENSE.txt") "$lic\imgui.txt"
 Copy-Item (Join-Path $root "third_party\rcheevos\LICENSE") "$lic\rcheevos.txt"
+Copy-Item (Join-Path $root "third_party\rl_achievements\LICENSE") "$lic\recomp-achievements.txt"
+Copy-Item (Join-Path $root "third_party\rl_achievements\cjson\LICENSE") "$lic\cJSON.txt"
 Copy-Item "$ucrt\share\licenses\sdl3\LICENSE.txt" "$lic\SDL3.txt"
 # stb_image: its licence is at the end of the header
 $stb = Get-Content -Raw (Join-Path $root "third_party\stb\stb_image.h")

@@ -429,6 +429,35 @@ loads, with its list and progress, and unlocks pop up at the lower right.
 - `--port ra-log` logs rc_client; `--port ra-spectator` checks achievements and
   sends nothing (tests; a headless run then signs in with the saved token).
 
+## Recomp Achievements (RecompLauncher, all three games, `src/eba_rla.cpp`)
+
+RecompLauncher's own achievements, made for it (not RetroAchievements' set):
+a set per game, 1000 points each, for clearing each story song, each "New
+songs" wave of the map on each difficulty, the credits on each difficulty (a
+game is Beaten at its first credits roll), each overall rank, unlocking EBA's
+and Ouendan 2's bonus songs, and S ranks (the first, 5, 10, 20, then every
+song on every difficulty). The lists, their titles and
+points: `docs/recomp-achievements/` (made by `tools/make_rla_lists.py`).
+
+- **The SDK** (`third_party/rl_achievements`, vendored from
+  github.com/elripalda/RecompAchievements at faf094a, free for any game): its C
+  file and cJSON, built on the rcheevos above by `cmake/eba.cmake`. The game
+  talks to RecompLauncher over a local pipe (`RL_SESSION`); started any other
+  way it does nothing, so every build has it. No accounts, no network: the
+  launcher shows the pop-ups, keeps and syncs the unlocks.
+- **Events**, from the game's own progress as its save keeps it in RAM
+  (`games.cpp`'s `Progress`: each stage's best rank and score per difficulty,
+  its state; the game's own tier and overall rank tables). What the progress
+  meets is taken as each song starts; what it meets after the song, new, is
+  fired. A loaded save fires nothing by itself.
+- **Any input counts** (the stylus, Tap mode, a gamepad, the assists). A song
+  played with autoplay or a replay fires nothing (what it brought is never
+  fired); Customs (their own runs, on their own save) never connect.
+- `--port rla-print=N` logs the events the progress meets at VBlank N (tests);
+  `tools/rla_fake_launcher.py` stands in for RecompLauncher (Windows' pipe) and
+  checks which events a headless run sends. More in
+  `docs/recomp-achievements/README.md`.
+
 ## Local ndskit patches
 
 In `patches/`, applied in this order to upstream ndskit (5ee24af); together

@@ -60,6 +60,18 @@ Game make_eba() {
     g.customs_dir = "customs";
     // an empty save: the title, then Kahn's briefing (the tutorial) until the main menu
     g.first_boot = {950, 245, 183, 1350, 7000};
+    // its progress (the decomp: UnkStruct_020548e8, *0x020CD244): a record 0x1C a difficulty, 5 a stage
+    // (the 5th Training's): +0 the best rank (0 S .. 4 D; INT_MAX not cleared), +4 the best score, +0x1A
+    // the stage's state (0 locked, 1 new, 3 cleared). The tiers 0x020B1F28 (func_02054ab0), the
+    // overall rank's scores 0x020B1F9C (func_02054d3c, of every record's best summed)
+    g.progress.event = "eba";
+    g.progress.ptr = 0x020CD244;
+    g.progress.stage_stride = 0x8C; g.progress.record = 0x1C; g.progress.records = 5;
+    g.progress.state = 0x1A;
+    g.progress.story = 16; g.progress.finale = 15;     // SS15B, Jumpin' Jack Flash
+    g.progress.tiers = {0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 5, 5, 6, 7};
+    g.progress.ranks = {400000, 1500000, 3000000, 6000000, 10000000, 15000000, 20000000, 25000000, 35000000,
+                        50000000, 80000000};
     return g;
 }
 
@@ -103,6 +115,18 @@ Game make_oe2() {
     g.first_boot = {1850, 238, 183, 2250, 7000};   // the title, the briefing's スキップ until the menu
     g.skins_dir = "skins";              // the HD approach-circle packs: the ring shapes are the same in all three games
     g.menu_button_x = 0.0f;             // the strip's right holds 応援スタイルを選ぶべし
+    // its progress (matched to EBA's, 2026-11-22): *0x020A7A84 (beside the session's pointer), a record
+    // 0x28 a difficulty, 4 a stage: +0 the three best scores (-1: none), +0x1D the stage's state (0
+    // locked, 2 open, 3 cleared), +0x1F the three scores' ranks (0 S .. 4 D, 0xFF none). The tiers
+    // 0x0208FB4C, the overall rank's scores 0x0208FBC0 (twelve)
+    g.progress.event = "oe2";
+    g.progress.ptr = 0x020A7A84;
+    g.progress.stage_stride = 0xA0; g.progress.record = 0x28; g.progress.records = 4;
+    g.progress.three = true; g.progress.state = 0x1D;
+    g.progress.story = 16; g.progress.finale = 15;     // OS15B, Sekai wa Sore o Ai to Yobundaze
+    g.progress.tiers = {0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 5, 5, 6, 7};
+    g.progress.ranks = {400000, 1500000, 3000000, 6000000, 10000000, 15000000, 20000000, 25000000, 35000000,
+                        50000000, 70000000, 100000000};
     return g;
 }
 
@@ -141,6 +165,16 @@ Game make_oe1() {
     g.first_boot = {700, 238, 183, 1100, 7000};
     g.skins_dir = "skins";
     g.intro_skip = false;               // its song intro has no SKIP: fast-forwarded instead (eba_buttons.cpp)
+    // its progress (matched to EBA's, 2026-11-22): at 0x0208EF70 (the pointer to it at 0x02090160), a
+    // record 8 bytes a difficulty, 5 a stage: +0 the best rank (0 S; INT_MAX not cleared), +4 the best
+    // score; no state kept. The tiers 0x02089774, the overall rank's scores 0x020862F8
+    g.progress.event = "oe1";
+    g.progress.ptr = 0x02090160;
+    g.progress.stage_stride = 0x28; g.progress.record = 8; g.progress.records = 5;
+    g.progress.story = 15; g.progress.finale = 14;     // s15, Ready Steady Go
+    g.progress.tiers = {0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 5, 5, 6};
+    g.progress.ranks = {400000, 1200000, 2500000, 5000000, 8000000, 12000000, 17000000, 25000000, 35000000,
+                        45000000, 60000000};
     return g;
 }
 

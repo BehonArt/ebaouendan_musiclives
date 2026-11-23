@@ -1,0 +1,454 @@
+{
+  "format": 1,
+  "game": "elitebeatagents",
+  "source": "events",
+  "console": "nds",
+  "versions": ">=1.3.0",
+  "achievements": [
+    {
+      "id": 1,
+      "title": "Walkie Talkie Man",
+      "description": "Clear Walkie Talkie Man (Steriogram) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss01"
+    },
+    {
+      "id": 2,
+      "title": "Makes No Difference",
+      "description": "Clear Makes No Difference (Sum 41) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss02"
+    },
+    {
+      "id": 3,
+      "title": "Sk8er Boi",
+      "description": "Clear Sk8er Boi (Avril Lavigne) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss06"
+    },
+    {
+      "id": 4,
+      "title": "I Was Born to Love You",
+      "description": "Clear I Was Born to Love You (Freddie Mercury) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss04"
+    },
+    {
+      "id": 5,
+      "title": "Rock This Town",
+      "description": "Clear Rock This Town (Stray Cats) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss05"
+    },
+    {
+      "id": 6,
+      "title": "Highway Star",
+      "description": "Clear Highway Star (Deep Purple) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss09"
+    },
+    {
+      "id": 7,
+      "title": "YMCA",
+      "description": "Clear YMCA (Village People) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss10"
+    },
+    {
+      "id": 8,
+      "title": "September",
+      "description": "Clear September (Earth, Wind & Fire) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss03"
+    },
+    {
+      "id": 9,
+      "title": "Canned Heat",
+      "description": "Clear Canned Heat (Jamiroquai) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss08"
+    },
+    {
+      "id": 10,
+      "title": "Material Girl",
+      "description": "Clear Material Girl (Madonna) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss11"
+    },
+    {
+      "id": 11,
+      "title": "La La",
+      "description": "Clear La La (Ashlee Simpson) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss13"
+    },
+    {
+      "id": 12,
+      "title": "You're the Inspiration",
+      "description": "Clear You're the Inspiration (Chicago) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss12"
+    },
+    {
+      "id": 13,
+      "title": "Let's Dance",
+      "description": "Clear Let's Dance (David Bowie) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ssb03"
+    },
+    {
+      "id": 14,
+      "title": "The Anthem",
+      "description": "Clear The Anthem (Good Charlotte) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss07"
+    },
+    {
+      "id": 15,
+      "title": "Without a Fight",
+      "description": "Clear Without a Fight (Hoobastank) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss15a"
+    },
+    {
+      "id": 16,
+      "title": "Jumpin' Jack Flash",
+      "description": "Clear Jumpin' Jack Flash (The Rolling Stones) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss15b"
+    },
+    {
+      "id": 101,
+      "title": "Fresh Recruit",
+      "description": "Open new songs on the map on Breezin' (wave 1 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_1"
+    },
+    {
+      "id": 102,
+      "title": "Light Breeze",
+      "description": "Open new songs on the map on Breezin' (wave 2 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_2"
+    },
+    {
+      "id": 103,
+      "title": "Spin Cycle",
+      "description": "Open new songs on the map on Breezin' (wave 3 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_3"
+    },
+    {
+      "id": 104,
+      "title": "Tailwind",
+      "description": "Open new songs on the map on Breezin' (wave 4 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_4"
+    },
+    {
+      "id": 105,
+      "title": "Gale Force",
+      "description": "Open new songs on the map on Breezin' (wave 5 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_5"
+    },
+    {
+      "id": 106,
+      "title": "Eye of the Storm",
+      "description": "Open new songs on the map on Breezin' (wave 6 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_6"
+    },
+    {
+      "id": 111,
+      "title": "Cruise Control",
+      "description": "Open new songs on the map on Cruisin' (wave 1 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_1"
+    },
+    {
+      "id": 112,
+      "title": "Agent J on the Case",
+      "description": "Open new songs on the map on Cruisin' (wave 2 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_2"
+    },
+    {
+      "id": 113,
+      "title": "Open Road",
+      "description": "Open new songs on the map on Cruisin' (wave 3 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_3"
+    },
+    {
+      "id": 114,
+      "title": "Need for Speed",
+      "description": "Open new songs on the map on Cruisin' (wave 4 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_4"
+    },
+    {
+      "id": 115,
+      "title": "Overdrive",
+      "description": "Open new songs on the map on Cruisin' (wave 5 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_5"
+    },
+    {
+      "id": 116,
+      "title": "Final Approach",
+      "description": "Open new songs on the map on Cruisin' (wave 6 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_6"
+    },
+    {
+      "id": 121,
+      "title": "Breaking a Sweat",
+      "description": "Open new songs on the map on Sweatin' (wave 1 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_1"
+    },
+    {
+      "id": 122,
+      "title": "Chieftain's Orders",
+      "description": "Open new songs on the map on Sweatin' (wave 2 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_2"
+    },
+    {
+      "id": 123,
+      "title": "Turning Up the Heat",
+      "description": "Open new songs on the map on Sweatin' (wave 3 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_3"
+    },
+    {
+      "id": 124,
+      "title": "Hot Streak",
+      "description": "Open new songs on the map on Sweatin' (wave 4 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_4"
+    },
+    {
+      "id": 125,
+      "title": "Feel the Burn",
+      "description": "Open new songs on the map on Sweatin' (wave 5 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_5"
+    },
+    {
+      "id": 126,
+      "title": "Boiling Point",
+      "description": "Open new songs on the map on Sweatin' (wave 6 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_6"
+    },
+    {
+      "id": 131,
+      "title": "Enter the Divas",
+      "description": "Open new songs on the map on Hard Rock (wave 1 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_1"
+    },
+    {
+      "id": 132,
+      "title": "Starr Power",
+      "description": "Open new songs on the map on Hard Rock (wave 2 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_2"
+    },
+    {
+      "id": 133,
+      "title": "Foxx Trot",
+      "description": "Open new songs on the map on Hard Rock (wave 3 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_3"
+    },
+    {
+      "id": 134,
+      "title": "Missy Impossible",
+      "description": "Open new songs on the map on Hard Rock (wave 4 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_4"
+    },
+    {
+      "id": 135,
+      "title": "Rock Steady",
+      "description": "Open new songs on the map on Hard Rock (wave 5 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_5"
+    },
+    {
+      "id": 136,
+      "title": "Showstoppers",
+      "description": "Open new songs on the map on Hard Rock (wave 6 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_6"
+    },
+    {
+      "id": 201,
+      "title": "Gone with the Wind",
+      "description": "Clear Jumpin' Jack Flash on Breezin' with Agent Spin and roll the credits.",
+      "points": 25,
+      "type": "win",
+      "event": "eba_credits_e"
+    },
+    {
+      "id": 202,
+      "title": "Calling Agent Chieftain",
+      "description": "Clear Jumpin' Jack Flash on Cruisin' with Agent J and roll the credits, unlocking Sweatin', led by Agent Chieftain.",
+      "points": 50,
+      "type": "win",
+      "event": "eba_credits_n"
+    },
+    {
+      "id": 203,
+      "title": "Cue the Divas",
+      "description": "Clear Jumpin' Jack Flash on Sweatin' with Agent Chieftain and roll the credits, unlocking Hard Rock, led by the Elite Beat Divas: Starr, Missy and Foxx.",
+      "points": 50,
+      "type": "win",
+      "event": "eba_credits_h"
+    },
+    {
+      "id": 204,
+      "title": "Commander Kahn Approves",
+      "description": "Clear Jumpin' Jack Flash on Hard Rock with the Elite Beat Divas and roll the credits.",
+      "points": 50,
+      "type": "win",
+      "event": "eba_credits_x"
+    },
+    {
+      "id": 301,
+      "title": "Trainee",
+      "description": "Reach overall rank 1 of 11: 400,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "eba_rank_1"
+    },
+    {
+      "id": 302,
+      "title": "Field Agent",
+      "description": "Reach overall rank 2 of 11: 1,500,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "eba_rank_2"
+    },
+    {
+      "id": 303,
+      "title": "Special Agent",
+      "description": "Reach overall rank 3 of 11: 3,000,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "eba_rank_3"
+    },
+    {
+      "id": 304,
+      "title": "Secret Agent Man",
+      "description": "Reach overall rank 4 of 11: 6,000,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "eba_rank_4"
+    },
+    {
+      "id": 305,
+      "title": "Licensed to Thrill",
+      "description": "Reach overall rank 5 of 11: 10,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_5"
+    },
+    {
+      "id": 306,
+      "title": "Undercover Groove",
+      "description": "Reach overall rank 6 of 11: 15,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_6"
+    },
+    {
+      "id": 307,
+      "title": "Classified",
+      "description": "Reach overall rank 7 of 11: 20,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_7"
+    },
+    {
+      "id": 308,
+      "title": "Top Secret",
+      "description": "Reach overall rank 8 of 11: 25,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_8"
+    },
+    {
+      "id": 309,
+      "title": "Rhombulan Repeller",
+      "description": "Reach overall rank 9 of 11: 35,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_9"
+    },
+    {
+      "id": 310,
+      "title": "Kahn's Right Hand",
+      "description": "Reach overall rank 10 of 11: 50,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_10"
+    },
+    {
+      "id": 311,
+      "title": "Truly Elite",
+      "description": "Reach overall rank 11 of 11, the top rank: 80,000,000 points of best scores, every song and difficulty added up.",
+      "points": 50,
+      "event": "eba_rank_11"
+    },
+    {
+      "id": 401,
+      "title": "Auto-Tuned In",
+      "description": "Unlock the bonus song Believe (Cher).",
+      "points": 25,
+      "event": "eba_bonus_ssb02"
+    },
+    {
+      "id": 402,
+      "title": "Learn Your ABCs",
+      "description": "Unlock the bonus song ABC (The Jackson 5).",
+      "points": 25,
+      "event": "eba_bonus_ssb01"
+    },
+    {
+      "id": 403,
+      "title": "Last Agent Standing",
+      "description": "Unlock the bonus song Survivor (Destiny's Child).",
+      "points": 25,
+      "event": "eba_bonus_ss14"
+    },
+    {
+      "id": 501,
+      "title": "Sharp-Dressed Agent",
+      "description": "Get your first S rank.",
+      "points": 10,
+      "event": "eba_s_1"
+    },
+    {
+      "id": 502,
+      "title": "Smooth Operator",
+      "description": "Get S ranks on 5 songs (each song on each difficulty counts once).",
+      "points": 25,
+      "event": "eba_s_5"
+    },
+    {
+      "id": 503,
+      "title": "Sunglasses at Night",
+      "description": "Get S ranks on 10 songs (each song on each difficulty counts once).",
+      "points": 25,
+      "event": "eba_s_10"
+    },
+    {
+      "id": 504,
+      "title": "S-Class Agent",
+      "description": "Get S ranks on 20 songs (each song on each difficulty counts once).",
+      "points": 50,
+      "event": "eba_s_20"
+    },
+    {
+      "id": 505,
+      "title": "Elite of the Elite",
+      "description": "Get an S rank on every song on every difficulty, bonus songs included (76).",
+      "points": 50,
+      "event": "eba_s_all"
+    }
+  ]
+}

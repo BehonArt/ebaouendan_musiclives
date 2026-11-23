@@ -114,6 +114,7 @@ void init() {
     rumble_options();
     customs_init();
     ra_init();
+    rla_init();
 }
 
 }  // namespace eba

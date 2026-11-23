@@ -23,6 +23,7 @@ set(EBA_PORT_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_skins.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_rumble.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_achievements.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/eba_rla.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_settings.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_customs.cpp
     ${CMAKE_CURRENT_LIST_DIR}/../src/eba_customs_ui.cpp
@@ -67,3 +68,15 @@ target_link_libraries(ndsrun rcheevos)                   # (plain: the generated
 if(WIN32)
     target_link_libraries(ndsrun winhttp)
 endif()
+
+# Recomp Achievements (RecompLauncher's own set): the SDK's C file and cJSON
+# (third_party/rl_achievements, vendored), on the rcheevos above (its runtime
+# calls are rcheevos's own); with no launcher it does nothing
+set(EBA_RLA ${CMAKE_CURRENT_LIST_DIR}/../third_party/rl_achievements)
+add_library(rl_achievements STATIC ${EBA_RLA}/src/rl_achievements.c ${EBA_RLA}/cjson/cJSON.c)
+target_include_directories(rl_achievements PUBLIC ${EBA_RLA}/include PRIVATE ${EBA_RLA}/cjson)
+target_link_libraries(rl_achievements PRIVATE rcheevos)
+# its memory rules' reader takes a buffer in the SDK's own rcheevos, not in this one; the port
+# sends events only (no reader: rl_ach_init("", NULL, NULL)), so those calls never run
+target_compile_options(rl_achievements PRIVATE -Wno-incompatible-pointer-types)
+target_link_libraries(ndsrun rl_achievements)

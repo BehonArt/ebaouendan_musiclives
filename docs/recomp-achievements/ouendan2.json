@@ -1,0 +1,461 @@
+{
+  "format": 1,
+  "game": "ouendan2",
+  "source": "events",
+  "console": "nds",
+  "versions": ">=1.3.0",
+  "achievements": [
+    {
+      "id": 1,
+      "title": "Zenryoku Shounen",
+      "description": "Clear Zenryoku Shounen (Sukima Switch) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os01"
+    },
+    {
+      "id": 2,
+      "title": "Real Life Real Heart",
+      "description": "Clear Real Life Real Heart (Kaela Kimura) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os02"
+    },
+    {
+      "id": 3,
+      "title": "Okuru Kotoba",
+      "description": "Clear Okuru Kotoba (FLOW) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os04"
+    },
+    {
+      "id": 4,
+      "title": "Pop Star",
+      "description": "Clear Pop Star (Ken Hirai) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os06"
+    },
+    {
+      "id": 5,
+      "title": "Go My Way",
+      "description": "Clear Go My Way (Hitomi Yaida) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os08"
+    },
+    {
+      "id": 6,
+      "title": "Julia ni Heartbreak",
+      "description": "Clear Julia ni Heartbreak (The Checkers) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os10"
+    },
+    {
+      "id": 7,
+      "title": "Going Under Ground",
+      "description": "Clear Going Under Ground (VISTA) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_osb02"
+    },
+    {
+      "id": 8,
+      "title": "Shounen Heart",
+      "description": "Clear Shounen Heart (Home Made Kazoku) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os11"
+    },
+    {
+      "id": 9,
+      "title": "Kibun Joujou",
+      "description": "Clear Kibun Joujou (mihimaru GT) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os03"
+    },
+    {
+      "id": 10,
+      "title": "Bambina",
+      "description": "Clear Bambina (Tomoyasu Hotei) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os07"
+    },
+    {
+      "id": 11,
+      "title": "Bang! Bang! Vacances!",
+      "description": "Clear Bang! Bang! Vacances! (SMAP) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os14"
+    },
+    {
+      "id": 12,
+      "title": "Believe",
+      "description": "Clear Believe (AI) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os12"
+    },
+    {
+      "id": 13,
+      "title": "Zoku",
+      "description": "Clear Zoku (Kishidan) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os13"
+    },
+    {
+      "id": 14,
+      "title": "Music Hour",
+      "description": "Clear Music Hour (Porno Graffitti) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os05"
+    },
+    {
+      "id": 15,
+      "title": "Countdown",
+      "description": "Clear Countdown (HYDE) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os15a"
+    },
+    {
+      "id": 16,
+      "title": "Sekai wa Sore o Ai to Yobundaze",
+      "description": "Clear Sekai wa Sore o Ai to Yobundaze (Sambomaster) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os15b"
+    },
+    {
+      "id": 101,
+      "title": "Hajime, Round Two",
+      "description": "Open new songs on the map on Kigaru (wave 1 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_1"
+    },
+    {
+      "id": 102,
+      "title": "Enter Shinta",
+      "description": "Open new songs on the map on Kigaru (wave 2 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_2"
+    },
+    {
+      "id": 103,
+      "title": "Rookie Rivalry",
+      "description": "Open new songs on the map on Kigaru (wave 3 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_3"
+    },
+    {
+      "id": 104,
+      "title": "Seeing Red",
+      "description": "Open new songs on the map on Kigaru (wave 4 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_4"
+    },
+    {
+      "id": 105,
+      "title": "Feeling Blue",
+      "description": "Open new songs on the map on Kigaru (wave 5 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_5"
+    },
+    {
+      "id": 106,
+      "title": "The Countdown Begins",
+      "description": "Open new songs on the map on Kigaru (wave 6 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_6"
+    },
+    {
+      "id": 111,
+      "title": "Ryuta Returns",
+      "description": "Open new songs on the map on Kakan (wave 1 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_1"
+    },
+    {
+      "id": 112,
+      "title": "Hayato Takes the Lead",
+      "description": "Open new songs on the map on Kakan (wave 2 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_2"
+    },
+    {
+      "id": 113,
+      "title": "Red vs. Blue",
+      "description": "Open new songs on the map on Kakan (wave 3 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_3"
+    },
+    {
+      "id": 114,
+      "title": "Hot Blood, Cool Heads",
+      "description": "Open new songs on the map on Kakan (wave 4 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_4"
+    },
+    {
+      "id": 115,
+      "title": "Two Flags, One Sky",
+      "description": "Open new songs on the map on Kakan (wave 5 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_5"
+    },
+    {
+      "id": 116,
+      "title": "T-Minus Cheer",
+      "description": "Open new songs on the map on Kakan (wave 6 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_6"
+    },
+    {
+      "id": 121,
+      "title": "Kai Meets Kaoru",
+      "description": "Open new songs on the map on Gekiretsu (wave 1 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_1"
+    },
+    {
+      "id": 122,
+      "title": "Battle of the Presidents",
+      "description": "Open new songs on the map on Gekiretsu (wave 2 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_2"
+    },
+    {
+      "id": 123,
+      "title": "Clash of Squads",
+      "description": "Open new songs on the map on Gekiretsu (wave 3 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_3"
+    },
+    {
+      "id": 124,
+      "title": "Blue Blazes",
+      "description": "Open new songs on the map on Gekiretsu (wave 4 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_4"
+    },
+    {
+      "id": 125,
+      "title": "Red Inferno",
+      "description": "Open new songs on the map on Gekiretsu (wave 5 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_5"
+    },
+    {
+      "id": 126,
+      "title": "Showdown Approaching",
+      "description": "Open new songs on the map on Gekiretsu (wave 6 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_6"
+    },
+    {
+      "id": 131,
+      "title": "Girls vs. Maidens",
+      "description": "Open new songs on the map on Karei (wave 1 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_1"
+    },
+    {
+      "id": 132,
+      "title": "Rin's Resolve",
+      "description": "Open new songs on the map on Karei (wave 2 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_2"
+    },
+    {
+      "id": 133,
+      "title": "Honoka's Harmony",
+      "description": "Open new songs on the map on Karei (wave 3 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_3"
+    },
+    {
+      "id": 134,
+      "title": "Reika's Rally",
+      "description": "Open new songs on the map on Karei (wave 4 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_4"
+    },
+    {
+      "id": 135,
+      "title": "Sayaka Answers Back",
+      "description": "Open new songs on the map on Karei (wave 5 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_5"
+    },
+    {
+      "id": 136,
+      "title": "Grace Under Pressure",
+      "description": "Open new songs on the map on Karei (wave 6 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_6"
+    },
+    {
+      "id": 201,
+      "title": "The World Calls It Love",
+      "description": "Clear Sekai wa Sore o Ai to Yobundaze on Kigaru with Hajime and Shinta and roll the credits.",
+      "points": 25,
+      "type": "win",
+      "event": "oe2_credits_e"
+    },
+    {
+      "id": 202,
+      "title": "Kai and Kaoru, You're Up!",
+      "description": "Clear Sekai wa Sore o Ai to Yobundaze on Kakan with Ryuta and Hayato and roll the credits, unlocking Gekiretsu, led by Kai and Kaoru.",
+      "points": 25,
+      "type": "win",
+      "event": "oe2_credits_n"
+    },
+    {
+      "id": 203,
+      "title": "Enter the Cheer Squads",
+      "description": "Clear Sekai wa Sore o Ai to Yobundaze on Gekiretsu with Kai and Kaoru and roll the credits, unlocking Karei, led by the Cheer Girls (Sayaka, Aoi and Anna) and the Cheer Maidens (Rin, Honoka and Reika).",
+      "points": 50,
+      "type": "win",
+      "event": "oe2_credits_h"
+    },
+    {
+      "id": 204,
+      "title": "Here Comes the Sun (Again)",
+      "description": "Clear Sekai wa Sore o Ai to Yobundaze on Karei with the Cheer Girls and the Cheer Maidens and roll the credits.",
+      "points": 50,
+      "type": "win",
+      "event": "oe2_credits_x"
+    },
+    {
+      "id": 301,
+      "title": "Rookie Cheerer",
+      "description": "Reach overall rank 1 of 12: 400,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "oe2_rank_1"
+    },
+    {
+      "id": 302,
+      "title": "Red or Blue?",
+      "description": "Reach overall rank 2 of 12: 1,500,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "oe2_rank_2"
+    },
+    {
+      "id": 303,
+      "title": "Flag Bearer",
+      "description": "Reach overall rank 3 of 12: 3,000,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "oe2_rank_3"
+    },
+    {
+      "id": 304,
+      "title": "Taiko Thunder",
+      "description": "Reach overall rank 4 of 12: 6,000,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "oe2_rank_4"
+    },
+    {
+      "id": 305,
+      "title": "Megaphone Maestro",
+      "description": "Reach overall rank 5 of 12: 10,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_5"
+    },
+    {
+      "id": 306,
+      "title": "Encouraging Nobility",
+      "description": "Reach overall rank 6 of 12: 15,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_6"
+    },
+    {
+      "id": 307,
+      "title": "Vice Captain",
+      "description": "Reach overall rank 7 of 12: 20,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_7"
+    },
+    {
+      "id": 308,
+      "title": "Squad Captain",
+      "description": "Reach overall rank 8 of 12: 25,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_8"
+    },
+    {
+      "id": 309,
+      "title": "Respected by Rivals",
+      "description": "Reach overall rank 9 of 12: 35,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_9"
+    },
+    {
+      "id": 310,
+      "title": "Pride of Both Squads",
+      "description": "Reach overall rank 10 of 12: 50,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_10"
+    },
+    {
+      "id": 311,
+      "title": "Living Legend",
+      "description": "Reach overall rank 11 of 12: 70,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_11"
+    },
+    {
+      "id": 312,
+      "title": "Heart of the Ouendan",
+      "description": "Reach overall rank 12 of 12, the top rank: 100,000,000 points of best scores, every song and difficulty added up.",
+      "points": 50,
+      "event": "oe2_rank_12"
+    },
+    {
+      "id": 401,
+      "title": "Magic Monkey My Hero",
+      "description": "Unlock the bonus song Monkey Magic (Orange Range).",
+      "points": 25,
+      "event": "oe2_bonus_osb03"
+    },
+    {
+      "id": 402,
+      "title": "...As It Speeds You From My Life",
+      "description": "Unlock the bonus song Glamorous Sky (NANA starring Mika Nakashima).",
+      "points": 25,
+      "event": "oe2_bonus_osb01"
+    },
+    {
+      "id": 403,
+      "title": "He Didn't Ghost You",
+      "description": "Unlock the bonus song Samurai Blue (ZZ).",
+      "points": 25,
+      "event": "oe2_bonus_os09"
+    },
+    {
+      "id": 501,
+      "title": "Stamp of Approval",
+      "description": "Get your first S rank.",
+      "points": 10,
+      "event": "oe2_s_1"
+    },
+    {
+      "id": 502,
+      "title": "Senpai Is Impressed",
+      "description": "Get S ranks on 5 songs (each song on each difficulty counts once).",
+      "points": 25,
+      "event": "oe2_s_5"
+    },
+    {
+      "id": 503,
+      "title": "Synchronized Shouting",
+      "description": "Get S ranks on 10 songs (each song on each difficulty counts once).",
+      "points": 25,
+      "event": "oe2_s_10"
+    },
+    {
+      "id": 504,
+      "title": "Sweat, Spirit and S Ranks",
+      "description": "Get S ranks on 20 songs (each song on each difficulty counts once).",
+      "points": 50,
+      "event": "oe2_s_20"
+    },
+    {
+      "id": 505,
+      "title": "Undying Fighting Spirit",
+      "description": "Get an S rank on every song on every difficulty, bonus songs included (76).",
+      "points": 50,
+      "event": "oe2_s_all"
+    }
+  ]
+}

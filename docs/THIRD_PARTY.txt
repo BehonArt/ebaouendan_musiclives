@@ -19,6 +19,13 @@ Dear ImGui (built in), MIT
 rcheevos (built in: the dump check), MIT
     https://github.com/RetroAchievements/rcheevos  licenses/rcheevos.txt
 
+Recomp Achievements SDK (built into the games: RecompLauncher's achievements),
+Recomp Achievements License 1.0 (free for any game)
+    https://github.com/elripalda/RecompAchievements  licenses/recomp-achievements.txt
+
+cJSON (built in, with the Recomp Achievements SDK), MIT
+    https://github.com/DaveGamble/cJSON            licenses/cJSON.txt
+
 pywebview and pythonnet (Customs Studio's window, tester kit only), BSD 3-Clause and MIT
     https://github.com/r0x0r/pywebview  https://github.com/pythonnet/pythonnet
 
