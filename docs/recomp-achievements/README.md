@@ -104,5 +104,9 @@ met match the saves' clears, S ranks, tiers (the game's own tier byte) and rank.
   or newer), each with its own id, saves and achievements; the launcher already starts a game
   directly with `--play EBA|OE1|OE2`:
   `"games": [{"id": "elitebeatagents", "name": "Elite Beat Agents", "args": ["--play", "EBA"]}, ...]`
-- **The console:** the lists say `"console": "nds"`, which is not in the spec's list yet.
+- **The hub has one list for the release** (`ebaouendan-musiclives`): `ebaouendan-musiclives.json`
+  is the three in one (ids 1000 EBA, 2000 Ouendan, 3000 Ouendan 2 on, each description starting
+  with its game), saved and live for testers on 2026-11-22. The per-game lists are for three tiles.
+- **The console:** the hub only takes the spec's consoles and none is the DS: the lists say
+  `"console": "gba"` as a stand-in (events lists don't use it) until RecompLauncher adds `nds`.
 - **Versions:** the lists say `>=1.3.0`, the release that brings the events.

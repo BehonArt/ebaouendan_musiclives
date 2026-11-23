@@ -18,8 +18,13 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "recomp-achievements")
 VERSIONS = ">=1.3.0"        # the recomp versions the events were checked on (the release that brings them)
-CONSOLE = "nds"             # not in SPEC.md's console list yet: ask RecompLauncher (events lists may not need it)
+CONSOLE = "gba"             # a stand-in: the hub only takes SPEC.md's consoles, no "nds" yet (events lists don't use it)
 TIERS = 6                   # the map's "New songs" waves before the finale (the port fires 1..7)
+# RecompLauncher lists the release under one id for now: the three lists in one, the ids 1000, 2000
+# and 3000 on, each description starting with its game (the hub's list today; the three per-game
+# lists are for when each game has its own tile)
+COMBINED = "ebaouendan-musiclives"
+COMBINED_ORDER = [("elitebeatagents", 1000, "EBA"), ("ouendan1", 2000, "Ouendan"), ("ouendan2", 3000, "Ouendan 2")]
 
 GAMES = {
     "elitebeatagents": {
@@ -218,7 +223,8 @@ def make(gid, g):
             "%s_bonus_%s" % (P, stem.lower()))
     total = (len(g["songs"]) + len(g["bonus"])) * 4
     for j, (cnt, title) in enumerate(zip(["1", "5", "10", "20", "all"], g["s"])):
-        desc = ("Get an S rank on every song on every difficulty, bonus songs included (%d)." % total if cnt == "all"
+        desc = ("Get an S rank on every song on every difficulty%s (%d)." % (
+                    ", bonus songs included" if g["bonus"] else "", total) if cnt == "all"
                 else "Get your first S rank." if cnt == "1"
                 else "Get S ranks on %s songs (each song on each difficulty counts once)." % cnt)
         add(501 + j, title, desc, pts["s"][j], "%s_s_%s" % (P, cnt))
@@ -258,6 +264,19 @@ def main():
         print("%s: %d achievements, %d points" % (gid, len(a), pts))
     with open(os.path.join(OUT, "LISTS.md"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(md))
+    allof = []
+    for gid, base, short in COMBINED_ORDER:
+        for x in make(gid, GAMES[gid])["achievements"]:
+            allof.append(dict(x, id=base + x["id"], description=short + ": " + x["description"]))
+    ids = [x["id"] for x in allof]
+    if len(set(ids)) != len(ids) or len({x["event"] for x in allof}) != len(allof):
+        print("the combined list repeats an id or an event")
+        ok = False
+    with open(os.path.join(OUT, COMBINED + ".json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"format": 1, "game": COMBINED, "source": "events", "console": CONSOLE, "versions": VERSIONS,
+                   "achievements": allof}, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print("%s (combined): %d achievements, %d points" % (COMBINED, len(allof), sum(x["points"] for x in allof)))
     return 0 if ok else 1
 
 

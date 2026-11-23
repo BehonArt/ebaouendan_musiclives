@@ -1,0 +1,1323 @@
+{
+  "format": 1,
+  "game": "ebaouendan-musiclives",
+  "source": "events",
+  "console": "gba",
+  "versions": ">=1.3.0",
+  "achievements": [
+    {
+      "id": 1001,
+      "title": "Walkie Talkie Man",
+      "description": "EBA: Clear Walkie Talkie Man (Steriogram) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss01"
+    },
+    {
+      "id": 1002,
+      "title": "Makes No Difference",
+      "description": "EBA: Clear Makes No Difference (Sum 41) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss02"
+    },
+    {
+      "id": 1003,
+      "title": "Sk8er Boi",
+      "description": "EBA: Clear Sk8er Boi (Avril Lavigne) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss06"
+    },
+    {
+      "id": 1004,
+      "title": "I Was Born to Love You",
+      "description": "EBA: Clear I Was Born to Love You (Freddie Mercury) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss04"
+    },
+    {
+      "id": 1005,
+      "title": "Rock This Town",
+      "description": "EBA: Clear Rock This Town (Stray Cats) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss05"
+    },
+    {
+      "id": 1006,
+      "title": "Highway Star",
+      "description": "EBA: Clear Highway Star (Deep Purple) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss09"
+    },
+    {
+      "id": 1007,
+      "title": "YMCA",
+      "description": "EBA: Clear YMCA (Village People) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss10"
+    },
+    {
+      "id": 1008,
+      "title": "September",
+      "description": "EBA: Clear September (Earth, Wind & Fire) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss03"
+    },
+    {
+      "id": 1009,
+      "title": "Canned Heat",
+      "description": "EBA: Clear Canned Heat (Jamiroquai) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss08"
+    },
+    {
+      "id": 1010,
+      "title": "Material Girl",
+      "description": "EBA: Clear Material Girl (Madonna) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss11"
+    },
+    {
+      "id": 1011,
+      "title": "La La",
+      "description": "EBA: Clear La La (Ashlee Simpson) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss13"
+    },
+    {
+      "id": 1012,
+      "title": "You're the Inspiration",
+      "description": "EBA: Clear You're the Inspiration (Chicago) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss12"
+    },
+    {
+      "id": 1013,
+      "title": "Let's Dance",
+      "description": "EBA: Clear Let's Dance (David Bowie) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ssb03"
+    },
+    {
+      "id": 1014,
+      "title": "The Anthem",
+      "description": "EBA: Clear The Anthem (Good Charlotte) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss07"
+    },
+    {
+      "id": 1015,
+      "title": "Without a Fight",
+      "description": "EBA: Clear Without a Fight (Hoobastank) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss15a"
+    },
+    {
+      "id": 1016,
+      "title": "Jumpin' Jack Flash",
+      "description": "EBA: Clear Jumpin' Jack Flash (The Rolling Stones) on any difficulty.",
+      "points": 5,
+      "event": "eba_clear_ss15b"
+    },
+    {
+      "id": 1101,
+      "title": "Fresh Recruit",
+      "description": "EBA: Open new songs on the map on Breezin' (wave 1 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_1"
+    },
+    {
+      "id": 1102,
+      "title": "Light Breeze",
+      "description": "EBA: Open new songs on the map on Breezin' (wave 2 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_2"
+    },
+    {
+      "id": 1103,
+      "title": "Spin Cycle",
+      "description": "EBA: Open new songs on the map on Breezin' (wave 3 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_3"
+    },
+    {
+      "id": 1104,
+      "title": "Tailwind",
+      "description": "EBA: Open new songs on the map on Breezin' (wave 4 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_4"
+    },
+    {
+      "id": 1105,
+      "title": "Gale Force",
+      "description": "EBA: Open new songs on the map on Breezin' (wave 5 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_5"
+    },
+    {
+      "id": 1106,
+      "title": "Eye of the Storm",
+      "description": "EBA: Open new songs on the map on Breezin' (wave 6 of 6).",
+      "points": 5,
+      "event": "eba_tier_e_6"
+    },
+    {
+      "id": 1111,
+      "title": "Cruise Control",
+      "description": "EBA: Open new songs on the map on Cruisin' (wave 1 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_1"
+    },
+    {
+      "id": 1112,
+      "title": "Agent J on the Case",
+      "description": "EBA: Open new songs on the map on Cruisin' (wave 2 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_2"
+    },
+    {
+      "id": 1113,
+      "title": "Open Road",
+      "description": "EBA: Open new songs on the map on Cruisin' (wave 3 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_3"
+    },
+    {
+      "id": 1114,
+      "title": "Need for Speed",
+      "description": "EBA: Open new songs on the map on Cruisin' (wave 4 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_4"
+    },
+    {
+      "id": 1115,
+      "title": "Overdrive",
+      "description": "EBA: Open new songs on the map on Cruisin' (wave 5 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_5"
+    },
+    {
+      "id": 1116,
+      "title": "Final Approach",
+      "description": "EBA: Open new songs on the map on Cruisin' (wave 6 of 6).",
+      "points": 5,
+      "event": "eba_tier_n_6"
+    },
+    {
+      "id": 1121,
+      "title": "Breaking a Sweat",
+      "description": "EBA: Open new songs on the map on Sweatin' (wave 1 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_1"
+    },
+    {
+      "id": 1122,
+      "title": "Chieftain's Orders",
+      "description": "EBA: Open new songs on the map on Sweatin' (wave 2 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_2"
+    },
+    {
+      "id": 1123,
+      "title": "Turning Up the Heat",
+      "description": "EBA: Open new songs on the map on Sweatin' (wave 3 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_3"
+    },
+    {
+      "id": 1124,
+      "title": "Hot Streak",
+      "description": "EBA: Open new songs on the map on Sweatin' (wave 4 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_4"
+    },
+    {
+      "id": 1125,
+      "title": "Feel the Burn",
+      "description": "EBA: Open new songs on the map on Sweatin' (wave 5 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_5"
+    },
+    {
+      "id": 1126,
+      "title": "Boiling Point",
+      "description": "EBA: Open new songs on the map on Sweatin' (wave 6 of 6).",
+      "points": 10,
+      "event": "eba_tier_h_6"
+    },
+    {
+      "id": 1131,
+      "title": "Enter the Divas",
+      "description": "EBA: Open new songs on the map on Hard Rock (wave 1 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_1"
+    },
+    {
+      "id": 1132,
+      "title": "Starr Power",
+      "description": "EBA: Open new songs on the map on Hard Rock (wave 2 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_2"
+    },
+    {
+      "id": 1133,
+      "title": "Foxx Trot",
+      "description": "EBA: Open new songs on the map on Hard Rock (wave 3 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_3"
+    },
+    {
+      "id": 1134,
+      "title": "Missy Impossible",
+      "description": "EBA: Open new songs on the map on Hard Rock (wave 4 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_4"
+    },
+    {
+      "id": 1135,
+      "title": "Rock Steady",
+      "description": "EBA: Open new songs on the map on Hard Rock (wave 5 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_5"
+    },
+    {
+      "id": 1136,
+      "title": "Showstoppers",
+      "description": "EBA: Open new songs on the map on Hard Rock (wave 6 of 6).",
+      "points": 25,
+      "event": "eba_tier_x_6"
+    },
+    {
+      "id": 1201,
+      "title": "Gone with the Wind",
+      "description": "EBA: Clear Jumpin' Jack Flash on Breezin' with Agent Spin and roll the credits.",
+      "points": 25,
+      "type": "win",
+      "event": "eba_credits_e"
+    },
+    {
+      "id": 1202,
+      "title": "Calling Agent Chieftain",
+      "description": "EBA: Clear Jumpin' Jack Flash on Cruisin' with Agent J and roll the credits, unlocking Sweatin', led by Agent Chieftain.",
+      "points": 50,
+      "type": "win",
+      "event": "eba_credits_n"
+    },
+    {
+      "id": 1203,
+      "title": "Cue the Divas",
+      "description": "EBA: Clear Jumpin' Jack Flash on Sweatin' with Agent Chieftain and roll the credits, unlocking Hard Rock, led by the Elite Beat Divas: Starr, Missy and Foxx.",
+      "points": 50,
+      "type": "win",
+      "event": "eba_credits_h"
+    },
+    {
+      "id": 1204,
+      "title": "Commander Kahn Approves",
+      "description": "EBA: Clear Jumpin' Jack Flash on Hard Rock with the Elite Beat Divas and roll the credits.",
+      "points": 50,
+      "type": "win",
+      "event": "eba_credits_x"
+    },
+    {
+      "id": 1301,
+      "title": "Trainee",
+      "description": "EBA: Reach overall rank 1 of 11: 400,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "eba_rank_1"
+    },
+    {
+      "id": 1302,
+      "title": "Field Agent",
+      "description": "EBA: Reach overall rank 2 of 11: 1,500,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "eba_rank_2"
+    },
+    {
+      "id": 1303,
+      "title": "Special Agent",
+      "description": "EBA: Reach overall rank 3 of 11: 3,000,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "eba_rank_3"
+    },
+    {
+      "id": 1304,
+      "title": "Secret Agent Man",
+      "description": "EBA: Reach overall rank 4 of 11: 6,000,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "eba_rank_4"
+    },
+    {
+      "id": 1305,
+      "title": "Licensed to Thrill",
+      "description": "EBA: Reach overall rank 5 of 11: 10,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_5"
+    },
+    {
+      "id": 1306,
+      "title": "Undercover Groove",
+      "description": "EBA: Reach overall rank 6 of 11: 15,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_6"
+    },
+    {
+      "id": 1307,
+      "title": "Classified",
+      "description": "EBA: Reach overall rank 7 of 11: 20,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_7"
+    },
+    {
+      "id": 1308,
+      "title": "Top Secret",
+      "description": "EBA: Reach overall rank 8 of 11: 25,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_8"
+    },
+    {
+      "id": 1309,
+      "title": "Rhombulan Repeller",
+      "description": "EBA: Reach overall rank 9 of 11: 35,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_9"
+    },
+    {
+      "id": 1310,
+      "title": "Kahn's Right Hand",
+      "description": "EBA: Reach overall rank 10 of 11: 50,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "eba_rank_10"
+    },
+    {
+      "id": 1311,
+      "title": "Truly Elite",
+      "description": "EBA: Reach overall rank 11 of 11, the top rank: 80,000,000 points of best scores, every song and difficulty added up.",
+      "points": 50,
+      "event": "eba_rank_11"
+    },
+    {
+      "id": 1401,
+      "title": "Auto-Tuned In",
+      "description": "EBA: Unlock the bonus song Believe (Cher).",
+      "points": 25,
+      "event": "eba_bonus_ssb02"
+    },
+    {
+      "id": 1402,
+      "title": "Learn Your ABCs",
+      "description": "EBA: Unlock the bonus song ABC (The Jackson 5).",
+      "points": 25,
+      "event": "eba_bonus_ssb01"
+    },
+    {
+      "id": 1403,
+      "title": "Last Agent Standing",
+      "description": "EBA: Unlock the bonus song Survivor (Destiny's Child).",
+      "points": 25,
+      "event": "eba_bonus_ss14"
+    },
+    {
+      "id": 1501,
+      "title": "Sharp-Dressed Agent",
+      "description": "EBA: Get your first S rank.",
+      "points": 10,
+      "event": "eba_s_1"
+    },
+    {
+      "id": 1502,
+      "title": "Smooth Operator",
+      "description": "EBA: Get S ranks on 5 songs (each song on each difficulty counts once).",
+      "points": 25,
+      "event": "eba_s_5"
+    },
+    {
+      "id": 1503,
+      "title": "Sunglasses at Night",
+      "description": "EBA: Get S ranks on 10 songs (each song on each difficulty counts once).",
+      "points": 25,
+      "event": "eba_s_10"
+    },
+    {
+      "id": 1504,
+      "title": "S-Class Agent",
+      "description": "EBA: Get S ranks on 20 songs (each song on each difficulty counts once).",
+      "points": 50,
+      "event": "eba_s_20"
+    },
+    {
+      "id": 1505,
+      "title": "Elite of the Elite",
+      "description": "EBA: Get an S rank on every song on every difficulty, bonus songs included (76).",
+      "points": 50,
+      "event": "eba_s_all"
+    },
+    {
+      "id": 2001,
+      "title": "Loop & Loop",
+      "description": "Ouendan: Clear Loop & Loop (Asian Kung-Fu Generation) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s01"
+    },
+    {
+      "id": 2002,
+      "title": "Koi no Dance Site",
+      "description": "Ouendan: Clear Koi no Dance Site (Morning Musume) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s02"
+    },
+    {
+      "id": 2003,
+      "title": "Guts Da Ze!!",
+      "description": "Ouendan: Clear Guts Da Ze!! (Ulfuls) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s03"
+    },
+    {
+      "id": 2004,
+      "title": "Melody",
+      "description": "Ouendan: Clear Melody (175R) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s04"
+    },
+    {
+      "id": 2005,
+      "title": "Linda Linda",
+      "description": "Ouendan: Clear Linda Linda (The Blue Hearts) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s05"
+    },
+    {
+      "id": 2006,
+      "title": "Kokoro Odoru",
+      "description": "Ouendan: Clear Kokoro Odoru (nobodyknows+) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s06"
+    },
+    {
+      "id": 2007,
+      "title": "Atsuki Kodou no Hate",
+      "description": "Ouendan: Clear Atsuki Kodou no Hate (B'z) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s07"
+    },
+    {
+      "id": 2008,
+      "title": "Thrill",
+      "description": "Ouendan: Clear Thrill (Tomoyasu Hotei) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s08"
+    },
+    {
+      "id": 2009,
+      "title": "Taisetsu na Mono",
+      "description": "Ouendan: Clear Taisetsu na Mono (Road of Major) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s09"
+    },
+    {
+      "id": 2010,
+      "title": "Neraiuchi",
+      "description": "Ouendan: Clear Neraiuchi (Linda Yamamoto) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s10"
+    },
+    {
+      "id": 2011,
+      "title": "One Night Carnival",
+      "description": "Ouendan: Clear One Night Carnival (Kishidan) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s11"
+    },
+    {
+      "id": 2012,
+      "title": "Over the Distance",
+      "description": "Ouendan: Clear Over the Distance (Hitomi Yaida) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s12"
+    },
+    {
+      "id": 2013,
+      "title": "Taiyou ga Moeteiru",
+      "description": "Ouendan: Clear Taiyou ga Moeteiru (The Yellow Monkey) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s13"
+    },
+    {
+      "id": 2014,
+      "title": "Shanghai Honey",
+      "description": "Ouendan: Clear Shanghai Honey (Orange Range) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s14"
+    },
+    {
+      "id": 2015,
+      "title": "Ready Steady Go",
+      "description": "Ouendan: Clear Ready Steady Go (L'Arc-en-Ciel) on any difficulty.",
+      "points": 10,
+      "event": "oe1_clear_s15"
+    },
+    {
+      "id": 2101,
+      "title": "Hajime!",
+      "description": "Ouendan: Open new songs on the map on Kigaru (wave 1 of 6).",
+      "points": 5,
+      "event": "oe1_tier_e_1"
+    },
+    {
+      "id": 2102,
+      "title": "Osu, Senpai!",
+      "description": "Ouendan: Open new songs on the map on Kigaru (wave 2 of 6).",
+      "points": 5,
+      "event": "oe1_tier_e_2"
+    },
+    {
+      "id": 2103,
+      "title": "Raise the Flag",
+      "description": "Ouendan: Open new songs on the map on Kigaru (wave 3 of 6).",
+      "points": 5,
+      "event": "oe1_tier_e_3"
+    },
+    {
+      "id": 2104,
+      "title": "Hot-Blooded Rookie",
+      "description": "Ouendan: Open new songs on the map on Kigaru (wave 4 of 6).",
+      "points": 5,
+      "event": "oe1_tier_e_4"
+    },
+    {
+      "id": 2105,
+      "title": "Nekketsu Rising",
+      "description": "Ouendan: Open new songs on the map on Kigaru (wave 5 of 6).",
+      "points": 5,
+      "event": "oe1_tier_e_5"
+    },
+    {
+      "id": 2106,
+      "title": "Lungs of Steel",
+      "description": "Ouendan: Open new songs on the map on Kigaru (wave 6 of 6).",
+      "points": 5,
+      "event": "oe1_tier_e_6"
+    },
+    {
+      "id": 2111,
+      "title": "Ryuta Takes Charge",
+      "description": "Ouendan: Open new songs on the map on Kakan (wave 1 of 6).",
+      "points": 5,
+      "event": "oe1_tier_n_1"
+    },
+    {
+      "id": 2112,
+      "title": "Bold Cheers",
+      "description": "Ouendan: Open new songs on the map on Kakan (wave 2 of 6).",
+      "points": 5,
+      "event": "oe1_tier_n_2"
+    },
+    {
+      "id": 2113,
+      "title": "Fists to the Sky",
+      "description": "Ouendan: Open new songs on the map on Kakan (wave 3 of 6).",
+      "points": 5,
+      "event": "oe1_tier_n_3"
+    },
+    {
+      "id": 2114,
+      "title": "Tireless Cheering",
+      "description": "Ouendan: Open new songs on the map on Kakan (wave 4 of 6).",
+      "points": 5,
+      "event": "oe1_tier_n_4"
+    },
+    {
+      "id": 2115,
+      "title": "Burning Spirit",
+      "description": "Ouendan: Open new songs on the map on Kakan (wave 5 of 6).",
+      "points": 5,
+      "event": "oe1_tier_n_5"
+    },
+    {
+      "id": 2116,
+      "title": "Eyes on the Sky",
+      "description": "Ouendan: Open new songs on the map on Kakan (wave 6 of 6).",
+      "points": 5,
+      "event": "oe1_tier_n_6"
+    },
+    {
+      "id": 2121,
+      "title": "The President Steps In",
+      "description": "Ouendan: Open new songs on the map on Gekiretsu (wave 1 of 6).",
+      "points": 10,
+      "event": "oe1_tier_h_1"
+    },
+    {
+      "id": 2122,
+      "title": "Fierce Fervor",
+      "description": "Ouendan: Open new songs on the map on Gekiretsu (wave 2 of 6).",
+      "points": 10,
+      "event": "oe1_tier_h_2"
+    },
+    {
+      "id": 2123,
+      "title": "No Holding Back",
+      "description": "Ouendan: Open new songs on the map on Gekiretsu (wave 3 of 6).",
+      "points": 10,
+      "event": "oe1_tier_h_3"
+    },
+    {
+      "id": 2124,
+      "title": "Thunderous Applause",
+      "description": "Ouendan: Open new songs on the map on Gekiretsu (wave 4 of 6).",
+      "points": 10,
+      "event": "oe1_tier_h_4"
+    },
+    {
+      "id": 2125,
+      "title": "Unbreakable",
+      "description": "Ouendan: Open new songs on the map on Gekiretsu (wave 5 of 6).",
+      "points": 10,
+      "event": "oe1_tier_h_5"
+    },
+    {
+      "id": 2126,
+      "title": "Brace for Impact",
+      "description": "Ouendan: Open new songs on the map on Gekiretsu (wave 6 of 6).",
+      "points": 10,
+      "event": "oe1_tier_h_6"
+    },
+    {
+      "id": 2131,
+      "title": "Enter the Cheer Girls",
+      "description": "Ouendan: Open new songs on the map on Karei (wave 1 of 6).",
+      "points": 25,
+      "event": "oe1_tier_x_1"
+    },
+    {
+      "id": 2132,
+      "title": "Sayaka Sets the Pace",
+      "description": "Ouendan: Open new songs on the map on Karei (wave 2 of 6).",
+      "points": 25,
+      "event": "oe1_tier_x_2"
+    },
+    {
+      "id": 2133,
+      "title": "Aoi Keeps Time",
+      "description": "Ouendan: Open new songs on the map on Karei (wave 3 of 6).",
+      "points": 25,
+      "event": "oe1_tier_x_3"
+    },
+    {
+      "id": 2134,
+      "title": "Anna-ther Level",
+      "description": "Ouendan: Open new songs on the map on Karei (wave 4 of 6).",
+      "points": 25,
+      "event": "oe1_tier_x_4"
+    },
+    {
+      "id": 2135,
+      "title": "Pom-Poms of Fury",
+      "description": "Ouendan: Open new songs on the map on Karei (wave 5 of 6).",
+      "points": 25,
+      "event": "oe1_tier_x_5"
+    },
+    {
+      "id": 2136,
+      "title": "Graceful Under Fire",
+      "description": "Ouendan: Open new songs on the map on Karei (wave 6 of 6).",
+      "points": 25,
+      "event": "oe1_tier_x_6"
+    },
+    {
+      "id": 2201,
+      "title": "Ready, Steady, Cheer!",
+      "description": "Ouendan: Clear Ready Steady Go on Kigaru with Hajime and roll the credits.",
+      "points": 25,
+      "type": "win",
+      "event": "oe1_credits_e"
+    },
+    {
+      "id": 2202,
+      "title": "Kai, You're Up!",
+      "description": "Ouendan: Clear Ready Steady Go on Kakan with Ryuta and roll the credits, unlocking Gekiretsu, led by Kai.",
+      "points": 25,
+      "type": "win",
+      "event": "oe1_credits_n"
+    },
+    {
+      "id": 2203,
+      "title": "Bring On the Cheer Girls",
+      "description": "Ouendan: Clear Ready Steady Go on Gekiretsu with Kai and roll the credits, unlocking Karei, led by the Cheer Girls: Sayaka, Aoi and Anna.",
+      "points": 50,
+      "type": "win",
+      "event": "oe1_credits_h"
+    },
+    {
+      "id": 2204,
+      "title": "The Comet Never Stood a Chance",
+      "description": "Ouendan: Clear Ready Steady Go on Karei with the Cheer Girls and roll the credits.",
+      "points": 50,
+      "type": "win",
+      "event": "oe1_credits_x"
+    },
+    {
+      "id": 2301,
+      "title": "Osu!",
+      "description": "Ouendan: Reach overall rank 1 of 11: 400,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "oe1_rank_1"
+    },
+    {
+      "id": 2302,
+      "title": "Fresh Gakuran",
+      "description": "Ouendan: Reach overall rank 2 of 11: 1,200,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe1_rank_2"
+    },
+    {
+      "id": 2303,
+      "title": "Flag Bearer",
+      "description": "Ouendan: Reach overall rank 3 of 11: 2,500,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe1_rank_3"
+    },
+    {
+      "id": 2304,
+      "title": "Taiko Pounder",
+      "description": "Ouendan: Reach overall rank 4 of 11: 5,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe1_rank_4"
+    },
+    {
+      "id": 2305,
+      "title": "Megaphone Wielder",
+      "description": "Ouendan: Reach overall rank 5 of 11: 8,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe1_rank_5"
+    },
+    {
+      "id": 2306,
+      "title": "Hot-Blooded",
+      "description": "Ouendan: Reach overall rank 6 of 11: 12,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe1_rank_6"
+    },
+    {
+      "id": 2307,
+      "title": "Vice Captain",
+      "description": "Ouendan: Reach overall rank 7 of 11: 17,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe1_rank_7"
+    },
+    {
+      "id": 2308,
+      "title": "Squad Captain",
+      "description": "Ouendan: Reach overall rank 8 of 11: 25,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe1_rank_8"
+    },
+    {
+      "id": 2309,
+      "title": "Pride of Yuuhi Town",
+      "description": "Ouendan: Reach overall rank 9 of 11: 35,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe1_rank_9"
+    },
+    {
+      "id": 2310,
+      "title": "Cheers Heard Round the World",
+      "description": "Ouendan: Reach overall rank 10 of 11: 45,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe1_rank_10"
+    },
+    {
+      "id": 2311,
+      "title": "Ouendan Supreme",
+      "description": "Ouendan: Reach overall rank 11 of 11, the top rank: 60,000,000 points of best scores, every song and difficulty added up.",
+      "points": 50,
+      "event": "oe1_rank_11"
+    },
+    {
+      "id": 2501,
+      "title": "S Is for Spirit",
+      "description": "Ouendan: Get your first S rank.",
+      "points": 10,
+      "event": "oe1_s_1"
+    },
+    {
+      "id": 2502,
+      "title": "Sweat and Tears",
+      "description": "Ouendan: Get S ranks on 5 songs (each song on each difficulty counts once).",
+      "points": 10,
+      "event": "oe1_s_5"
+    },
+    {
+      "id": 2503,
+      "title": "Shouts in Unison",
+      "description": "Ouendan: Get S ranks on 10 songs (each song on each difficulty counts once).",
+      "points": 25,
+      "event": "oe1_s_10"
+    },
+    {
+      "id": 2504,
+      "title": "Spotless Spirit",
+      "description": "Ouendan: Get S ranks on 20 songs (each song on each difficulty counts once).",
+      "points": 50,
+      "event": "oe1_s_20"
+    },
+    {
+      "id": 2505,
+      "title": "Flawless Fighting Spirit",
+      "description": "Ouendan: Get an S rank on every song on every difficulty (60).",
+      "points": 50,
+      "event": "oe1_s_all"
+    },
+    {
+      "id": 3001,
+      "title": "Zenryoku Shounen",
+      "description": "Ouendan 2: Clear Zenryoku Shounen (Sukima Switch) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os01"
+    },
+    {
+      "id": 3002,
+      "title": "Real Life Real Heart",
+      "description": "Ouendan 2: Clear Real Life Real Heart (Kaela Kimura) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os02"
+    },
+    {
+      "id": 3003,
+      "title": "Okuru Kotoba",
+      "description": "Ouendan 2: Clear Okuru Kotoba (FLOW) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os04"
+    },
+    {
+      "id": 3004,
+      "title": "Pop Star",
+      "description": "Ouendan 2: Clear Pop Star (Ken Hirai) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os06"
+    },
+    {
+      "id": 3005,
+      "title": "Go My Way",
+      "description": "Ouendan 2: Clear Go My Way (Hitomi Yaida) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os08"
+    },
+    {
+      "id": 3006,
+      "title": "Julia ni Heartbreak",
+      "description": "Ouendan 2: Clear Julia ni Heartbreak (The Checkers) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os10"
+    },
+    {
+      "id": 3007,
+      "title": "Going Under Ground",
+      "description": "Ouendan 2: Clear Going Under Ground (VISTA) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_osb02"
+    },
+    {
+      "id": 3008,
+      "title": "Shounen Heart",
+      "description": "Ouendan 2: Clear Shounen Heart (Home Made Kazoku) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os11"
+    },
+    {
+      "id": 3009,
+      "title": "Kibun Joujou",
+      "description": "Ouendan 2: Clear Kibun Joujou (mihimaru GT) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os03"
+    },
+    {
+      "id": 3010,
+      "title": "Bambina",
+      "description": "Ouendan 2: Clear Bambina (Tomoyasu Hotei) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os07"
+    },
+    {
+      "id": 3011,
+      "title": "Bang! Bang! Vacances!",
+      "description": "Ouendan 2: Clear Bang! Bang! Vacances! (SMAP) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os14"
+    },
+    {
+      "id": 3012,
+      "title": "Believe",
+      "description": "Ouendan 2: Clear Believe (AI) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os12"
+    },
+    {
+      "id": 3013,
+      "title": "Zoku",
+      "description": "Ouendan 2: Clear Zoku (Kishidan) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os13"
+    },
+    {
+      "id": 3014,
+      "title": "Music Hour",
+      "description": "Ouendan 2: Clear Music Hour (Porno Graffitti) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os05"
+    },
+    {
+      "id": 3015,
+      "title": "Countdown",
+      "description": "Ouendan 2: Clear Countdown (HYDE) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os15a"
+    },
+    {
+      "id": 3016,
+      "title": "Sekai wa Sore o Ai to Yobundaze",
+      "description": "Ouendan 2: Clear Sekai wa Sore o Ai to Yobundaze (Sambomaster) on any difficulty.",
+      "points": 5,
+      "event": "oe2_clear_os15b"
+    },
+    {
+      "id": 3101,
+      "title": "Hajime, Round Two",
+      "description": "Ouendan 2: Open new songs on the map on Kigaru (wave 1 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_1"
+    },
+    {
+      "id": 3102,
+      "title": "Enter Shinta",
+      "description": "Ouendan 2: Open new songs on the map on Kigaru (wave 2 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_2"
+    },
+    {
+      "id": 3103,
+      "title": "Rookie Rivalry",
+      "description": "Ouendan 2: Open new songs on the map on Kigaru (wave 3 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_3"
+    },
+    {
+      "id": 3104,
+      "title": "Seeing Red",
+      "description": "Ouendan 2: Open new songs on the map on Kigaru (wave 4 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_4"
+    },
+    {
+      "id": 3105,
+      "title": "Feeling Blue",
+      "description": "Ouendan 2: Open new songs on the map on Kigaru (wave 5 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_5"
+    },
+    {
+      "id": 3106,
+      "title": "The Countdown Begins",
+      "description": "Ouendan 2: Open new songs on the map on Kigaru (wave 6 of 6).",
+      "points": 5,
+      "event": "oe2_tier_e_6"
+    },
+    {
+      "id": 3111,
+      "title": "Ryuta Returns",
+      "description": "Ouendan 2: Open new songs on the map on Kakan (wave 1 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_1"
+    },
+    {
+      "id": 3112,
+      "title": "Hayato Takes the Lead",
+      "description": "Ouendan 2: Open new songs on the map on Kakan (wave 2 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_2"
+    },
+    {
+      "id": 3113,
+      "title": "Red vs. Blue",
+      "description": "Ouendan 2: Open new songs on the map on Kakan (wave 3 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_3"
+    },
+    {
+      "id": 3114,
+      "title": "Hot Blood, Cool Heads",
+      "description": "Ouendan 2: Open new songs on the map on Kakan (wave 4 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_4"
+    },
+    {
+      "id": 3115,
+      "title": "Two Flags, One Sky",
+      "description": "Ouendan 2: Open new songs on the map on Kakan (wave 5 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_5"
+    },
+    {
+      "id": 3116,
+      "title": "T-Minus Cheer",
+      "description": "Ouendan 2: Open new songs on the map on Kakan (wave 6 of 6).",
+      "points": 5,
+      "event": "oe2_tier_n_6"
+    },
+    {
+      "id": 3121,
+      "title": "Kai Meets Kaoru",
+      "description": "Ouendan 2: Open new songs on the map on Gekiretsu (wave 1 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_1"
+    },
+    {
+      "id": 3122,
+      "title": "Battle of the Presidents",
+      "description": "Ouendan 2: Open new songs on the map on Gekiretsu (wave 2 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_2"
+    },
+    {
+      "id": 3123,
+      "title": "Clash of Squads",
+      "description": "Ouendan 2: Open new songs on the map on Gekiretsu (wave 3 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_3"
+    },
+    {
+      "id": 3124,
+      "title": "Blue Blazes",
+      "description": "Ouendan 2: Open new songs on the map on Gekiretsu (wave 4 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_4"
+    },
+    {
+      "id": 3125,
+      "title": "Red Inferno",
+      "description": "Ouendan 2: Open new songs on the map on Gekiretsu (wave 5 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_5"
+    },
+    {
+      "id": 3126,
+      "title": "Showdown Approaching",
+      "description": "Ouendan 2: Open new songs on the map on Gekiretsu (wave 6 of 6).",
+      "points": 10,
+      "event": "oe2_tier_h_6"
+    },
+    {
+      "id": 3131,
+      "title": "Girls vs. Maidens",
+      "description": "Ouendan 2: Open new songs on the map on Karei (wave 1 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_1"
+    },
+    {
+      "id": 3132,
+      "title": "Rin's Resolve",
+      "description": "Ouendan 2: Open new songs on the map on Karei (wave 2 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_2"
+    },
+    {
+      "id": 3133,
+      "title": "Honoka's Harmony",
+      "description": "Ouendan 2: Open new songs on the map on Karei (wave 3 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_3"
+    },
+    {
+      "id": 3134,
+      "title": "Reika's Rally",
+      "description": "Ouendan 2: Open new songs on the map on Karei (wave 4 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_4"
+    },
+    {
+      "id": 3135,
+      "title": "Sayaka Answers Back",
+      "description": "Ouendan 2: Open new songs on the map on Karei (wave 5 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_5"
+    },
+    {
+      "id": 3136,
+      "title": "Grace Under Pressure",
+      "description": "Ouendan 2: Open new songs on the map on Karei (wave 6 of 6).",
+      "points": 25,
+      "event": "oe2_tier_x_6"
+    },
+    {
+      "id": 3201,
+      "title": "The World Calls It Love",
+      "description": "Ouendan 2: Clear Sekai wa Sore o Ai to Yobundaze on Kigaru with Hajime and Shinta and roll the credits.",
+      "points": 25,
+      "type": "win",
+      "event": "oe2_credits_e"
+    },
+    {
+      "id": 3202,
+      "title": "Kai and Kaoru, You're Up!",
+      "description": "Ouendan 2: Clear Sekai wa Sore o Ai to Yobundaze on Kakan with Ryuta and Hayato and roll the credits, unlocking Gekiretsu, led by Kai and Kaoru.",
+      "points": 25,
+      "type": "win",
+      "event": "oe2_credits_n"
+    },
+    {
+      "id": 3203,
+      "title": "Enter the Cheer Squads",
+      "description": "Ouendan 2: Clear Sekai wa Sore o Ai to Yobundaze on Gekiretsu with Kai and Kaoru and roll the credits, unlocking Karei, led by the Cheer Girls (Sayaka, Aoi and Anna) and the Cheer Maidens (Rin, Honoka and Reika).",
+      "points": 50,
+      "type": "win",
+      "event": "oe2_credits_h"
+    },
+    {
+      "id": 3204,
+      "title": "Here Comes the Sun (Again)",
+      "description": "Ouendan 2: Clear Sekai wa Sore o Ai to Yobundaze on Karei with the Cheer Girls and the Cheer Maidens and roll the credits.",
+      "points": 50,
+      "type": "win",
+      "event": "oe2_credits_x"
+    },
+    {
+      "id": 3301,
+      "title": "Rookie Cheerer",
+      "description": "Ouendan 2: Reach overall rank 1 of 12: 400,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "oe2_rank_1"
+    },
+    {
+      "id": 3302,
+      "title": "Red or Blue?",
+      "description": "Ouendan 2: Reach overall rank 2 of 12: 1,500,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "oe2_rank_2"
+    },
+    {
+      "id": 3303,
+      "title": "Flag Bearer",
+      "description": "Ouendan 2: Reach overall rank 3 of 12: 3,000,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "oe2_rank_3"
+    },
+    {
+      "id": 3304,
+      "title": "Taiko Thunder",
+      "description": "Ouendan 2: Reach overall rank 4 of 12: 6,000,000 points of best scores, every song and difficulty added up.",
+      "points": 10,
+      "event": "oe2_rank_4"
+    },
+    {
+      "id": 3305,
+      "title": "Megaphone Maestro",
+      "description": "Ouendan 2: Reach overall rank 5 of 12: 10,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_5"
+    },
+    {
+      "id": 3306,
+      "title": "Encouraging Nobility",
+      "description": "Ouendan 2: Reach overall rank 6 of 12: 15,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_6"
+    },
+    {
+      "id": 3307,
+      "title": "Vice Captain",
+      "description": "Ouendan 2: Reach overall rank 7 of 12: 20,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_7"
+    },
+    {
+      "id": 3308,
+      "title": "Squad Captain",
+      "description": "Ouendan 2: Reach overall rank 8 of 12: 25,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_8"
+    },
+    {
+      "id": 3309,
+      "title": "Respected by Rivals",
+      "description": "Ouendan 2: Reach overall rank 9 of 12: 35,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_9"
+    },
+    {
+      "id": 3310,
+      "title": "Pride of Both Squads",
+      "description": "Ouendan 2: Reach overall rank 10 of 12: 50,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_10"
+    },
+    {
+      "id": 3311,
+      "title": "Living Legend",
+      "description": "Ouendan 2: Reach overall rank 11 of 12: 70,000,000 points of best scores, every song and difficulty added up.",
+      "points": 25,
+      "event": "oe2_rank_11"
+    },
+    {
+      "id": 3312,
+      "title": "Heart of the Ouendan",
+      "description": "Ouendan 2: Reach overall rank 12 of 12, the top rank: 100,000,000 points of best scores, every song and difficulty added up.",
+      "points": 50,
+      "event": "oe2_rank_12"
+    },
+    {
+      "id": 3401,
+      "title": "Magic Monkey My Hero",
+      "description": "Ouendan 2: Unlock the bonus song Monkey Magic (Orange Range).",
+      "points": 25,
+      "event": "oe2_bonus_osb03"
+    },
+    {
+      "id": 3402,
+      "title": "...As It Speeds You From My Life",
+      "description": "Ouendan 2: Unlock the bonus song Glamorous Sky (NANA starring Mika Nakashima).",
+      "points": 25,
+      "event": "oe2_bonus_osb01"
+    },
+    {
+      "id": 3403,
+      "title": "He Didn't Ghost You",
+      "description": "Ouendan 2: Unlock the bonus song Samurai Blue (ZZ).",
+      "points": 25,
+      "event": "oe2_bonus_os09"
+    },
+    {
+      "id": 3501,
+      "title": "Stamp of Approval",
+      "description": "Ouendan 2: Get your first S rank.",
+      "points": 10,
+      "event": "oe2_s_1"
+    },
+    {
+      "id": 3502,
+      "title": "Senpai Is Impressed",
+      "description": "Ouendan 2: Get S ranks on 5 songs (each song on each difficulty counts once).",
+      "points": 25,
+      "event": "oe2_s_5"
+    },
+    {
+      "id": 3503,
+      "title": "Synchronized Shouting",
+      "description": "Ouendan 2: Get S ranks on 10 songs (each song on each difficulty counts once).",
+      "points": 25,
+      "event": "oe2_s_10"
+    },
+    {
+      "id": 3504,
+      "title": "Sweat, Spirit and S Ranks",
+      "description": "Ouendan 2: Get S ranks on 20 songs (each song on each difficulty counts once).",
+      "points": 50,
+      "event": "oe2_s_20"
+    },
+    {
+      "id": 3505,
+      "title": "Undying Fighting Spirit",
+      "description": "Ouendan 2: Get an S rank on every song on every difficulty, bonus songs included (76).",
+      "points": 50,
+      "event": "oe2_s_all"
+    }
+  ]
+}

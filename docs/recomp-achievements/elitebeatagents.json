@@ -2,7 +2,7 @@
   "format": 1,
   "game": "elitebeatagents",
   "source": "events",
-  "console": "nds",
+  "console": "gba",
   "versions": ">=1.3.0",
   "achievements": [
     {

@@ -203,4 +203,4 @@ A game is Beaten when the credits roll on any difficulty (the *win* ones), and M
 | 502 | Sweat and Tears | Get S ranks on 5 songs (each song on each difficulty counts once). | 10 |  | `oe1_s_5` |
 | 503 | Shouts in Unison | Get S ranks on 10 songs (each song on each difficulty counts once). | 25 |  | `oe1_s_10` |
 | 504 | Spotless Spirit | Get S ranks on 20 songs (each song on each difficulty counts once). | 50 |  | `oe1_s_20` |
-| 505 | Flawless Fighting Spirit | Get an S rank on every song on every difficulty, bonus songs included (60). | 50 |  | `oe1_s_all` |
+| 505 | Flawless Fighting Spirit | Get an S rank on every song on every difficulty (60). | 50 |  | `oe1_s_all` |
