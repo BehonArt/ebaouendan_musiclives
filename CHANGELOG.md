@@ -1,9 +1,11 @@
 # Changelog
 
-## Next (unreleased)
+## v1.3.0
+
+Achievements in RecompLauncher. The games, Customs and Customs Studio are otherwise unchanged; if you have 1.2.1, update: your saves, settings, customs and charts are kept.
 
 ### New: Recomp Achievements in RecompLauncher
-Play the three games from **RecompLauncher** and they earn its own achievements: a set made for each game, **1000 points** each, with pop-ups, Beaten and Mastered, and the leaderboards, all handled by the launcher.
+Play the three games from **RecompLauncher** and they earn its own achievements: a set made for each game, **1000 points** each, with pop-ups, Beaten and Mastered, and the leaderboards, all handled by the launcher. Recomp Achievements is in RecompLauncher's beta, for its testers, for now: it reaches everyone as the launcher opens it up.
 - **Every story song you clear**, every **"New songs!"** wave on the map on each difficulty, **the credits** on each difficulty (Normal and Hard unlock the next one and its leads), each **overall rank** your scores add up to, **unlocking EBA's and Ouendan 2's bonus songs**, and **S ranks**: your first, 5, 10, 20, then every song on every difficulty.
 - **Beaten** the first time the credits roll, on any difficulty; **Mastered** with every achievement.
 - **Play your way:** the mouse, a touch screen, Tap mode, a gamepad and the assists (No-Fail too) all count.
